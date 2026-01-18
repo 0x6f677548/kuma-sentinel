@@ -132,3 +132,4 @@ dmypy.json
 # Project specific
 nmap_output_*.xml
 *.nmap
+config-test.ini

@@ -1,0 +1,1 @@
+"""Checker implementations for sentinel."""

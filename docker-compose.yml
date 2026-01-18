@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  kuma-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kuma-sentinel:latest
+    container_name: kuma-sentinel
+    
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
+    # Volume mounts for logs and data
+    volumes:
+      - ./logs:/var/log/kuma-sentinel
+      - ./data:/data
+      - ./config.ini:/etc/kuma-sentinel/config.ini:ro
+    
+    # Run in interactive mode
+    stdin_open: true
+    tty: true
+    
+    # Network (for future services like Uptime Kuma)
+    networks:
+      - kuma-network
+
+networks:
+  kuma-network:
+    driver: bridge

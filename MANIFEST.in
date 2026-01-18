@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+include example.config.ini
+recursive-include src/kuma_sentinel *.py
+recursive-include tests *.py

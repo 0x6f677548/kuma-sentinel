@@ -39,8 +39,13 @@ class Checker(ABC):
 
     def _initialize_heartbeat(self) -> None:
         """Initialize heartbeat service if enabled in config."""
+        heartbeat_enabled = self.config.get("heartbeat_enabled", False)
+        # Convert string "True"/"False" to boolean if needed
+        if isinstance(heartbeat_enabled, str):
+            heartbeat_enabled = heartbeat_enabled.lower() == "true"
+        
         if (
-            self.config.get("heartbeat_enabled")
+            heartbeat_enabled
             and self.config.get("heartbeat_token")
             and self.config.get("uptime_kuma_url")
         ):

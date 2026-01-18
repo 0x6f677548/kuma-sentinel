@@ -189,7 +189,7 @@ class PortscanCommand(Command):
                     "portscan_nmap_keep_xmloutput": cfg.portscan_nmap_keep_xmloutput,
                 }
                 checker = PortChecker(logger, checker_config)
-                result = checker.execute()
+                result = checker.execute_with_heartbeat()
 
                 # Calculate scan duration
                 scan_end = time.time()

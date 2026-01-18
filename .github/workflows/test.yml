@@ -41,4 +41,4 @@ jobs:
         uses: astral-sh/setup-uv@v3
   
       - name: Run pytest
-        run: uv run pytest
+        run: uv run --with dev pytest --cov=src/kuma_sentinel

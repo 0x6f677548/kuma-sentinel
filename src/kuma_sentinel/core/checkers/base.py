@@ -43,7 +43,7 @@ class Checker(ABC):
         # Convert string "True"/"False" to boolean if needed
         if isinstance(heartbeat_enabled, str):
             heartbeat_enabled = heartbeat_enabled.lower() == "true"
-        
+
         if (
             heartbeat_enabled
             and self.config.get("heartbeat_token")
@@ -54,6 +54,7 @@ class Checker(ABC):
                 str(self.config.get("uptime_kuma_url")),
                 str(self.config.get("heartbeat_token")),
                 self.config.get("heartbeat_interval", 300),
+                check_name=self.name,
             )
 
     @abstractmethod

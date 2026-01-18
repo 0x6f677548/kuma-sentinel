@@ -19,6 +19,7 @@ class HeartbeatService:
         uptime_kuma_url: str,
         heartbeat_token: str,
         interval: int = 300,
+        check_name: str = "Agent",
     ):
         """Initialize heartbeat service.
         Args:
@@ -26,11 +27,13 @@ class HeartbeatService:
             uptime_kuma_url: Base URL for Uptime Kuma API
             heartbeat_token: Push token for heartbeat monitor
             interval: Seconds between heartbeat pings (default: 300)
+            check_name: Name of the check being run (e.g., "PortScan")
         """
         self.logger = logger
         self.uptime_kuma_url = uptime_kuma_url
         self.heartbeat_token = heartbeat_token
         self.interval = interval
+        self.check_name = check_name
         self.stop_event = threading.Event()
         self.thread: Optional[threading.Thread] = None
 
@@ -74,10 +77,10 @@ class HeartbeatService:
 
     def _ping_loop(self) -> None:
         """Background thread loop for periodic heartbeat pings.
-        Sleeps for the configured interval, then sends a ping.
+        Sends initial ping immediately, then continues at configured intervals.
         Repeats until stop_event is set.
         """
         while not self.stop_event.is_set():
             time.sleep(self.interval)
             if not self.stop_event.is_set():
-                self.send_message("Agent check in progress...")
+                self.send_message(f"{self.check_name} check in progress...")

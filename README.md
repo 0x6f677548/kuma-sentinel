@@ -1,14 +1,51 @@
-# Kuma Sentinel
+[![PyPI - Version](https://img.shields.io/pypi/v/kuma-sentinel.svg)](https://pypi.org/project/kuma-sentinel)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kuma-sentinel.svg)](https://pypi.org/project/kuma-sentinel)
+[![Deploy to ghcr.io](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/build-and-publish-to-ghcr.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/build-and-publish-to-ghcr.yml)
+[![Deploy to PyPI](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/build-and-publish-to-pypi.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/build-and-publish-to-pypi.yml)
+[![Lint](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/lint.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/lint.yml)
+[![Test](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/test.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-sentinel/actions/workflows/test.yml)
+[![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/0x6f677548/kuma-sentinel)](https://gitmcp.io/0x6f677548/kuma-sentinel)
 
-Extensible monitoring agent with Uptime Kuma integration. Currently includes port scanning with heartbeat health monitoring.
 
-A Python CLI tool that scans specified IP ranges for open TCP ports using nmap and reports the results to Uptime Kuma with separate push tokens for heartbeat monitoring and port-scan alerts. Designed to be extended with additional monitoring checks like ZFS pools, disk space, etc.
+# Kuma-Sentinel
+
+Extensible remote monitoring CLI tool for Uptime Kuma. Monitor various system conditions and push results to Uptime Kuma push monitors.
+
+Useful for evaluating system health on remote machines and reporting back to a central Uptime Kuma instance. Currently includes port scanning capabilities with heartbeat monitoring.
+
+## Overview
+A Python CLI tool that monitors system conditions locally and reports the results to a central Uptime Kuma instance with separate push tokens for heartbeat monitoring and alerting. Install on remote machines and run via cron jobs, systemd timers, or custom services to periodically check conditions like port accessibility and system health. Currently includes port scanning capabilities (verify all ports in a range are closed, detect open ports). Designed to be extended with additional monitoring checks like ZFS pool health, disk space, system metrics, etc.
+
+## Diagram
+
+```plaintext
+┌─────────────────────┐
+│  Watchdog Machine   │
+│  (Kuma Sentinel)    │
+│                     │
+│  • Port Scanning    │
+│  • Disk Monitoring  │
+│  • ZFS Checks       │
+└──────────┬──────────┘
+           │ Push results
+           │ via HTTP
+           ▼
+┌─────────────────────┐
+│   Uptime Kuma       │
+│  (Central Server)   │
+│                     │
+│  • Monitor Status   │
+│  • Send Alerts      │
+└─────────────────────┘
+```
+
 
 ## Features
 
-- **Nmap Integration**: Powerful network scanning with configurable port ranges and timing profiles
-- **Uptime Kuma Integration**: Reports scan results and health status to Uptime Kuma monitoring
-- **Heartbeat Monitoring**: Sends periodic heartbeat pings during long scans to signal agent health and activity
+- **Remote Monitoring**: Execute monitoring checks on remote systems and push results to Uptime Kuma
+- **Port Scanning**: Scan IP ranges for open TCP ports using nmap with configurable port ranges and timing profiles
+- **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
+- **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
 - **Flexible Configuration**: Support for INI config files, environment variables, and CLI arguments with clear priority
 - **Multi-Source Configuration**:
   1. Command-line arguments (highest priority)
@@ -16,8 +53,8 @@ A Python CLI tool that scans specified IP ranges for open TCP ports using nmap a
   3. Environment variables
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
-- **Exclusion Lists**: Exclude specific IPs/ranges from scans
-- **Extensible Architecture**: Built to support additional monitoring checks beyond port scanning
+- **Exclusion Lists**: Exclude specific IPs/ranges from scans (port scanning)
+- **Extensible Architecture**: Built to support additional monitoring checks beyond port scanning (ZFS pools, disk space, etc.)
 
 ## Installation
 
@@ -102,8 +139,40 @@ docker run -it --rm `
 kuma-sentinel portscan 192.168.1.0/24 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
 ```
 
+## Use Cases
 
-### With Custom Ports and Timing
+### Network Security Monitoring
+
+Monitor ports on your local machine or network to ensure no unauthorized ports are exposed. Deploy Kuma Sentinel on your watchdog/monitoring machines and schedule it to run periodically via cron or systemd timer to push results to your central Uptime Kuma instance.
+
+**Scenario**: You have multiple machines in your infrastructure that you want to monitor for exposed ports. Your watchdog machine should periodically scan a range of machines to ensure only expected ports are open.
+
+**Traditional approach**: Set up individual TCP port monitors in Uptime Kuma for each machine/port combination, which becomes difficult to manage at scale.
+
+**With Kuma Sentinel**: Install on your watchdog machine and run a portscan check that scans your infrastructure and reports back to your central Uptime Kuma instance.
+
+**Example setup on a watchdog machine**:
+```bash
+# Deploy in Docker
+docker-compose up -d
+
+# Schedule with cron to run every 30 minutes
+*/30 * * * * kuma-sentinel portscan \
+  --exclude 192.168.1.1,192.168.1.10 \
+  --ports 22,3389,80,443 \
+  192.168.1.0/24 \
+  http://uptime-kuma-instance:3001/api/push \
+  your-heartbeat-token \
+  your-portscan-token
+```
+
+**Result**: 
+- ✅ If all scanned ports are in expected state → Uptime Kuma shows UP
+- ⚠️ If unexpected open ports are detected → Uptime Kuma shows DOWN and triggers alerts
+
+### Common Usage Examples
+
+#### With Custom Ports and Timing
 
 ```bash
 kuma-sentinel portscan \
@@ -115,7 +184,7 @@ kuma-sentinel portscan \
   your-portscan-token
 ```
 
-### Multiple IP Ranges
+#### Multiple IP Ranges
 
 ```bash
 kuma-sentinel portscan \
@@ -127,13 +196,13 @@ kuma-sentinel portscan \
   your-portscan-token
 ```
 
-### Using Configuration File
+#### Using Configuration File
 
 ```bash
 kuma-sentinel portscan --config /etc/kuma-sentinel/config.ini
 ```
 
-### With Exclusions
+#### With Exclusions
 
 ```bash
 kuma-sentinel portscan \

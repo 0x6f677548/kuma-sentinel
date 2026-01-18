@@ -173,7 +173,7 @@ def _parse_nmap_xml(logger: Logger, xml_file: str) -> List[str]:
             hosts_with_ports.append(f"{host_str}:{','.join(open_ports)}")
 
         logger.info(
-            f"✅ Parsed XML: found {len(hosts_with_ports)} hosts with " "open ports"
+            f"✅ Parsed XML: found {len(hosts_with_ports)} hosts with open ports"
         )
         return hosts_with_ports
 

@@ -74,14 +74,17 @@ class Config:
             and "KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT" in os.environ
         ):
             self.portscan_nmap_keep_xmloutput = (
-                os.environ["KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT"].lower() == "true"
+                os.environ["KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT"].lower()
+                == "true"
             )
 
         if (
             "portscan_nmap_arguments" not in self._explicitly_set
             and "KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS" in os.environ
         ):
-            self.portscan_nmap_arguments = os.environ["KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS"].split()
+            self.portscan_nmap_arguments = os.environ[
+                "KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS"
+            ].split()
 
         if (
             "heartbeat_enabled" not in self._explicitly_set
@@ -143,7 +146,9 @@ class Config:
                 self._explicitly_set.add("portscan_nmap_arguments")
 
         if parser.has_option(section, "keep_xml_output"):
-            self.portscan_nmap_keep_xmloutput = parser.getboolean(section, "keep_xml_output")
+            self.portscan_nmap_keep_xmloutput = parser.getboolean(
+                section, "keep_xml_output"
+            )
             self._explicitly_set.add("portscan_nmap_keep_xmloutput")
 
     def _load_heartbeat_config(self, parser: configparser.ConfigParser):
@@ -177,7 +182,9 @@ class Config:
         if parser.has_option(section, "ip_ranges"):
             ranges_str = parser.get(section, "ip_ranges")
             if ranges_str.strip():
-                self.portscan_ip_ranges = [r.strip() for r in ranges_str.split(",") if r.strip()]
+                self.portscan_ip_ranges = [
+                    r.strip() for r in ranges_str.split(",") if r.strip()
+                ]
                 self._explicitly_set.add("portscan_ip_ranges")
 
     def _load_uptime_kuma_config(self, parser: configparser.ConfigParser):
@@ -259,7 +266,9 @@ class Config:
             errors.append("Port scan push token not provided")
 
         if self.portscan_nmap_timing not in ["T0", "T1", "T2", "T3", "T4", "T5"]:
-            errors.append(f"Invalid timing level '{self.portscan_nmap_timing}'. Must be T0-T5")
+            errors.append(
+                f"Invalid timing level '{self.portscan_nmap_timing}'. Must be T0-T5"
+            )
 
         if errors:
             raise ValueError(
@@ -286,8 +295,14 @@ class Config:
             "log_file": self.log_file,
             "portscan_nmap_ports": self.portscan_nmap_ports,
             "portscan_nmap_timing": self.portscan_nmap_timing,
-            "portscan_nmap_arguments": self.portscan_nmap_arguments if self.portscan_nmap_arguments else "(none)",
-            "portscan_exclude_ips": self.portscan_exclude_ips if self.portscan_exclude_ips else "(none)",
+            "portscan_nmap_arguments": (
+                self.portscan_nmap_arguments
+                if self.portscan_nmap_arguments
+                else "(none)"
+            ),
+            "portscan_exclude_ips": (
+                self.portscan_exclude_ips if self.portscan_exclude_ips else "(none)"
+            ),
             "portscan_ip_ranges": ", ".join(self.portscan_ip_ranges),
             "heartbeat_enabled": self.heartbeat_enabled,
             "heartbeat_interval": f"{self.heartbeat_interval}s",

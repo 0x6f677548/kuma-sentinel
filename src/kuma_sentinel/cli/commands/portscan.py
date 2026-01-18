@@ -139,22 +139,20 @@ class PortscanCommand(Command):
             logger.info(f"   IP Ranges: {config_summary['portscan_ip_ranges']}")
             logger.info("🔔 Uptime Kuma Integration:")
             logger.info(f"   URL: {config_summary['uptime_kuma_url']}")
+            logger.info(f"   Heartbeat Enabled: {config_summary['heartbeat_enabled']}")
             logger.info(
-                f"   Heartbeat Enabled: " f"{config_summary['heartbeat_enabled']}"
+                f"   Heartbeat Interval: {config_summary['heartbeat_interval']}"
             )
             logger.info(
-                f"   Heartbeat Interval: " f"{config_summary['heartbeat_interval']}"
+                f"   Heartbeat Token: {config_summary['heartbeat_token']} (masked)"
             )
             logger.info(
-                f"   Heartbeat Token: " f"{config_summary['heartbeat_token']} (masked)"
-            )
-            logger.info(
-                f"   Port-Scan Token: " f"{config_summary['portscan_token']} (masked)"
+                f"   Port-Scan Token: {config_summary['portscan_token']} (masked)"
             )
             logger.info("📂 Logging:")
             logger.info(f"   Log File: {config_summary['log_file']}")
             logger.info(
-                f"   Keep XML Output: " f"{config_summary['portscan_nmap_keep_xmloutput']}"
+                f"   Keep XML Output: {config_summary['portscan_nmap_keep_xmloutput']}"
             )
             logger.info("=" * 70)
 

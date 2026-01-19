@@ -5,10 +5,7 @@ from importlib.metadata import version
 import click
 
 __version__ = version("kuma-sentinel")
-from kuma_sentinel.cli.commands.kopiasnapshotstatus import (
-    KopiaSnapshotStatusCommand,
-)
-from kuma_sentinel.cli.commands.portscan import PortscanCommand
+from kuma_sentinel.cli.commands import _COMMAND_REGISTRY
 
 
 def print_version(ctx, param, value):
@@ -38,12 +35,16 @@ def cli(ctx: click.Context):
     ctx.ensure_object(dict)
 
 
-# Register commands
-portscan_cmd = PortscanCommand()
-cli.add_command(portscan_cmd.register_command())
+# Register commands at function definition time (deferred until cli is actually invoked)
+def _register_commands():
+    """Register all commands from the registry."""
+    for _, command_class in sorted(_COMMAND_REGISTRY.items()):
+        cmd_instance = command_class()
+        cli.add_command(cmd_instance.register_command())
 
-kopiasnapshotstatus_cmd = KopiaSnapshotStatusCommand()
-cli.add_command(kopiasnapshotstatus_cmd.register_command())
+
+# Call registration
+_register_commands()
 
 
 if __name__ == "__main__":

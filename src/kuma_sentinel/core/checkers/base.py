@@ -2,8 +2,9 @@
 
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import Any, Dict, Optional
+from typing import Optional
 
+from kuma_sentinel.core.config.base import ConfigBase
 from kuma_sentinel.core.heartbeat import HeartbeatService
 from kuma_sentinel.core.models import CheckResult
 
@@ -19,12 +20,12 @@ class Checker(ABC):
     name: str = ""  # e.g., "portscan"
     description: str = ""  # e.g., "Scans TCP ports on target ranges"
 
-    def __init__(self, logger: Logger, config: Dict[str, Any]):
+    def __init__(self, logger: Logger, config: ConfigBase):
         """Initialize the checker.
 
         Args:
             logger: Logger instance for output
-            config: Configuration dictionary for this check
+            config: Configuration object for this check
         """
         if not self.name:
             raise ValueError(f"Checker {self.__class__.__name__} must define 'name'")
@@ -39,21 +40,21 @@ class Checker(ABC):
 
     def _initialize_heartbeat(self) -> None:
         """Initialize heartbeat service if enabled in config."""
-        heartbeat_enabled = self.config.get("heartbeat_enabled", False)
+        heartbeat_enabled = self.config.heartbeat_enabled
+        heartbeat_token = self.config.heartbeat_token
+        uptime_kuma_url = self.config.uptime_kuma_url
+        heartbeat_interval = self.config.heartbeat_interval
+
         # Convert string "True"/"False" to boolean if needed
         if isinstance(heartbeat_enabled, str):
             heartbeat_enabled = heartbeat_enabled.lower() == "true"
 
-        if (
-            heartbeat_enabled
-            and self.config.get("heartbeat_token")
-            and self.config.get("uptime_kuma_url")
-        ):
+        if heartbeat_enabled and heartbeat_token and uptime_kuma_url:
             self.heartbeat = HeartbeatService(
                 self.logger,
-                str(self.config.get("uptime_kuma_url")),
-                str(self.config.get("heartbeat_token")),
-                self.config.get("heartbeat_interval", 300),
+                str(uptime_kuma_url),
+                str(heartbeat_token),
+                heartbeat_interval,
                 check_name=self.name,
             )
 
@@ -69,7 +70,8 @@ class Checker(ABC):
     def execute_with_heartbeat(self) -> CheckResult:
         """Execute check with automatic heartbeat management.
 
-        Starts heartbeat before execution and stops it afterward.
+        Sends heartbeat at start and end (with duration), starts the service
+        before execution and stops it afterward.
 
         Returns:
             CheckResult from the check execution
@@ -79,7 +81,16 @@ class Checker(ABC):
                 self.heartbeat.send_message(f"{self.name} check starting...")
                 self.heartbeat.start()
 
-            return self.execute()
+            result = self.execute()
+
+            # Send end message with result and duration
+            if self.heartbeat:
+                status_emoji = "✅" if result.status == "up" else "❌"
+                self.heartbeat.send_message(
+                    f"{status_emoji} {self.name} check completed in {result.duration_seconds}s: {result.message}"
+                )
+
+            return result
         finally:
             if self.heartbeat:
                 self.heartbeat.stop()

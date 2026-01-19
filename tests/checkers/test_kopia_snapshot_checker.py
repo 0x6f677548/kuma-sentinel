@@ -11,6 +11,7 @@ from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
     _parse_snapshot_timestamp,
     _run_kopia_command,
 )
+from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 from kuma_sentinel.core.models import CheckResult
 
 
@@ -351,13 +352,11 @@ class TestKopiaSnapshotChecker:
             (12.0, metadata2),
         ]  # Two fresh snapshots
 
-        config = {
-            "kopiasnapshotstatus_snapshot_paths": ["/data", "/backups"],
-            "kopiasnapshotstatus_max_age_hours": 24,
-            "uptime_kuma_token": "test-token",
-            "uptime_kuma_server": "http://localhost:3001",
-            "heartbeat_enabled": False,
-        }
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
 
         logger = MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
@@ -379,13 +378,11 @@ class TestKopiaSnapshotChecker:
             (48.0, self.create_metadata()),
         ]  # Second is too old
 
-        config = {
-            "kopiasnapshotstatus_snapshot_paths": ["/data", "/backups"],
-            "kopiasnapshotstatus_max_age_hours": 24,
-            "uptime_kuma_token": "test-token",
-            "uptime_kuma_server": "http://localhost:3001",
-            "heartbeat_enabled": False,
-        }
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
 
         logger = MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
@@ -402,13 +399,11 @@ class TestKopiaSnapshotChecker:
         metadata1 = self.create_metadata()
         mock_age.side_effect = [(5.0, metadata1), (None, None)]  # Second fails
 
-        config = {
-            "kopiasnapshotstatus_snapshot_paths": ["/data", "/backups"],
-            "kopiasnapshotstatus_max_age_hours": 24,
-            "uptime_kuma_token": "test-token",
-            "uptime_kuma_server": "http://localhost:3001",
-            "heartbeat_enabled": False,
-        }
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
 
         logger = MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
@@ -419,13 +414,11 @@ class TestKopiaSnapshotChecker:
 
     def test_execute_no_paths_configured(self):
         """Test execution with no snapshot paths configured."""
-        config = {
-            "kopiasnapshotstatus_snapshot_paths": [],
-            "kopiasnapshotstatus_max_age_hours": 24,
-            "uptime_kuma_token": "test-token",
-            "uptime_kuma_server": "http://localhost:3001",
-            "heartbeat_enabled": False,
-        }
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshot_paths = []
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
 
         logger = MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
@@ -442,13 +435,11 @@ class TestKopiaSnapshotChecker:
         metadata = self.create_metadata()
         mock_age.return_value = (10.0, metadata)
 
-        config = {
-            "kopiasnapshotstatus_snapshot_paths": ["/data"],
-            "kopiasnapshotstatus_max_age_hours": 24,
-            "uptime_kuma_token": "test-token",
-            "uptime_kuma_server": "http://localhost:3001",
-            "heartbeat_enabled": False,
-        }
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshot_paths = ["/data"]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
 
         logger = MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)

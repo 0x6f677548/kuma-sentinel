@@ -189,10 +189,9 @@ class KopiaSnapshotChecker(Checker):
         try:
             self.logger.info("🔍 Starting Kopia snapshot status check")
 
-            # Get snapshot paths from config
-            snapshot_paths = self.config.get("kopiasnapshotstatus_snapshot_paths", [])
-
-            max_age_hours = self.config.get("kopiasnapshotstatus_max_age_hours", 24)
+            # Get snapshot paths from config - type: ignore since KopiaSnapshotChecker expects KopiaSnapshotConfig
+            snapshot_paths = self.config.kopiasnapshotstatus_snapshot_paths or []  # type: ignore
+            max_age_hours = self.config.kopiasnapshotstatus_max_age_hours  # type: ignore
 
             if not snapshot_paths:
                 self.logger.error("❌ No snapshot paths configured")

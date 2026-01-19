@@ -7,7 +7,7 @@ name = "kuma-sentinel"
 version = "0.0.2"
 description = "Extensible monitoring agent with Uptime Kuma integration. Includes port scanning with heartbeat monitoring."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Hugo Batista", email = "mail@hugobatista.com" }
@@ -22,9 +22,6 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -42,6 +39,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 
 [project.urls]
@@ -108,6 +106,15 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["kuma_sentinel"]
 
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
@@ -120,13 +127,16 @@ dependencies = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 
 [tool.hatch.envs.default.scripts]
+test = "pytest"
 lint = "ruff check src tests"
 format = "black src tests"
 format-check = "black --check src tests"
 check = [
     "ruff check src tests",
     "black --check src tests",
+    "mypy src tests",
 ]

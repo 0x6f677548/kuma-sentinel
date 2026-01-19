@@ -11,39 +11,48 @@
 
 Extensible remote monitoring CLI tool for Uptime Kuma. Monitor various system conditions and push results to Uptime Kuma push monitors.
 
-Useful for evaluating system health on remote machines and reporting back to a central Uptime Kuma instance. Currently includes port scanning capabilities with heartbeat monitoring.
+Useful for evaluating system health on remote machines and reporting back to a central Uptime Kuma instance. Currently includes:
+- **Port scanning** - Scan TCP ports across IP ranges using nmap
+- **Backup monitoring** - Check Kopia snapshot freshness and status
 
 ## Overview
-A Python CLI tool that monitors system conditions locally and reports the results to a central Uptime Kuma instance with separate push tokens for heartbeat monitoring and alerting. Install on remote machines and run via cron jobs, systemd timers, or custom services to periodically check conditions like port accessibility and system health. Currently includes port scanning capabilities (verify all ports in a range are closed, detect open ports). Designed to be extended with additional monitoring checks like ZFS pool health, disk space, system metrics, etc.
+A Python CLI tool that monitors system conditions locally and reports the results to a central Uptime Kuma instance with separate push tokens for heartbeat monitoring and alerting. Install on remote machines and run via cron jobs, systemd timers, or custom services to periodically check conditions like:
+- **Port accessibility** - Verify expected ports are open/closed, detect exposed ports
+- **Backup freshness** - Monitor Kopia snapshot age and completeness
+- **System health** - Extensible design supports additional checks (ZFS pools, disk space, etc.)
+
+Designed to be extended with additional monitoring checks and custom checkers.
 
 ## Diagram
 
 ```plaintext
-┌─────────────────────┐
-│  Watchdog Machine   │
-│  (Kuma Sentinel)    │
-│                     │
-│  • Port Scanning    │
-│  • Disk Monitoring  │
-│  • ZFS Checks       │
-└──────────┬──────────┘
-           │ Push results
-           │ via HTTP
-           ▼
-┌─────────────────────┐
-│   Uptime Kuma       │
-│  (Central Server)   │
-│                     │
-│  • Monitor Status   │
-│  • Send Alerts      │
-└─────────────────────┘
+┌─────────────────────────────┐
+│   Monitoring Machine        │
+│   (Kuma Sentinel)           │
+│                             │
+│  • Port Scanning (nmap)     │
+│  • Backup Monitoring (Kopia)│
+│  • Custom Checks (extensible)
+└────────────┬────────────────┘
+             │ Push results
+             │ via HTTP
+             ▼
+┌─────────────────────────────┐
+│     Uptime Kuma             │
+│   (Central Server)          │
+│                             │
+│  • Monitor Status           │
+│  • Send Alerts              │
+│  • Track Metrics            │
+└─────────────────────────────┘
 ```
 
 
 ## Features
 
 - **Remote Monitoring**: Execute monitoring checks on remote systems and push results to Uptime Kuma
-- **Port Scanning**: Scan IP ranges for open TCP ports using nmap with configurable port ranges and timing profiles
+- **Port Scanning**: Scan TCP ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
+- **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
 - **Flexible Configuration**: Support for INI config files, environment variables, and CLI arguments with clear priority
@@ -53,8 +62,7 @@ A Python CLI tool that monitors system conditions locally and reports the result
   3. Environment variables
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
-- **Exclusion Lists**: Exclude specific IPs/ranges from scans (port scanning)
-- **Extensible Architecture**: Built to support additional monitoring checks beyond port scanning (ZFS pools, disk space, etc.)
+- **Extensible Architecture**: Built to support additional monitoring checks (ZFS pools, disk space, system metrics, etc.)
 
 ## Installation
 
@@ -293,6 +301,7 @@ token = your-kopia-token
 timing = T3
 arguments = 
 keep_xml_output = false
+timeout = 3600
 
 [portscan.targets]
 ports = 1-1000
@@ -307,15 +316,29 @@ max_age_hours = 24
 ### Environment Variables
 
 ```bash
+# Logging
 KUMA_SENTINEL_LOG_FILE=/var/log/kuma-sentinel.log
+
+# Heartbeat (shared across all commands)
 KUMA_SENTINEL_HEARTBEAT_ENABLED=true
 KUMA_SENTINEL_HEARTBEAT_INTERVAL=300
-KUMA_SENTINEL_NMAP_PORTS=1-1000
-KUMA_SENTINEL_NMAP_TIMING=T3
-KUMA_SENTINEL_NMAP_EXCLUDE_IPS=192.168.1.1
-KUMA_SENTINEL_NMAP_ARGUMENTS=--script vuln
-KUMA_SENTINEL_NMAP_KEEP_XMLOUTPUT=false
+KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
+
+# Port Scan Command
+KUMA_SENTINEL_PORTSCAN_NMAP_PORTS=1-1000
+KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T3
+KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT=3600
+KUMA_SENTINEL_PORTSCAN_EXCLUDE_IPS=192.168.1.1
+KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS=--script vuln
+KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT=false
+KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
+
+# Kopia Snapshot Status Command
+KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
+KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ```
+
+**Configuration Priority**: CLI arguments > INI file > Environment variables > Defaults
 
 ### CLI Arguments
 
@@ -424,13 +447,18 @@ Example log output:
 
 ## Requirements
 
-- Python 3.7+
-- nmap (must be installed on system and in PATH)
+- Python 3.10+
 - click (installed automatically)
+
+**Per-Command Requirements:**
+- **portscan**: nmap (must be installed on system and in PATH)
+- **kopiasnapshotstatus**: Kopia backup tool (must be installed and configured on system)
 
 ## Development
 
-### Setup
+For detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+### Quick Setup
 
 ```bash
 git clone https://go.hugobatista.com/gh/kuma-sentinel.git
@@ -438,28 +466,26 @@ cd kuma-sentinel
 pip install -e ".[dev]"
 ```
 
-### Running Tests
+### Quick Commands
 
+**Run tests:**
 ```bash
 pytest
 pytest --cov=src/kuma_sentinel
 pytest -v
 ```
 
-### Code Quality
-
+**Code quality checks:**
 ```bash
-# Lint with ruff
+hatch run check  # Run ruff, black, and mypy
 ruff check src/ tests/
-
-# Format with black
 black src/ tests/
-
-# Fix linting issues
-ruff check --fix src/ tests/
+mypy src/ tests/
 ```
 
 ### Building Package
+
+See [DEVELOPMENT.md](DEVELOPMENT.md#building-the-package) for package build instructions.
 
 ```bash
 python -m pip install build
@@ -476,13 +502,13 @@ Hugo Batista - [GitHub](https://go.hugobatista.com/gh)
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! See [DEVELOPMENT.md](DEVELOPMENT.md) for development setup and guidelines.
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests for new functionality
-5. Run tests and linting
+5. Run tests and linting: `hatch run check`
 6. Submit a pull request
 
 ## Issues

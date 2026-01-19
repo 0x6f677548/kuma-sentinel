@@ -139,6 +139,20 @@ docker run -it --rm `
 kuma-sentinel portscan 192.168.1.0/24 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
 ```
 
+### Kopia Snapshot Status
+
+```bash
+kuma-sentinel kopiasnapshotstatus /data /backups http://uptimekuma:3001/api/push your-kopia-token
+```
+
+Monitor multiple snapshot paths:
+```bash
+kuma-sentinel kopiasnapshotstatus /data /backups /archives \
+  --max-age-hours 24 \
+  http://uptimekuma:3001/api/push \
+  your-kopia-token
+```
+
 ## Use Cases
 
 ### Network Security Monitoring
@@ -169,6 +183,34 @@ docker-compose up -d
 **Result**: 
 - ✅ If all scanned ports are in expected state → Uptime Kuma shows UP
 - ⚠️ If unexpected open ports are detected → Uptime Kuma shows DOWN and triggers alerts
+
+### Backup Monitoring
+
+Monitor Kopia backup snapshot freshness across multiple backup paths. Ensure your backups are running on schedule and alert if backups become stale.
+
+**Scenario**: You have multiple critical data paths being backed up with Kopia, and you need to ensure backups complete regularly without manual intervention.
+
+**Traditional approach**: Manually check backup timestamps or SSH into the machine to verify backup age.
+
+**With Kuma Sentinel**: Deploy on your backup server and run periodic Kopia snapshot status checks that report to Uptime Kuma.
+
+**Example setup on a backup server**:
+```bash
+# Deploy in Docker
+docker-compose up -d
+
+# Schedule with cron to run every 6 hours
+0 */6 * * * kuma-sentinel kopiasnapshotstatus \
+  --max-age-hours 24 \
+  /data /backups /archives \
+  http://uptime-kuma-instance:3001/api/push \
+  your-kopia-token
+```
+
+**Result**:
+- ✅ If all snapshots are fresh (less than 24 hours old) → Uptime Kuma shows UP
+- ⚠️ If any snapshot is stale or missing → Uptime Kuma shows DOWN and triggers alerts
+- 📊 Details include age of each snapshot for visibility
 
 ### Common Usage Examples
 
@@ -218,6 +260,7 @@ kuma-sentinel portscan \
 ```bash
 kuma-sentinel --help
 kuma-sentinel portscan --help
+kuma-sentinel kopiasnapshotstatus --help
 ```
 
 ## Configuration
@@ -236,8 +279,15 @@ interval = 300
 
 [uptime_kuma]
 url = http://uptimekuma:3001/api/push
-heartbeat_token = your-heartbeat-token
-portscan_token = your-portscan-token
+
+[heartbeat.uptime_kuma]
+token = your-heartbeat-token
+
+[portscan.uptime_kuma]
+token = your-portscan-token
+
+[kopiasnapshotstatus.uptime_kuma]
+token = your-kopia-token
 
 [portscan.nmap]
 timing = T3
@@ -248,6 +298,10 @@ keep_xml_output = false
 ports = 1-1000
 exclude_ips = 192.168.1.1,192.168.1.254
 ip_ranges = 192.168.1.0/24,10.0.0.0/8
+
+[kopiasnapshotstatus.targets]
+snapshot_paths = /data,/backups
+max_age_hours = 24
 ```
 
 ### Environment Variables

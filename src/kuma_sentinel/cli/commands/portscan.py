@@ -11,7 +11,7 @@ from kuma_sentinel.cli.commands.base import Command
 from kuma_sentinel.core.checkers.port_checker import PortChecker
 from kuma_sentinel.core.config import DEFAULT_CONFIG_PATH, Config
 from kuma_sentinel.core.logger import setup_logging
-from kuma_sentinel.core.uptime_kuma import send_heartbeat, send_port_alert
+from kuma_sentinel.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
 
 
 class PortscanCommand(Command):
@@ -167,11 +167,12 @@ class PortscanCommand(Command):
             logger.info("🔍 Starting port scan")
 
             # Send initial heartbeat
-            send_heartbeat(
+            send_push(
                 logger,
                 cfg.uptime_kuma_url,
                 cfg.heartbeat_token,
-                f"Port scan starting for ranges: {', '.join(cfg.portscan_ip_ranges)}",
+                f"portscan starting for ranges: {', '.join(cfg.portscan_ip_ranges)}",
+                command="portscan",
             )
 
             try:
@@ -197,20 +198,23 @@ class PortscanCommand(Command):
                 scan_minutes = scan_duration // 60
 
                 # Send final heartbeat
-                send_heartbeat(
+                send_push(
                     logger,
                     cfg.uptime_kuma_url,
                     cfg.heartbeat_token,
-                    f"Scan complete after {scan_minutes} minutes",
+                    f"portscan complete after {scan_minutes} minutes",
+                    command="portscan",
                 )
 
                 # Send port alert based on result
-                send_port_alert(
+                send_push(
                     logger,
                     cfg.uptime_kuma_url,
                     cfg.portscan_token,
-                    result.status,
                     f"{result.message} ({scan_minutes}m)",
+                    command="portscan",
+                    status=result.status,
+                    timeout=PUSH_TIMEOUT_ALERT,
                 )
 
                 logger.info(f"✅ Port scan complete ({scan_minutes}m)")
@@ -218,12 +222,14 @@ class PortscanCommand(Command):
 
             except Exception as e:
                 logger.error(f"❌ Unexpected error: {str(e)}")
-                send_port_alert(
+                send_push(
                     logger,
                     cfg.uptime_kuma_url,
                     cfg.portscan_token,
-                    "down",
                     f"Port scan error: {str(e)}",
+                    command="portscan",
+                    status="down",
+                    timeout=PUSH_TIMEOUT_ALERT,
                 )
                 sys.exit(1)
 

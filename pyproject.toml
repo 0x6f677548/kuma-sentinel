@@ -53,6 +53,12 @@ Issues = "https://go.hugobatista.com/gh/kuma-sentinel/issues"
 [project.scripts]
 kuma-sentinel = "kuma_sentinel.cli.app:cli"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/kuma_sentinel"]
+
+[tool.setuptools.package-data]
+kuma_sentinel = ["py.typed"]
+
 [tool.black]
 line-length = 88
 target-version = ["py37", "py38", "py39", "py310", "py311", "py312"]
@@ -107,3 +113,20 @@ minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-ra --strict-markers --cov=src/kuma_sentinel --cov-report=html --cov-report=term-missing"
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.hatch.envs.default.scripts]
+lint = "ruff check src tests"
+format = "black src tests"
+format-check = "black --check src tests"
+check = [
+    "ruff check src tests",
+    "black --check src tests",
+]

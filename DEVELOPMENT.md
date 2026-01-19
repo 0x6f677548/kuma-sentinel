@@ -60,6 +60,12 @@ uv run black src/ tests/
 
 # Check if formatting is needed
 uv run black --check src/ tests/
+
+# Or use hatch scripts for convenience
+hatch run lint          # Run ruff linter
+hatch run format        # Format with black
+hatch run format-check  # Check formatting without modifying
+hatch run check         # Run both ruff and black checks
 ```
 
 ### Building the Package

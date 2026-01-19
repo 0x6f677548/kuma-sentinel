@@ -4,6 +4,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from logging import Logger
+from typing import Optional
+
+# Timeout constants for different push types
+PUSH_TIMEOUT_HEARTBEAT = 5
+PUSH_TIMEOUT_ALERT = 10
 
 
 def url_encode(msg: str) -> str:
@@ -11,68 +16,52 @@ def url_encode(msg: str) -> str:
     return urllib.parse.quote(msg)
 
 
-def send_heartbeat(
-    logger: Logger, uptime_kuma_url: str, push_token: str, message: str
+def send_push(
+    logger: Logger,
+    uptime_kuma_url: Optional[str],
+    push_token: Optional[str],
+    message: str,
+    command: str,
+    status: str = "up",
+    timeout: int = PUSH_TIMEOUT_HEARTBEAT,
 ) -> bool:
-    """Send heartbeat ping to Uptime Kuma.
+    """Send a generic push notification to Uptime Kuma.
 
     Args:
         logger: Logger instance
         uptime_kuma_url: Base URL for Uptime Kuma API
-        push_token: Push token for heartbeat monitor
-        message: Heartbeat message
+        push_token: Push token for the monitor
+        message: Notification message
+        command: Command/check name (e.g., "portscan", "kopiasnapshotstatus")
+        status: Status to report (default: "up")
+        timeout: Request timeout in seconds
 
     Returns:
         True if successful, False otherwise
     """
-    try:
-        encoded_msg = url_encode(message)
-        push_url = f"{uptime_kuma_url}/{push_token}?status=up&msg={encoded_msg}"
-
-        with urllib.request.urlopen(push_url, timeout=5) as response:
-            data = response.read().decode()
-            if '{"ok":true}' in data:
-                logger.info(f"✅ Heartbeat sent: {message}")
-                return True
-            else:
-                logger.warning(f"⚠️  Heartbeat failed to send: {data}")
-                return False
-    except Exception as e:
-        logger.warning(f"⚠️  Heartbeat failed to send: {str(e)}")
+    # Validate required parameters
+    if not uptime_kuma_url:
+        logger.warning(
+            f"⚠️  Cannot send {command} push: Uptime Kuma URL not configured"
+        )
         return False
 
+    if not push_token:
+        logger.warning(f"⚠️  Cannot send {command} push: push token not configured")
+        return False
 
-# Backward compatibility alias
-send_keepalive = send_heartbeat
-
-
-def send_port_alert(
-    logger: Logger, uptime_kuma_url: str, push_token: str, status: str, message: str
-) -> bool:
-    """Send port scan alert to Uptime Kuma.
-
-    Args:
-        logger: Logger instance
-        uptime_kuma_url: Base URL for Uptime Kuma API
-        push_token: Push token for port-scan alert monitor
-        status: Status to report (up/down)
-        message: Alert message
-
-    Returns:
-        True if successful, False otherwise
-    """
     try:
         encoded_msg = url_encode(message)
         push_url = f"{uptime_kuma_url}/{push_token}?status={status}&msg={encoded_msg}"
 
-        with urllib.request.urlopen(push_url, timeout=10) as response:
+        with urllib.request.urlopen(push_url, timeout=timeout) as response:
             data = response.read().decode()
             if '{"ok":true}' in data:
-                logger.info(f"✅ Port alert sent ({status}): {message}")
+                logger.info(f"✅ {command} push sent ({status}): {message}")
                 return True
             else:
-                logger.error(f"❌ Port alert failed: {data}")
+                logger.error(f"❌ {command} push failed: {data}")
                 return False
     except Exception as e:
-        logger.error(f"❌ Port alert failed: {str(e)}")
+        logger.error(f"❌ {command} push failed: {str(e)}")
         return False

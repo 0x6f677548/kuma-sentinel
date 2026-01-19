@@ -5,6 +5,9 @@ from importlib.metadata import version
 import click
 
 __version__ = version("kuma-sentinel")
+from kuma_sentinel.cli.commands.kopiasnapshotstatus import (
+    KopiaSnapshotStatusCommand,
+)
 from kuma_sentinel.cli.commands.portscan import PortscanCommand
 
 
@@ -38,6 +41,9 @@ def cli(ctx: click.Context):
 # Register commands
 portscan_cmd = PortscanCommand()
 cli.add_command(portscan_cmd.register_command())
+
+kopiasnapshotstatus_cmd = KopiaSnapshotStatusCommand()
+cli.add_command(kopiasnapshotstatus_cmd.register_command())
 
 
 if __name__ == "__main__":

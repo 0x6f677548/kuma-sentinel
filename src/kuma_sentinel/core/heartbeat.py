@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Optional
 
-from kuma_sentinel.core.uptime_kuma import send_heartbeat
+from kuma_sentinel.core.uptime_kuma import send_push
 
 
 class HeartbeatService:
@@ -68,11 +68,12 @@ class HeartbeatService:
         Returns:
             True if ping was successful, False otherwise
         """
-        return send_heartbeat(
+        return send_push(
             self.logger,
             self.uptime_kuma_url,
             self.heartbeat_token,
             message,
+            command="heartbeat",
         )
 
     def _ping_loop(self) -> None:

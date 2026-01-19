@@ -13,6 +13,7 @@ DEFAULT_PORTSCAN_NMAP_ARGUMENTS: List[str] = []
 DEFAULT_HEARTBEAT_ENABLED = True
 DEFAULT_HEARTBEAT_INTERVAL = 300
 DEFAULT_PORTSCAN_NMAP_TIMEOUT = 3600  # seconds
+DEFAULT_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS = 24
 
 
 class Config:
@@ -32,6 +33,11 @@ class Config:
         self.heartbeat_token: Optional[str] = None
         self.portscan_token: Optional[str] = None
         self.portscan_nmap_keep_xmloutput = False
+        self.kopiasnapshotstatus_snapshot_paths: List[str] = []
+        self.kopiasnapshotstatus_max_age_hours = (
+            DEFAULT_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS
+        )
+        self.kopiasnapshotstatus_token: Optional[str] = None
         # Track which values were explicitly set (not from defaults)
         self._explicitly_set: Set[str] = set()
 
@@ -94,6 +100,22 @@ class Config:
                 os.environ["KUMA_SENTINEL_HEARTBEAT_ENABLED"].lower() == "true"
             )
 
+        if (
+            "kopiasnapshotstatus_max_age_hours" not in self._explicitly_set
+            and "KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS" in os.environ
+        ):
+            self.kopiasnapshotstatus_max_age_hours = int(
+                os.environ["KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS"]
+            )
+
+        if (
+            "kopiasnapshotstatus_token" not in self._explicitly_set
+            and "KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN" in os.environ
+        ):
+            self.kopiasnapshotstatus_token = os.environ[
+                "KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN"
+            ]
+
     def load_from_ini(self, config_file: str):
         """Load configuration from INI file.
 
@@ -113,6 +135,7 @@ class Config:
             self._load_heartbeat_config(parser)
             self._load_targets_config(parser)
             self._load_uptime_kuma_config(parser)
+            self._load_kopiasnapshotstatus_config(parser)
 
         except FileNotFoundError as e:
             raise FileNotFoundError(
@@ -190,20 +213,50 @@ class Config:
     def _load_uptime_kuma_config(self, parser: configparser.ConfigParser):
         """Load uptime kuma configuration from INI."""
         section = "uptime_kuma"
-        if not parser.has_section(section):
-            return
-
-        if parser.has_option(section, "url"):
+        if parser.has_section(section) and parser.has_option(section, "url"):
             self.uptime_kuma_url = parser.get(section, "url")
             self._explicitly_set.add("uptime_kuma_url")
 
-        if parser.has_option(section, "heartbeat_token"):
-            self.heartbeat_token = parser.get(section, "heartbeat_token")
+        # Load command-specific tokens from dedicated sections
+        if parser.has_section("heartbeat.uptime_kuma") and parser.has_option(
+            "heartbeat.uptime_kuma", "token"
+        ):
+            self.heartbeat_token = parser.get("heartbeat.uptime_kuma", "token")
             self._explicitly_set.add("heartbeat_token")
 
-        if parser.has_option(section, "portscan_token"):
-            self.portscan_token = parser.get(section, "portscan_token")
+        if parser.has_section("portscan.uptime_kuma") and parser.has_option(
+            "portscan.uptime_kuma", "token"
+        ):
+            self.portscan_token = parser.get("portscan.uptime_kuma", "token")
             self._explicitly_set.add("portscan_token")
+
+        if parser.has_section("kopiasnapshotstatus.uptime_kuma") and parser.has_option(
+            "kopiasnapshotstatus.uptime_kuma", "token"
+        ):
+            self.kopiasnapshotstatus_token = parser.get(
+                "kopiasnapshotstatus.uptime_kuma", "token"
+            )
+            self._explicitly_set.add("kopiasnapshotstatus_token")
+
+    def _load_kopiasnapshotstatus_config(self, parser: configparser.ConfigParser):
+        """Load kopia snapshot status configuration from INI."""
+        section = "kopiasnapshotstatus.targets"
+        if not parser.has_section(section):
+            return
+
+        if parser.has_option(section, "snapshot_paths"):
+            paths_str = parser.get(section, "snapshot_paths")
+            if paths_str.strip():
+                self.kopiasnapshotstatus_snapshot_paths = [
+                    p.strip() for p in paths_str.split(",") if p.strip()
+                ]
+                self._explicitly_set.add("kopiasnapshotstatus_snapshot_paths")
+
+        if parser.has_option(section, "max_age_hours"):
+            self.kopiasnapshotstatus_max_age_hours = parser.getint(
+                section, "max_age_hours"
+            )
+            self._explicitly_set.add("kopiasnapshotstatus_max_age_hours")
 
     def load_from_args(self, args):
         """Load configuration from command-line arguments.
@@ -310,4 +363,13 @@ class Config:
             "heartbeat_token": heartbeat_tok,
             "portscan_token": portscan_tok,
             "portscan_nmap_keep_xmloutput": self.portscan_nmap_keep_xmloutput,
+            "kopiasnapshotstatus_snapshot_paths": ", ".join(
+                self.kopiasnapshotstatus_snapshot_paths
+            ),
+            "kopiasnapshotstatus_max_age_hours": self.kopiasnapshotstatus_max_age_hours,
+            "kopiasnapshotstatus_token": (
+                "***"
+                if mask_tokens and self.kopiasnapshotstatus_token
+                else self.kopiasnapshotstatus_token
+            ),
         }

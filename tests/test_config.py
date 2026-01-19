@@ -40,8 +40,12 @@ interval = 600
 
 [uptime_kuma]
 url = http://localhost/api/push
-heartbeat_token = test_heartbeat
-portscan_token = test_portscan
+
+[heartbeat.uptime_kuma]
+token = test_heartbeat
+
+[portscan.uptime_kuma]
+token = test_portscan
 
 [portscan.nmap]
 timing = T2

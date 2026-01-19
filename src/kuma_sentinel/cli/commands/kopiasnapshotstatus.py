@@ -1,199 +1,114 @@
 """Kopia snapshot status monitoring command."""
 
-import os
-import sys
-import time
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import click
 
-from kuma_sentinel.cli.commands.base import Command
+from kuma_sentinel.cli.commands.executor import CommandExecutor, CommandMetadata
 from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
     KopiaSnapshotChecker,
 )
-from kuma_sentinel.core.config import DEFAULT_CONFIG_PATH, Config
-from kuma_sentinel.core.logger import setup_logging
-from kuma_sentinel.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
+from kuma_sentinel.core.config import Config
 
 
-class KopiaSnapshotStatusCommand(Command):
-    """Kopia snapshot status monitoring command."""
+class KopiaSnapshotStatusCommand(CommandExecutor):
+    """Kopia snapshot status monitoring command using unified executor."""
 
-    def register_command(self) -> click.Command:
-        """Register the kopiasnapshotstatus command."""
+    def get_metadata(self) -> CommandMetadata:
+        """Return metadata for kopiasnapshotstatus command."""
+        return CommandMetadata(
+            name="kopiasnapshotstatus",
+            checker_class=KopiaSnapshotChecker,
+            help_text="Check Kopia snapshot freshness",
+        )
 
-        @click.command("kopiasnapshotstatus", help="Check Kopia snapshot freshness")
-        @click.argument("snapshot_paths", nargs=-1, required=False)
-        @click.argument("uptime_kuma_url", required=False)
-        @click.argument("kopiasnapshotstatus_token", required=False)
-        @click.option(
+    def get_builtin_command(
+        self, base_command: click.Command, metadata: CommandMetadata
+    ) -> click.Command:
+        """Build kopiasnapshotstatus command with arguments and options."""
+        # Add arguments
+        base_command = click.argument("snapshot_paths", nargs=-1, required=False)(
+            base_command
+        )
+        base_command = click.argument("uptime_kuma_url", required=False)(
+            base_command
+        )
+        base_command = click.argument("kopiasnapshotstatus_token", required=False)(
+            base_command
+        )
+
+        # Add options
+        base_command = click.option(
             "--config",
             type=click.Path(exists=True),
             help="INI configuration file",
-        )
-        @click.option(
+        )(base_command)
+
+        base_command = click.option(
             "--max-age-hours",
             type=int,
             help="Maximum age in hours for snapshots",
-        )
-        @click.option(
+        )(base_command)
+
+        base_command = click.option(
             "--log-file",
             type=click.Path(),
             help="Log file path",
-        )
-        @click.pass_context
-        def kopiasnapshotstatus(
-            ctx: click.Context,
-            snapshot_paths,
-            uptime_kuma_url: Optional[str],
-            kopiasnapshotstatus_token: Optional[str],
-            config: Optional[str],
-            max_age_hours: Optional[int],
-            log_file: Optional[str],
-        ):
-            """Check Kopia snapshot freshness and report to Uptime Kuma."""
-            # Initialize configuration
-            cfg = Config()
+        )(base_command)
 
-            # Load from config file if provided or if default exists
-            config_file = config or DEFAULT_CONFIG_PATH
-            if os.path.exists(config_file):
-                try:
-                    click.secho(
-                        f"📂 Loading INI config file: {config_file}",
-                        fg="cyan",
-                    )
-                    cfg.load_from_ini(config_file)
-                    click.secho(
-                        "✅ Config file loaded successfully",
-                        fg="green",
-                    )
-                except Exception as e:
-                    click.secho(
-                        f"Error loading config file: {e}",
-                        fg="red",
-                        err=True,
-                    )
-                    sys.exit(1)
+        return base_command
 
-            # Create args-like object for load_from_args
-            class Args:
-                snapshot_paths: list
-                uptime_kuma_url: Optional[str]
-                kopiasnapshotstatus_token: Optional[str]
-                max_age_hours: Optional[int]
-                log_file: Optional[str]
+    def load_from_args(self, cfg: Config, args: Dict[str, Any]) -> None:
+        """Load kopiasnapshotstatus-specific args into config."""
+        # Create args-like object for Click arguments
+        class Args:
+            snapshot_paths: list
+            uptime_kuma_url: Optional[str]
+            kopiasnapshotstatus_token: Optional[str]
+            max_age_hours: Optional[int]
+            log_file: Optional[str]
 
-            args = Args()
-            args.snapshot_paths = list(snapshot_paths) if snapshot_paths else []
-            args.uptime_kuma_url = uptime_kuma_url
-            args.kopiasnapshotstatus_token = kopiasnapshotstatus_token
-            args.max_age_hours = max_age_hours
-            args.log_file = log_file
+        args_obj = Args()
+        args_obj.snapshot_paths = list(args.get("snapshot_paths", [])) if args.get("snapshot_paths") else []
+        args_obj.uptime_kuma_url = args.get("uptime_kuma_url")
+        args_obj.kopiasnapshotstatus_token = args.get("kopiasnapshotstatus_token")
+        args_obj.max_age_hours = args.get("max_age_hours")
+        args_obj.log_file = args.get("log_file")
 
-            # For kopia command, directly set config attributes
-            if args.snapshot_paths:
-                cfg.kopiasnapshotstatus_snapshot_paths = args.snapshot_paths
-            if args.uptime_kuma_url:
-                cfg.uptime_kuma_url = args.uptime_kuma_url
-            if args.kopiasnapshotstatus_token:
-                cfg.kopiasnapshotstatus_token = args.kopiasnapshotstatus_token
-            if args.max_age_hours is not None:
-                cfg.kopiasnapshotstatus_max_age_hours = args.max_age_hours
-            if args.log_file:
-                cfg.log_file = args.log_file
+        # For kopia command, directly set config attributes from args
+        if args_obj.snapshot_paths:
+            cfg.kopiasnapshotstatus_snapshot_paths = args_obj.snapshot_paths
+        if args_obj.uptime_kuma_url:
+            cfg.uptime_kuma_url = args_obj.uptime_kuma_url
+        if args_obj.kopiasnapshotstatus_token:
+            cfg.kopiasnapshotstatus_token = args_obj.kopiasnapshotstatus_token
+        if args_obj.max_age_hours is not None:
+            cfg.kopiasnapshotstatus_max_age_hours = args_obj.max_age_hours
+        if args_obj.log_file:
+            cfg.log_file = args_obj.log_file
 
-            cfg.load_from_env()
+    def build_checker_config(self, cfg: Config) -> Dict[str, Any]:
+        """Build checker configuration for KopiaSnapshotChecker."""
+        return {
+            "kopiasnapshotstatus_snapshot_paths": cfg.kopiasnapshotstatus_snapshot_paths,
+            "kopiasnapshotstatus_max_age_hours": cfg.kopiasnapshotstatus_max_age_hours,
+            "kopiasnapshotstatus_token": cfg.kopiasnapshotstatus_token,
+            "heartbeat_enabled": cfg.heartbeat_enabled,
+            "heartbeat_interval": cfg.heartbeat_interval,
+            "uptime_kuma_url": cfg.uptime_kuma_url,
+            "heartbeat_token": cfg.heartbeat_token,
+        }
 
-            # Setup logging
-            logger = setup_logging(cfg.log_file)
+    def get_summary_fields(self, cfg: Config) -> Dict[str, Dict[str, str]]:
+        """Get fields to display in config summary logging."""
+        return {
+            "📋 Kopia Snapshot Configuration": {
+                "Snapshot Paths": "kopiasnapshotstatus_snapshot_paths",
+                "Max Age Hours": "kopiasnapshotstatus_max_age_hours",
+            },
+            "🔔 Uptime Kuma Integration": {
+                "URL": "uptime_kuma_url",
+                "Heartbeat Enabled": "heartbeat_enabled",
+            },
+        }
 
-            # Log configuration summary
-            logger.info("=" * 70)
-            logger.info("🔍 KUMA SENTINEL - KOPIA SNAPSHOT CONFIGURATION")
-            logger.info("=" * 70)
-            config_summary = cfg.get_summary(mask_tokens=True)
-            logger.info("📋 Kopia Snapshot Configuration:")
-            paths_summary = config_summary.get("kopiasnapshotstatus_snapshot_paths", [])
-            logger.info(f"   Snapshot Paths: {paths_summary}")
-            logger.info(
-                f"   Max Age Hours: {config_summary.get('kopiasnapshotstatus_max_age_hours', 24)}"
-            )
-            logger.info("🔔 Uptime Kuma Integration:")
-            logger.info(f"   URL: {config_summary.get('uptime_kuma_url', 'N/A')}")
-            logger.info(
-                f"   Heartbeat Enabled: {config_summary.get('heartbeat_enabled', False)}"
-            )
-            logger.info("=" * 70)
-
-            # Execute check with heartbeat support
-            try:
-                check_start_time = time.time()
-
-                # Create checker config dict from Config object
-                checker_config = {
-                    "kopiasnapshotstatus_snapshot_paths": cfg.kopiasnapshotstatus_snapshot_paths,
-                    "kopiasnapshotstatus_max_age_hours": cfg.kopiasnapshotstatus_max_age_hours,
-                    "kopiasnapshotstatus_token": cfg.kopiasnapshotstatus_token,
-                    "heartbeat_enabled": cfg.heartbeat_enabled,
-                    "heartbeat_interval": cfg.heartbeat_interval,
-                    "uptime_kuma_url": cfg.uptime_kuma_url,
-                    "heartbeat_token": cfg.heartbeat_token,
-                }
-
-                checker = KopiaSnapshotChecker(logger, checker_config)
-                result = checker.execute_with_heartbeat()
-
-                check_end_time = time.time()
-                check_duration = int(check_end_time - check_start_time)
-                check_minutes = check_duration // 60
-
-                # Send final heartbeat if enabled
-                if (
-                    cfg.heartbeat_enabled
-                    and cfg.heartbeat_token
-                    and cfg.uptime_kuma_url
-                ):
-                    send_push(
-                        logger,
-                        cfg.uptime_kuma_url,
-                        cfg.heartbeat_token,
-                        f"kopiasnapshotstatus check complete after {check_minutes}m",
-                        command="kopiasnapshotstatus",
-                    )
-
-                # Send snapshot check alert based on result
-                send_push(
-                    logger,
-                    cfg.uptime_kuma_url,
-                    cfg.kopiasnapshotstatus_token,
-                    f"{result.message} ({check_duration}s)",
-                    command="kopiasnapshotstatus",
-                    status=result.status,
-                    timeout=PUSH_TIMEOUT_ALERT,
-                )
-
-                # Log result
-                logger.info(f"📊 Check complete: {result.status.upper()}")
-                logger.info(f"   Duration: {check_duration}s")
-                logger.info(f"   Message: {result.message}")
-
-                # Exit with appropriate status code
-                exit_code = 0 if result.status == "up" else 1
-                sys.exit(exit_code)
-
-            except Exception as e:
-                logger.error(f"❌ Unexpected error: {str(e)}", exc_info=True)
-                # Send error alert
-                send_push(
-                    logger,
-                    cfg.uptime_kuma_url,
-                    cfg.kopiasnapshotstatus_token,
-                    f"Kopia snapshot check error: {str(e)}",
-                    command="kopiasnapshotstatus",
-                    status="down",
-                    timeout=PUSH_TIMEOUT_ALERT,
-                )
-                sys.exit(1)
-
-        return kopiasnapshotstatus

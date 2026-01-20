@@ -353,7 +353,10 @@ class TestKopiaSnapshotChecker:
         ]  # Two fresh snapshots
 
         config = KopiaSnapshotConfig()
-        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups", "max_age_hours": 24},
+        ]
         config.kopiasnapshotstatus_max_age_hours = 24
         config.uptime_kuma_url = "http://localhost:3001"
         config.heartbeat_enabled = False
@@ -379,7 +382,10 @@ class TestKopiaSnapshotChecker:
         ]  # Second is too old
 
         config = KopiaSnapshotConfig()
-        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups", "max_age_hours": 24},
+        ]
         config.kopiasnapshotstatus_max_age_hours = 24
         config.uptime_kuma_url = "http://localhost:3001"
         config.heartbeat_enabled = False
@@ -394,13 +400,74 @@ class TestKopiaSnapshotChecker:
     @patch(
         "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
     )
+    def test_execute_per_path_max_age_hours(self, mock_age):
+        """Test execution with per-path max_age_hours thresholds."""
+        metadata1 = self.create_metadata()
+        metadata2 = self.create_metadata()
+        mock_age.side_effect = [
+            (5.0, metadata1),   # /data: 5h < 24h (OK)
+            (30.0, metadata2),  # /backups: 30h < 48h (OK, using per-path threshold)
+        ]
+
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups", "max_age_hours": 48},
+        ]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+        result = checker.execute()
+
+        assert result.status == "up"
+        assert "All snapshots fresh" in result.message
+        assert result.details["snapshots"]["/data"]["age_hours"] == 5.0
+        assert result.details["snapshots"]["/backups"]["age_hours"] == 30.0
+
+    @patch(
+        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
+    )
+    def test_execute_per_path_max_age_hours_fallback_to_default(self, mock_age):
+        """Test execution using default max_age_hours for paths without explicit threshold."""
+        metadata1 = self.create_metadata()
+        metadata2 = self.create_metadata()
+        mock_age.side_effect = [
+            (5.0, metadata1),
+            (12.0, metadata2),
+        ]
+
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups"},  # No explicit max_age_hours, should use default
+        ]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+        result = checker.execute()
+
+        assert result.status == "up"
+        assert result.details["snapshots"]["/backups"]["age_hours"] == 12.0
+
+    @patch(
+        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
+    )
     def test_execute_snapshot_missing(self, mock_age):
         """Test execution when snapshot cannot be retrieved."""
         metadata1 = self.create_metadata()
         mock_age.side_effect = [(5.0, metadata1), (None, None)]  # Second fails
 
         config = KopiaSnapshotConfig()
-        config.kopiasnapshotstatus_snapshot_paths = ["/data", "/backups"]
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups", "max_age_hours": 24},
+        ]
         config.kopiasnapshotstatus_max_age_hours = 24
         config.uptime_kuma_url = "http://localhost:3001"
         config.heartbeat_enabled = False
@@ -413,9 +480,9 @@ class TestKopiaSnapshotChecker:
         assert "failed" in result.message.lower()
 
     def test_execute_no_paths_configured(self):
-        """Test execution with no snapshot paths configured."""
+        """Test execution with no snapshots configured."""
         config = KopiaSnapshotConfig()
-        config.kopiasnapshotstatus_snapshot_paths = []
+        config.kopiasnapshotstatus_snapshots = []
         config.kopiasnapshotstatus_max_age_hours = 24
         config.uptime_kuma_url = "http://localhost:3001"
         config.heartbeat_enabled = False
@@ -425,7 +492,7 @@ class TestKopiaSnapshotChecker:
         result = checker.execute()
 
         assert result.status == "down"
-        assert "no snapshot paths" in result.message.lower()
+        assert "no snapshots" in result.message.lower()
 
     @patch(
         "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
@@ -436,7 +503,7 @@ class TestKopiaSnapshotChecker:
         mock_age.return_value = (10.0, metadata)
 
         config = KopiaSnapshotConfig()
-        config.kopiasnapshotstatus_snapshot_paths = ["/data"]
+        config.kopiasnapshotstatus_snapshots = [{"path": "/data", "max_age_hours": 24}]
         config.kopiasnapshotstatus_max_age_hours = 24
         config.uptime_kuma_url = "http://localhost:3001"
         config.heartbeat_enabled = False

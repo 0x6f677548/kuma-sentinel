@@ -1,6 +1,6 @@
 """Kopia snapshot status monitoring command."""
 
-from typing import Dict
+from typing import Dict, List, Tuple
 
 import click
 
@@ -21,32 +21,25 @@ class KopiaSnapshotStatusCommand(CommandExecutor):
 
     def get_builtin_command(self, base_command: click.Command) -> click.Command:
         """Build kopiasnapshotstatus command with arguments and options."""
-        # Add arguments
-        base_command = click.argument("snapshot_paths", nargs=-1, required=False)(
-            base_command
-        )
-        base_command = click.argument("uptime_kuma_url", required=False)(base_command)
-        base_command = click.argument("kopiasnapshotstatus_token", required=False)(
-            base_command
-        )
+        # Add common arguments (uptime_kuma_url, heartbeat_token, token)
+        base_command = self._add_common_arguments(base_command)
 
-        # Add options
+        # Add common options (--config, --log-file)
+        base_command = self._add_common_options(base_command)
+
         base_command = click.option(
-            "--config",
-            type=click.Path(exists=True),
-            help="INI configuration file",
+            "--snapshot",
+            "snapshots",
+            nargs=2,
+            multiple=True,
+            type=(str, int),
+            help="Snapshot path and max age in hours (can be repeated)",
         )(base_command)
 
         base_command = click.option(
             "--max-age-hours",
             type=int,
-            help="Maximum age in hours for snapshots",
-        )(base_command)
-
-        base_command = click.option(
-            "--log-file",
-            type=click.Path(),
-            help="Log file path",
+            help="Global default maximum age in hours for snapshots",
         )(base_command)
 
         return base_command
@@ -55,11 +48,13 @@ class KopiaSnapshotStatusCommand(CommandExecutor):
         """Get fields to display in config summary logging."""
         return {
             "📋 Kopia Snapshot Configuration": {
-                "Snapshot Paths": "kopiasnapshotstatus_snapshot_paths",
-                "Max Age Hours": "kopiasnapshotstatus_max_age_hours",
+                "Snapshots": "kopiasnapshotstatus_snapshots",
+                "Default Max Age Hours": "kopiasnapshotstatus_max_age_hours_default",
             },
             "🔔 Uptime Kuma Integration": {
                 "URL": "uptime_kuma_url",
                 "Heartbeat Enabled": "heartbeat_enabled",
             },
         }
+
+

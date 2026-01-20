@@ -31,6 +31,54 @@ class CommandExecutor(Command):
     _checker_class: Any = None
     _config_class: Any = None
 
+    def _add_common_arguments(self, base_command: click.Command) -> click.Command:
+        """Add common positional arguments to a Click command.
+
+        These arguments are common across all monitoring commands:
+        - uptime_kuma_url (shared)
+        - heartbeat_token (shared)
+        - token (command-specific, mapped by executor based on config class)
+
+        Returns:
+            The decorated command with common arguments added
+
+        Note:
+            Arguments are added in reverse order (Click decorators apply inside-out).
+            The generic 'token' argument is mapped to the command-specific token field
+            by the executor during config loading based on the config class type.
+        """
+        # Add in reverse order (Click applies decorators inside-out)
+        base_command = click.argument("token", required=False)(base_command)
+        base_command = click.argument("heartbeat_token", required=False)(base_command)
+        base_command = click.argument("uptime_kuma_url", required=False)(base_command)
+        return base_command
+
+    def _add_common_options(self, base_command: click.Command) -> click.Command:
+        """Add common options to a Click command.
+
+        These options are common across all monitoring commands:
+        - --config: Configuration file path (YAML or INI depending on command)
+        - --log-file: Log file path
+
+        Returns:
+            The decorated command with common options added
+
+        Note:
+            Options are added in reverse order (Click decorators apply inside-out).
+        """
+        # Add in reverse order (Click applies decorators inside-out)
+        base_command = click.option(
+            "--log-file",
+            type=click.Path(),
+            help="Log file path",
+        )(base_command)
+        base_command = click.option(
+            "--config",
+            type=click.Path(exists=True),
+            help="Configuration file path",
+        )(base_command)
+        return base_command
+
     def register_command(self) -> click.Command:
         """Register and return a Click command using the executor pattern.
 
@@ -152,6 +200,13 @@ class CommandExecutor(Command):
 
         # Step 4: Load from command-line args (highest precedence)
         self.config.load_from_args(args)
+
+        # Step 4a: Map generic 'token' argument to command-specific token field
+        # The generic token from CLI is mapped based on the config class type
+        token_cli = args.get("token")
+        if token_cli:
+            if hasattr(self.config, "command_token"):
+                self.config.command_token = token_cli
 
         # Step 5: Validate configuration
         try:

@@ -194,12 +194,14 @@ def _run_nmap_scan(
         cmd.append(nmap_xml)
 
         # Get config values
-        exclude_ips = config.portscan_exclude_ips
+        exclude_hosts = config.portscan_exclude
         nmap_args = config.portscan_nmap_arguments or []
         portscan_ip_ranges = config.portscan_ip_ranges or []
 
-        if exclude_ips:
-            cmd.extend(["--exclude", exclude_ips])
+        if exclude_hosts:
+            # Join list into comma-separated string for nmap
+            exclude_str = ",".join(exclude_hosts)
+            cmd.extend(["--exclude", exclude_str])
         cmd.extend(nmap_args)
         cmd.extend(portscan_ip_ranges)
 

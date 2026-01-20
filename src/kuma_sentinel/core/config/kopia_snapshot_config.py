@@ -1,6 +1,6 @@
 """Kopia snapshot status command configuration."""
 
-from typing import Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 from .base import ConfigBase, FieldMapping
 
@@ -13,17 +13,34 @@ class KopiaSnapshotConfig(ConfigBase):
         super().__init__()
 
         # Kopia-specific attributes
-        self.kopiasnapshotstatus_snapshot_paths: List[str] = []
+        # snapshots: List of dicts with 'path' and optional 'max_age_hours' keys
+        self.kopiasnapshotstatus_snapshots: List[Dict[str, Any]] = []
+        # Global default for any path without explicit max_age_hours
         self.kopiasnapshotstatus_max_age_hours = 24
+
+    @staticmethod
+    def _snapshot_converter(snapshots_tuples: Tuple[Tuple[str, int], ...]) -> List[Dict[str, Any]]:
+        """Convert Click snapshot tuples to dict list.
+        
+        Click with nargs=2 and multiple=True produces: ((path1, age1), (path2, age2), ...)
+        We convert to: [{"path": path1, "max_age_hours": age1}, ...]
+        """
+        if not snapshots_tuples:
+            return []
+        return [
+            {"path": path, "max_age_hours": max_age}
+            for path, max_age in snapshots_tuples
+        ]
 
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for kopia snapshot configuration."""
         mappings = super()._get_field_mappings()
         mappings.update(
             {
-                "kopiasnapshotstatus_snapshot_paths": FieldMapping(
-                    arg_key="snapshot_paths",
-                    yaml_path="kopiasnapshotstatus.targets.snapshot_paths",
+                "kopiasnapshotstatus_snapshots": FieldMapping(
+                    arg_key="snapshots",
+                    yaml_path="kopiasnapshotstatus.targets.snapshots",
+                    converter=self._snapshot_converter,
                 ),
                 "kopiasnapshotstatus_max_age_hours": FieldMapping(
                     env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS",
@@ -47,12 +64,19 @@ class KopiaSnapshotConfig(ConfigBase):
 
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get kopia snapshot configuration summary for logging."""
+        # Build snapshot summary
+        snapshot_summary = []
+        for snapshot in self.kopiasnapshotstatus_snapshots:
+            path = snapshot.get("path", "")
+            max_age = snapshot.get("max_age_hours", self.kopiasnapshotstatus_max_age_hours)
+            snapshot_summary.append(f"{path}@{max_age}h")
+
         return {
             "log_file": self.log_file,
-            "kopiasnapshotstatus_snapshot_paths": ", ".join(
-                self.kopiasnapshotstatus_snapshot_paths
-            ),
-            "kopiasnapshotstatus_max_age_hours": self.kopiasnapshotstatus_max_age_hours,
+            "kopiasnapshotstatus_snapshots": "; ".join(snapshot_summary)
+            if snapshot_summary
+            else "(using defaults)",
+            "kopiasnapshotstatus_max_age_hours_default": self.kopiasnapshotstatus_max_age_hours,
             "heartbeat_enabled": self.heartbeat_enabled,
             "heartbeat_interval": f"{self.heartbeat_interval}s",
             "uptime_kuma_url": self.uptime_kuma_url,

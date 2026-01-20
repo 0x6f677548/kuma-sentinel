@@ -190,27 +190,35 @@ class KopiaSnapshotChecker(Checker):
         try:
             self.logger.info("🔍 Starting Kopia snapshot status check")
 
-            # Get snapshot paths from config - type: ignore since KopiaSnapshotChecker expects KopiaSnapshotConfig
-            snapshot_paths = self.config.kopiasnapshotstatus_snapshot_paths or []  # type: ignore
-            max_age_hours = self.config.kopiasnapshotstatus_max_age_hours  # type: ignore
+            # Get snapshots from config - type: ignore since KopiaSnapshotChecker expects KopiaSnapshotConfig
+            snapshots = self.config.kopiasnapshotstatus_snapshots or []  # type: ignore
+            default_max_age_hours = self.config.kopiasnapshotstatus_max_age_hours  # type: ignore
 
-            if not snapshot_paths:
-                self.logger.error("❌ No snapshot paths configured")
+            if not snapshots:
+                self.logger.error("❌ No snapshots configured")
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message="No snapshot paths configured",
+                    message="No snapshots configured",
                     duration_seconds=int(time.time() - check_start),
-                    details={"error": "no_snapshot_paths"},
+                    details={"error": "no_snapshots"},
                 )
 
-            # Check each snapshot path
+            # Check each snapshot
             all_results: dict[str, tuple[bool, Optional[float], Optional[dict]]] = {}
             failed_paths: list[str] = []
             old_snapshots: list[tuple[str, float, int, Optional[dict]]] = []
 
-            for path in snapshot_paths:
-                self.logger.info(f"📋 Checking snapshot path: {path}")
+            for snapshot_config in snapshots:
+                path = snapshot_config.get("path")
+                if not path:
+                    self.logger.warning("⚠️  Snapshot config missing 'path' field, skipping")
+                    continue
+
+                # Get per-path max_age_hours or use default
+                max_age_hours = snapshot_config.get("max_age_hours", default_max_age_hours)
+
+                self.logger.info(f"📋 Checking snapshot path: {path} (max age: {max_age_hours}h)")
 
                 age_hours, metadata = _get_latest_snapshot_age(self.logger, path)
 

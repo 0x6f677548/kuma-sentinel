@@ -17,7 +17,7 @@ class PortscanConfig(ConfigBase):
         self.portscan_nmap_timing = "T3"
         self.portscan_nmap_arguments = []
         self.portscan_nmap_timeout = 3600
-        self.portscan_exclude_ips = ""
+        self.portscan_exclude: List[str] = []
         self.portscan_ip_ranges: List[str] = []
         self.portscan_nmap_keep_xmloutput = False
 
@@ -42,10 +42,11 @@ class PortscanConfig(ConfigBase):
                     yaml_path="portscan.nmap.timeout",
                     converter=int,
                 ),
-                "portscan_exclude_ips": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_EXCLUDE_IPS",
+                "portscan_exclude": FieldMapping(
+                    env_var="KUMA_SENTINEL_PORTSCAN_EXCLUDE",
                     arg_key="exclude",
-                    yaml_path="portscan.targets.exclude_ips",
+                    yaml_path="portscan.targets.exclude",
+                    converter=list,
                 ),
                 "portscan_nmap_keep_xmloutput": FieldMapping(
                     env_var="KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT",
@@ -102,8 +103,8 @@ class PortscanConfig(ConfigBase):
                 if self.portscan_nmap_arguments
                 else "(none)"
             ),
-            "portscan_exclude_ips": (
-                self.portscan_exclude_ips if self.portscan_exclude_ips else "(none)"
+            "portscan_exclude": (
+                ", ".join(self.portscan_exclude) if self.portscan_exclude else "(none)"
             ),
             "portscan_ip_ranges": ", ".join(self.portscan_ip_ranges),
             "heartbeat_enabled": self.heartbeat_enabled,

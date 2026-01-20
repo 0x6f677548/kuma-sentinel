@@ -21,19 +21,24 @@ class PortscanCommand(CommandExecutor):
 
     def get_builtin_command(self, base_command: click.Command) -> click.Command:
         """Build portscan command with arguments and options."""
-        # Add arguments
-        base_command = click.argument("ip_ranges", nargs=-1, required=False)(
-            base_command
-        )
-        base_command = click.argument("uptime_kuma_url", required=False)(base_command)
-        base_command = click.argument("heartbeat_token", required=False)(base_command)
-        base_command = click.argument("portscan_token", required=False)(base_command)
+        # Add common arguments (uptime_kuma_url, heartbeat_token, token)
+        base_command = self._add_common_arguments(base_command)
 
-        # Add options
+        # Add common options (--config, --log-file)
+        base_command = self._add_common_options(base_command)
+
         base_command = click.option(
-            "--config",
-            type=click.Path(exists=True),
-            help="INI configuration file",
+            "--ip-range",
+            "ip_ranges",
+            multiple=True,
+            help="IP ranges to scan (can be repeated)",
+        )(base_command)
+
+        base_command = click.option(
+            "--exclude",
+            "exclude",
+            multiple=True,
+            help="IP/range to exclude (can be repeated)",
         )(base_command)
 
         base_command = click.option(
@@ -47,17 +52,6 @@ class PortscanCommand(CommandExecutor):
             help="Nmap timing level",
         )(base_command)
 
-        base_command = click.option(
-            "--exclude",
-            help="Comma-separated IPs/ranges to exclude",
-        )(base_command)
-
-        base_command = click.option(
-            "--log-file",
-            type=click.Path(),
-            help="Log file path",
-        )(base_command)
-
         return base_command
 
     def get_summary_fields(self) -> Dict[str, Dict[str, str]]:
@@ -67,7 +61,7 @@ class PortscanCommand(CommandExecutor):
                 "Ports": "portscan_nmap_ports",
                 "Timing": "portscan_nmap_timing",
                 "Arguments": "portscan_nmap_arguments",
-                "Exclude IPs": "portscan_exclude_ips",
+                "Exclude IPs": "portscan_exclude",
             },
             "📍 Targets": {
                 "IP Ranges": "portscan_ip_ranges",

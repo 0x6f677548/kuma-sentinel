@@ -149,16 +149,24 @@ kuma-sentinel portscan 192.168.1.0/24 http://uptimekuma:3001/api/push your-heart
 
 ### Kopia Snapshot Status
 
+Monitor Kopia backup snapshot freshness with per-path age thresholds:
+
 ```bash
-kuma-sentinel kopiasnapshotstatus /data /backups http://uptimekuma:3001/api/push your-kopia-token
+# Using configuration file (recommended)
+kuma-sentinel kopiasnapshotstatus --config /etc/kuma-sentinel/config.yaml
+
+# Or with CLI arguments
+kuma-sentinel kopiasnapshotstatus \
+  --snapshot /data 24 \
+  --snapshot /backups 48
 ```
 
-Monitor multiple snapshot paths:
+Multiple snapshots with different age requirements:
 ```bash
-kuma-sentinel kopiasnapshotstatus /data /backups /archives \
-  --max-age-hours 24 \
-  http://uptimekuma:3001/api/push \
-  your-kopia-token
+kuma-sentinel kopiasnapshotstatus \
+  --snapshot /data 24 \
+  --snapshot /backups 48 \
+  --snapshot /archive 168
 ```
 
 ## Use Cases
@@ -194,9 +202,9 @@ docker-compose up -d
 
 ### Backup Monitoring
 
-Monitor Kopia backup snapshot freshness across multiple backup paths. Ensure your backups are running on schedule and alert if backups become stale.
+Monitor Kopia backup snapshot freshness across multiple backup paths with different age requirements. Ensure your backups are running on schedule and alert if backups become stale.
 
-**Scenario**: You have multiple critical data paths being backed up with Kopia, and you need to ensure backups complete regularly without manual intervention.
+**Scenario**: You have multiple critical data paths being backed up with Kopia at different intervals, and you need to ensure backups complete regularly without manual intervention.
 
 **Traditional approach**: Manually check backup timestamps or SSH into the machine to verify backup age.
 
@@ -208,17 +216,29 @@ Monitor Kopia backup snapshot freshness across multiple backup paths. Ensure you
 docker-compose up -d
 
 # Schedule with cron to run every 6 hours
-0 */6 * * * kuma-sentinel kopiasnapshotstatus \
-  --max-age-hours 24 \
-  /data /backups /archives \
-  http://uptime-kuma-instance:3001/api/push \
-  your-kopia-token
+0 */6 * * * kuma-sentinel kopiasnapshotstatus --config /etc/kuma-sentinel/config.yaml
+```
+
+**Configuration example** (`/etc/kuma-sentinel/config.yaml`):
+```yaml
+kopiasnapshotstatus:
+  uptime_kuma:
+    token: your-kopia-token
+  targets:
+    snapshots:
+      - path: /data
+        max_age_hours: 24      # Critical data - must be backed up daily
+      - path: /backups
+        max_age_hours: 48      # Important - allow 2 days
+      - path: /archive
+        max_age_hours: 168     # Archive - allow 1 week
+    max_age_hours: 24          # Global default
 ```
 
 **Result**:
-- ✅ If all snapshots are fresh (less than 24 hours old) → Uptime Kuma shows UP
-- ⚠️ If any snapshot is stale or missing → Uptime Kuma shows DOWN and triggers alerts
-- 📊 Details include age of each snapshot for visibility
+- ✅ If all snapshots are fresh (within their thresholds) → Uptime Kuma shows UP
+- ⚠️ If any snapshot is stale → Uptime Kuma shows DOWN and triggers alerts
+- 📊 Details include age of each snapshot and its threshold for visibility
 
 ### Common Usage Examples
 
@@ -303,7 +323,7 @@ portscan:
   
   targets:
     ports: 1-1000
-    exclude_ips: 192.168.1.1,192.168.1.254
+    exclude: [192.168.1.1, 192.168.1.254]
     ip_ranges:
       - 192.168.1.0/24
       - 10.0.0.0/8
@@ -313,9 +333,17 @@ kopiasnapshotstatus:
     token: your-kopia-token
   
   targets:
-    snapshot_paths:
-      - /data
-      - /backups
+    # List of snapshots with per-path maximum age thresholds
+    # Each snapshot can have a different age requirement
+    snapshots:
+      - path: /data
+        max_age_hours: 24
+      - path: /backups
+        max_age_hours: 48
+      - path: /archive
+        # Omit max_age_hours to use the global default (24)
+    
+    # Global default for snapshots without explicit max_age_hours
     max_age_hours: 24
 ```
 
@@ -335,7 +363,7 @@ KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
 KUMA_SENTINEL_PORTSCAN_NMAP_PORTS=1-1000
 KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T3
 KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT=3600
-KUMA_SENTINEL_PORTSCAN_EXCLUDE_IPS=192.168.1.1
+KUMA_SENTINEL_PORTSCAN_EXCLUDE="192.168.1.1,192.168.1.254"
 KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS=--script vuln
 KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT=false
 KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token

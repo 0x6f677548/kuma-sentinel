@@ -201,6 +201,37 @@ portscan:
 
 Lists are natively supported in YAML, eliminating need for comma-separated string parsing.
 
+### Kopia Snapshot Configuration Example
+
+The Kopia snapshot checker demonstrates advanced configuration with **per-path thresholds**:
+
+```yaml
+kopiasnapshotstatus:
+  uptime_kuma:
+    token: your-kopia-token
+  targets:
+    # Structured list with path and per-path max_age_hours
+    snapshots:
+      - path: /data
+        max_age_hours: 24          # Critical: must be fresh daily
+      - path: /backups
+        max_age_hours: 48          # Important: allow 2 days
+      - path: /archive
+        # Omit max_age_hours to use global default
+    # Global default for snapshots without explicit threshold
+    max_age_hours: 24
+```
+
+This is loaded via the `FieldMapping` system in [src/kuma_sentinel/core/config/kopia_snapshot_config.py](src/kuma_sentinel/core/config/kopia_snapshot_config.py):
+
+```python
+"kopiasnapshotstatus_snapshots": FieldMapping(
+    yaml_path="kopiasnapshotstatus.targets.snapshots",
+),
+```
+
+The checker iterates over snapshots and uses each snapshot's `max_age_hours` or falls back to the global default.
+
 ## Making Changes
 
 ### Adding a New Feature

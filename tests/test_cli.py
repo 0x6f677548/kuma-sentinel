@@ -18,4 +18,4 @@ def test_portscan_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["portscan", "--help"])
     assert result.exit_code == 0
-    assert "IP_RANGES" in result.output
+    assert "--ip-range" in result.output

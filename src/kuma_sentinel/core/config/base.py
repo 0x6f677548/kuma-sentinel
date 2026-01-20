@@ -3,7 +3,7 @@
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, get_type_hints
 
 import yaml
 
@@ -16,7 +16,7 @@ class FieldMapping:
     env_var: Optional[str] = None  # Environment variable name
     arg_key: Optional[str] = None  # CLI argument key
     yaml_path: Optional[str] = None  # YAML path (dot-separated: "section.subsection.key")
-    converter: Callable[[str], Any] = str  # Type converter function
+    converter: Callable[[Any], Any] = str  # Type converter function (can take any type, returns Any)
 
 
 # Hardcoded defaults are now inlined in field mappings and __init__ methods
@@ -169,16 +169,40 @@ class ConfigBase(ABC):
                 setattr(self, field_name, converted)
 
     def _apply_field_mappings_from_args(self, args: dict) -> None:
-        """Apply field mappings from command-line arguments."""
+        """Apply field mappings from command-line arguments with intelligent type handling.
+        
+        Handles:
+        - List[str] fields: Converts tuples from Click's multiple=True to lists
+        - Fields with converter: Applies the converter function
+        - Simple fields: Uses value as-is
+        """
         mappings = self._get_field_mappings()
+        type_hints = get_type_hints(self.__class__)
+        
         for field_name, mapping in mappings.items():
             if not mapping.arg_key:
                 continue
 
             arg_value = args.get(mapping.arg_key)
-            if arg_value:
-                converted = self._convert_value(arg_value, mapping)
-                setattr(self, field_name, converted)
+            if arg_value is None:
+                continue
+            
+            # Get the field's expected type from type hints
+            field_type = type_hints.get(field_name)
+            
+            # Handle List[str] fields - convert tuple from Click to list
+            if field_type == List[str]:
+                value = list(arg_value) if arg_value else []
+            
+            # Handle converter function from mapping (if not default str converter)
+            elif mapping.converter is not str:
+                value = mapping.converter(arg_value)
+            
+            # For str type with no explicit converter, use value as-is
+            else:
+                value = arg_value
+            
+            setattr(self, field_name, value)
 
     @staticmethod
     def _get_nested_value(data: dict, path: str) -> Any:

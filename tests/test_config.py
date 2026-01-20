@@ -53,7 +53,7 @@ def test_portscan_config_load_from_yaml():
             "nmap": {"timing": "T2"},
             "targets": {
                 "ports": "1-10000",
-                "exclude_ips": "192.168.1.1",
+                "exclude": ["192.168.1.1"],
                 "ip_ranges": ["192.168.1.0/24", "10.0.0.0/8"],
             },
         },
@@ -70,7 +70,7 @@ def test_portscan_config_load_from_yaml():
         assert config.log_file == "/tmp/test.log"
         assert config.portscan_nmap_ports == "1-10000"
         assert config.portscan_nmap_timing == "T2"
-        assert config.portscan_exclude_ips == "192.168.1.1"
+        assert config.portscan_exclude == ["192.168.1.1"]
         assert config.heartbeat_interval == 600
         assert config.portscan_ip_ranges == ["192.168.1.0/24", "10.0.0.0/8"]
         assert config.uptime_kuma_url == "http://localhost/api/push"
@@ -133,15 +133,18 @@ def test_portscan_config_get_summary():
 
 
 def test_kopia_config_load_from_yaml():
-    """Test loading kopia configuration from YAML file."""
+    """Test loading kopia configuration from YAML file with per-path thresholds."""
     yaml_content = {
         "logging": {"log_file": "/tmp/test.log"},
         "uptime_kuma": {"url": "http://localhost/api/push"},
         "heartbeat": {"uptime_kuma": {"token": "test_heartbeat"}},
         "kopiasnapshotstatus": {
             "targets": {
-                "snapshot_paths": ["/data", "/backups"],
-                "max_age_hours": 48,
+                "snapshots": [
+                    {"path": "/data", "max_age_hours": 24},
+                    {"path": "/backups", "max_age_hours": 48},
+                ],
+                "max_age_hours": 24,
             },
             "uptime_kuma": {"token": "test_kopia"},
         },
@@ -156,8 +159,11 @@ def test_kopia_config_load_from_yaml():
         config.load_from_yaml(config_file)
 
         assert config.log_file == "/tmp/test.log"
-        assert config.kopiasnapshotstatus_snapshot_paths == ["/data", "/backups"]
-        assert config.kopiasnapshotstatus_max_age_hours == 48
+        assert config.kopiasnapshotstatus_snapshots == [
+            {"path": "/data", "max_age_hours": 24},
+            {"path": "/backups", "max_age_hours": 48},
+        ]
+        assert config.kopiasnapshotstatus_max_age_hours == 24
         assert config.uptime_kuma_url == "http://localhost/api/push"
         assert config.heartbeat_token == "test_heartbeat"
         assert config.command_token == "test_kopia"

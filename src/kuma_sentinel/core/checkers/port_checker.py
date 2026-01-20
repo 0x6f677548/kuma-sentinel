@@ -58,6 +58,7 @@ def _run_nmap_process(
         Tuple of (success: bool, stderr_msg: Optional[str])
     """
     try:
+        logger.debug(f"🔧 Running nmap command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,

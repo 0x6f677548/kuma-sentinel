@@ -58,7 +58,7 @@ class CommandExecutor(Command):
         cfg = self._load_and_validate_config(self._command_name, args)
 
         # Setup logging
-        logger = setup_logging(cfg.log_file)
+        logger = setup_logging(cfg.log_file, cfg.log_level)
 
         # Log configuration summary
         self._log_config_summary(logger, cfg, self._command_name)
@@ -117,7 +117,7 @@ class CommandExecutor(Command):
     ) -> ConfigBase:
         """Load and validate configuration with correct precedence.
 
-        Loading order: defaults (in __init__) -> env vars -> ini file -> args.
+        Loading order: defaults (in __init__) -> env vars -> yaml file -> args.
         Later stages can override earlier stages.
         """
         # Create config instance using class attribute set by decorator
@@ -127,17 +127,17 @@ class CommandExecutor(Command):
         self.config.load_from_env()
 
         # Step 3: Load from config file if provided or if default exists
-        config_file = args.get("config") or "/etc/kuma-sentinel/config.ini"
+        config_file = args.get("config") or "/etc/kuma-sentinel/config.yaml"
         if config_file and sys.modules.get("os"):
             import os
 
             if os.path.exists(config_file):
                 try:
                     click.secho(
-                        f"📂 Loading INI config file: {config_file}",
+                        f"📂 Loading YAML config file: {config_file}",
                         fg="cyan",
                     )
-                    self.config.load_from_ini(config_file)
+                    self.config.load_from_yaml(config_file)
                     click.secho(
                         "✅ Config file loaded successfully",
                         fg="green",

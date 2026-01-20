@@ -55,10 +55,10 @@ Designed to be extended with additional monitoring checks and custom checkers.
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
-- **Flexible Configuration**: Support for INI config files, environment variables, and CLI arguments with clear priority
+- **Flexible Configuration**: Support for YAML config files, environment variables, and CLI arguments with clear priority
 - **Multi-Source Configuration**:
   1. Command-line arguments (highest priority)
-  2. INI config file
+  2. YAML config file
   3. Environment variables
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
@@ -126,14 +126,14 @@ docker build -t kuma-sentinel:latest .
 
 # Linux/macOS
 docker run -it --rm \
-  -v $(pwd)/config.ini:/etc/kuma-sentinel/config.ini:ro \
+  -v $(pwd)/config.yaml:/etc/kuma-sentinel/config.yaml:ro \
   -v $(pwd)/logs:/var/log/kuma-sentinel \
   kuma-sentinel:latest \
   portscan 192.168.100.110-199 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
 
 # Windows (PowerShell)
 docker run -it --rm `
-  -v ${pwd}/config.ini:/etc/kuma-sentinel/config.ini:ro `
+  -v ${pwd}/config.yaml:/etc/kuma-sentinel/config.yaml:ro `
   -v ${pwd}/logs:/var/log/kuma-sentinel `
   kuma-sentinel:latest `
   portscan 192.168.100.110-199 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
@@ -249,7 +249,7 @@ kuma-sentinel portscan \
 #### Using Configuration File
 
 ```bash
-kuma-sentinel portscan --config /etc/kuma-sentinel/config.ini
+kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
 ```
 
 #### With Exclusions
@@ -273,44 +273,50 @@ kuma-sentinel kopiasnapshotstatus --help
 
 ## Configuration
 
-### INI File Format
+### YAML File Format
 
-Default location: `/etc/kuma-sentinel/config.ini`
+Default location: `/etc/kuma-sentinel/config.yaml`
 
-```ini
-[logging]
-log_file = /var/log/kuma-sentinel.log
+```yaml
+logging:
+  log_file: /var/log/kuma-sentinel.log
+  log_level: INFO
 
-[heartbeat]
-enabled = true
-interval = 300
+heartbeat:
+  enabled: true
+  interval: 300
+  uptime_kuma:
+    token: your-heartbeat-token
 
-[uptime_kuma]
-url = http://uptimekuma:3001/api/push
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
 
-[heartbeat.uptime_kuma]
-token = your-heartbeat-token
+portscan:
+  uptime_kuma:
+    token: your-portscan-token
+  
+  nmap:
+    timing: T3
+    arguments: []
+    keep_xml_output: false
+    timeout: 3600
+  
+  targets:
+    ports: 1-1000
+    exclude_ips: 192.168.1.1,192.168.1.254
+    ip_ranges:
+      - 192.168.1.0/24
+      - 10.0.0.0/8
 
-[portscan.uptime_kuma]
-token = your-portscan-token
-
-[kopiasnapshotstatus.uptime_kuma]
-token = your-kopia-token
-
-[portscan.nmap]
-timing = T3
-arguments = 
-keep_xml_output = false
-timeout = 3600
-
-[portscan.targets]
-ports = 1-1000
-exclude_ips = 192.168.1.1,192.168.1.254
-ip_ranges = 192.168.1.0/24,10.0.0.0/8
-
-[kopiasnapshotstatus.targets]
-snapshot_paths = /data,/backups
-max_age_hours = 24
+kopiasnapshotstatus:
+  uptime_kuma:
+    token: your-kopia-token
+  
+  targets:
+    snapshot_paths:
+      - /data
+      - /backups
+    max_age_hours: 24
 ```
 
 ### Environment Variables
@@ -318,6 +324,7 @@ max_age_hours = 24
 ```bash
 # Logging
 KUMA_SENTINEL_LOG_FILE=/var/log/kuma-sentinel.log
+KUMA_SENTINEL_LOG_LEVEL=INFO
 
 # Heartbeat (shared across all commands)
 KUMA_SENTINEL_HEARTBEAT_ENABLED=true
@@ -338,7 +345,7 @@ KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
 KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ```
 
-**Configuration Priority**: CLI arguments > INI file > Environment variables > Defaults
+**Configuration Priority**: CLI arguments > YAML file > Environment variables > Defaults
 
 ### CLI Arguments
 
@@ -367,7 +374,7 @@ kuma-sentinel portscan \
 
 ```bash
 # Run scan every 30 minutes
-*/30 * * * * kuma-sentinel portscan --config /etc/kuma-sentinel/config.ini
+*/30 * * * * kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
 ```
 
 ### Systemd Timer Example
@@ -381,7 +388,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/kuma-sentinel portscan --config /etc/kuma-sentinel/config.ini
+ExecStart=/usr/bin/kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
 StandardOutput=journal
 StandardError=journal
 ```
@@ -426,8 +433,9 @@ systemctl status kuma-sentinel.timer
 Logs are written to:
 
 1. **File**: Configured in `log_file` (default: `/var/log/kuma-sentinel.log`)
-2. **Console**: Standard output for direct execution
-3. **Journalctl**: Syslog integration for systemd systems
+2. **Level**: Configured in `log_level` (default: `INFO`, options: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
+3. **Console**: Standard output for direct execution
+4. **Journalctl**: Syslog integration for systemd systems
 
 Example log output:
 

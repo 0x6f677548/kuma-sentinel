@@ -1,10 +1,11 @@
 """Base configuration management for kuma sentinel."""
 
-import configparser
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
+
+import yaml
 
 
 # Declarative field mapping for config loading
@@ -14,11 +15,8 @@ class FieldMapping:
 
     env_var: Optional[str] = None  # Environment variable name
     arg_key: Optional[str] = None  # CLI argument key
-    ini_section: Optional[str] = None  # INI section name
-    ini_option: Optional[str] = None  # INI option name
+    yaml_path: Optional[str] = None  # YAML path (dot-separated: "section.subsection.key")
     converter: Callable[[str], Any] = str  # Type converter function
-    list_converter: bool = False  # If True, split by comma
-    bool_converter: bool = False  # If True, parse as boolean
 
 
 # Hardcoded defaults are now inlined in field mappings and __init__ methods
@@ -42,6 +40,7 @@ class ConfigBase(ABC):
         """Initialize configuration with defaults."""
         # Shared attributes
         self.log_file = "/var/log/kuma-sentinel.log"
+        self.log_level = "INFO"
         self.uptime_kuma_url: Optional[str] = None
         self.heartbeat_enabled = True
         self.heartbeat_interval = 300
@@ -61,48 +60,48 @@ class ConfigBase(ABC):
             "log_file": FieldMapping(
                 env_var="KUMA_SENTINEL_LOG_FILE",
                 arg_key="log_file",
-                ini_section="logging",
-                ini_option="log_file",
+                yaml_path="logging.log_file",
+            ),
+            "log_level": FieldMapping(
+                env_var="KUMA_SENTINEL_LOG_LEVEL",
+                arg_key="log_level",
+                yaml_path="logging.log_level",
             ),
             "uptime_kuma_url": FieldMapping(
                 arg_key="uptime_kuma_url",
-                ini_section="uptime_kuma",
-                ini_option="url",
+                yaml_path="uptime_kuma.url",
             ),
             "heartbeat_enabled": FieldMapping(
                 env_var="KUMA_SENTINEL_HEARTBEAT_ENABLED",
-                ini_section="heartbeat",
-                ini_option="enabled",
-                bool_converter=True,
+                yaml_path="heartbeat.enabled",
+                converter=self._parse_bool,
             ),
             "heartbeat_interval": FieldMapping(
                 env_var="KUMA_SENTINEL_HEARTBEAT_INTERVAL",
-                ini_section="heartbeat",
-                ini_option="interval",
+                yaml_path="heartbeat.interval",
                 converter=int,
             ),
             "heartbeat_token": FieldMapping(
                 env_var="KUMA_SENTINEL_HEARTBEAT_TOKEN",
                 arg_key="heartbeat_token",
-                ini_section="heartbeat.uptime_kuma",
-                ini_option="token",
+                yaml_path="heartbeat.uptime_kuma.token",
             ),
         }
 
-    def load_from_ini(self, config_file: str) -> None:
-        """Load configuration from INI file.
+    def load_from_yaml(self, config_file: str) -> None:
+        """Load configuration from YAML file.
 
         Args:
-            config_file: Path to INI configuration file
+            config_file: Path to YAML configuration file
 
         Raises:
             FileNotFoundError: If config file not found
             RuntimeError: If config file parsing fails
         """
         try:
-            parser = configparser.ConfigParser()
-            parser.read(config_file)
-            self._apply_field_mappings_from_ini(parser)
+            with open(config_file) as f:
+                data = yaml.safe_load(f) or {}
+            self._apply_field_mappings_from_yaml(data)
         except FileNotFoundError as e:
             raise FileNotFoundError(
                 f"Configuration file not found: {config_file}"
@@ -119,7 +118,7 @@ class ConfigBase(ABC):
     def load_from_env(self) -> None:
         """Load configuration from environment variables.
 
-        Loading priority: CLI args > INI file > Environment variables > Defaults
+        Loading priority: CLI args > YAML file > Environment variables > Defaults
         """
         self._apply_field_mappings_from_env()
 
@@ -157,21 +156,17 @@ class ConfigBase(ABC):
                 converted = self._convert_value(env_value, mapping)
                 setattr(self, field_name, converted)
 
-    def _apply_field_mappings_from_ini(self, parser: configparser.ConfigParser) -> None:
-        """Apply field mappings from INI file."""
+    def _apply_field_mappings_from_yaml(self, data: dict) -> None:
+        """Apply field mappings from YAML data dictionary."""
         mappings = self._get_field_mappings()
         for field_name, mapping in mappings.items():
-            if not mapping.ini_section or not mapping.ini_option:
+            if not mapping.yaml_path:
                 continue
 
-            if not parser.has_section(mapping.ini_section):
-                continue
-            if not parser.has_option(mapping.ini_section, mapping.ini_option):
-                continue
-
-            ini_value = parser.get(mapping.ini_section, mapping.ini_option)
-            converted = self._convert_value(ini_value, mapping)
-            setattr(self, field_name, converted)
+            yaml_value = self._get_nested_value(data, mapping.yaml_path)
+            if yaml_value is not None:
+                converted = self._convert_value(yaml_value, mapping)
+                setattr(self, field_name, converted)
 
     def _apply_field_mappings_from_args(self, args: dict) -> None:
         """Apply field mappings from command-line arguments."""
@@ -186,19 +181,53 @@ class ConfigBase(ABC):
                 setattr(self, field_name, converted)
 
     @staticmethod
-    def _convert_value(value: str, mapping: FieldMapping) -> Any:
-        """Convert a string value using the mapping's converter.
+    def _get_nested_value(data: dict, path: str) -> Any:
+        """Get value from nested dictionary using dot-separated path.
 
-        Handles bool and list conversions specially.
+        Args:
+            data: Dictionary to search
+            path: Dot-separated path (e.g., "logging.log_file")
+
+        Returns:
+            Value at path, or None if not found
         """
-        if mapping.bool_converter:
+        keys = path.split(".")
+        current: Any = data
+        for key in keys:
+            if isinstance(current, dict):
+                current = current.get(key)
+            else:
+                return None
+        return current
+
+    @staticmethod
+    def _convert_value(value: Any, mapping: FieldMapping) -> Any:
+        """Convert a value using the mapping's converter.
+
+        Handles type conversion appropriately based on YAML native types.
+        """
+        # If value is already the right type (from YAML parsing), return as-is
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value
+        if isinstance(value, list):
+            return value
+
+        # Convert strings using the mapping converter
+        if isinstance(value, str):
+            return mapping.converter(value)
+
+        return value
+
+    @staticmethod
+    def _parse_bool(value: Any) -> bool:
+        """Parse a value as boolean."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
             return value.lower() in ("true", "yes", "1", "on")
-
-        if mapping.list_converter:
-            items = [item.strip() for item in value.split(",")]
-            return [mapping.converter(item) for item in items]
-
-        return mapping.converter(value)
+        return bool(value)
 
     @abstractmethod
     def get_summary(self, mask_tokens: bool = True) -> dict:

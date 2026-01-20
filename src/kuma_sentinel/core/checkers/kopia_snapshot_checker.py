@@ -25,6 +25,7 @@ def _run_kopia_command(
         Tuple of (success: bool, stdout: Optional[str], stderr: Optional[str])
     """
     try:
+        logger.debug(f"🔧 Running kopia command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,

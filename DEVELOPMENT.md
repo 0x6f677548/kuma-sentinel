@@ -107,8 +107,7 @@ kuma-sentinel/
 ├── README.md                  # User documentation
 ├── DEVELOPMENT.md             # This file - development guide
 ├── LICENSE                    # MIT License
-├── example.config.ini         # Example configuration template
-└── .gitignore                 # Git ignore rules
+├── example.config.yaml        # Example configuration template
 ```
 
 ### Directory Details
@@ -163,12 +162,44 @@ class FieldMapping:
     """Declarative mapping for a config field across all loading sources."""
     env_var: Optional[str] = None           # Environment variable name
     arg_key: Optional[str] = None           # CLI argument key
-    ini_section: Optional[str] = None       # INI section name
-    ini_option: Optional[str] = None        # INI option name
+    yaml_path: Optional[str] = None         # YAML path (dot-separated: "section.key")
     converter: Callable[[str], Any] = str   # Type converter function
-    list_converter: bool = False            # If True, split by comma
-    bool_converter: bool = False            # If True, parse as boolean
 ```
+
+### Configuration Loading
+
+Configuration is loaded in priority order:
+
+1. **Defaults** - Set in `ConfigBase.__init__()` and subclass `__init__()` methods
+2. **Environment Variables** - Via `load_from_env()` using `env_var` field mapping
+3. **YAML File** - Via `load_from_yaml()` using `yaml_path` mapping
+4. **CLI Arguments** - Via `load_from_args()` using `arg_key` mapping
+
+Each layer can override values from previous layers through declarative `FieldMapping` definitions.
+
+### YAML Configuration Format
+
+Configuration files use YAML with nested structures:
+
+```yaml
+logging:
+  log_file: /var/log/kuma-sentinel.log
+  log_level: INFO
+
+heartbeat:
+  enabled: true
+  interval: 300
+  uptime_kuma:
+    token: heartbeat-token
+
+portscan:
+  targets:
+    ports: 1-1000
+    ip_ranges:
+      - 192.168.1.0/24
+```
+
+Lists are natively supported in YAML, eliminating need for comma-separated string parsing.
 
 ## Making Changes
 
@@ -240,22 +271,19 @@ class MyCheckConfig(ConfigBase):
             "mycheck_enabled": FieldMapping(
                 env_var="KUMA_SENTINEL_MYCHECK_ENABLED",
                 arg_key="enabled",
-                ini_section="mycheck",
-                ini_option="enabled",
-                bool_converter=True,
+                yaml_path="mycheck.enabled",
+                converter=self._parse_bool,
             ),
             "mycheck_timeout": FieldMapping(
                 env_var="KUMA_SENTINEL_MYCHECK_TIMEOUT",
                 arg_key="timeout",
-                ini_section="mycheck",
-                ini_option="timeout",
+                yaml_path="mycheck.timeout",
                 converter=int,
             ),
             "command_token": FieldMapping(
                 env_var="KUMA_SENTINEL_MYCHECK_TOKEN",
                 arg_key="mycheck_token",
-                ini_section="mycheck.uptime_kuma",
-                ini_option="token",
+                yaml_path="mycheck.uptime_kuma.token",
             ),
         })
         return mappings
@@ -383,7 +411,7 @@ class MyCheckCommand(CommandExecutor):
         base_command = click.option(
             "--config",
             type=click.Path(exists=True),
-            help="INI configuration file",
+            help="YAML configuration file",
         )(base_command)
 
         base_command = click.option(
@@ -490,15 +518,14 @@ kuma-sentinel mycheck --help
 
 ### Configuration File Example
 
-Add to `example.config.ini`:
+Add to `example.config.yaml`:
 
-```ini
-[mycheck]
-enabled = true
-timeout = 300
-
-[mycheck.uptime_kuma]
-token = your-mycheck-token
+```yaml
+mycheck:
+  enabled: true
+  timeout: 300
+  uptime_kuma:
+    token: your-mycheck-token
 ```
 
 ### Environment Variables Example

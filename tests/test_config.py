@@ -4,6 +4,7 @@ import os
 import tempfile
 
 import pytest
+import yaml
 
 from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 from kuma_sentinel.core.config.portscan_config import (
@@ -41,40 +42,30 @@ def test_portscan_config_load_from_env(monkeypatch):
     assert config.portscan_nmap_timing == "T4"
 
 
-def test_portscan_config_load_from_ini():
-    """Test loading portscan configuration from INI file."""
-    ini_content = """[logging]
-log_file = /tmp/test.log
-
-[heartbeat]
-enabled = true
-interval = 600
-
-[uptime_kuma]
-url = http://localhost/api/push
-
-[heartbeat.uptime_kuma]
-token = test_heartbeat
-
-[portscan.uptime_kuma]
-token = test_portscan
-
-[portscan.nmap]
-timing = T2
-
-[portscan.targets]
-ports = 1-10000
-exclude_ips = 192.168.1.1
-ip_ranges = 192.168.1.0/24,10.0.0.0/8
-"""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as f:
-        f.write(ini_content)
+def test_portscan_config_load_from_yaml():
+    """Test loading portscan configuration from YAML file."""
+    yaml_content = {
+        "logging": {"log_file": "/tmp/test.log"},
+        "heartbeat": {"enabled": True, "interval": 600, "uptime_kuma": {"token": "test_heartbeat"}},
+        "uptime_kuma": {"url": "http://localhost/api/push"},
+        "portscan": {
+            "uptime_kuma": {"token": "test_portscan"},
+            "nmap": {"timing": "T2"},
+            "targets": {
+                "ports": "1-10000",
+                "exclude_ips": "192.168.1.1",
+                "ip_ranges": ["192.168.1.0/24", "10.0.0.0/8"],
+            },
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(yaml_content, f)
         f.flush()
         config_file = f.name
 
     try:
         config = PortscanConfig()
-        config.load_from_ini(config_file)
+        config.load_from_yaml(config_file)
 
         assert config.log_file == "/tmp/test.log"
         assert config.portscan_nmap_ports == "1-10000"
@@ -141,32 +132,28 @@ def test_portscan_config_get_summary():
     assert summary["portscan_token"] == "token"
 
 
-def test_kopia_config_load_from_ini():
-    """Test loading kopia configuration from INI file."""
-    ini_content = """[logging]
-log_file = /tmp/test.log
-
-[uptime_kuma]
-url = http://localhost/api/push
-
-[heartbeat.uptime_kuma]
-token = test_heartbeat
-
-[kopiasnapshotstatus.targets]
-snapshot_paths = /data,/backups
-max_age_hours = 48
-
-[kopiasnapshotstatus.uptime_kuma]
-token = test_kopia
-"""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as f:
-        f.write(ini_content)
+def test_kopia_config_load_from_yaml():
+    """Test loading kopia configuration from YAML file."""
+    yaml_content = {
+        "logging": {"log_file": "/tmp/test.log"},
+        "uptime_kuma": {"url": "http://localhost/api/push"},
+        "heartbeat": {"uptime_kuma": {"token": "test_heartbeat"}},
+        "kopiasnapshotstatus": {
+            "targets": {
+                "snapshot_paths": ["/data", "/backups"],
+                "max_age_hours": 48,
+            },
+            "uptime_kuma": {"token": "test_kopia"},
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(yaml_content, f)
         f.flush()
         config_file = f.name
 
     try:
         config = KopiaSnapshotConfig()
-        config.load_from_ini(config_file)
+        config.load_from_yaml(config_file)
 
         assert config.log_file == "/tmp/test.log"
         assert config.kopiasnapshotstatus_snapshot_paths == ["/data", "/backups"]
@@ -230,11 +217,11 @@ def test_kopia_config_load_kopia_token_from_env(monkeypatch):
 
 
 def test_token_loading_priority_portscan(monkeypatch, tmp_path):
-    """Test token loading priority: CLI > INI > Env > Defaults for portscan.
+    """Test token loading priority: CLI > YAML > Env > Defaults for portscan.
 
     Priority order:
     1. CLI arguments (highest)
-    2. INI file
+    2. YAML file
     3. Environment variables
     4. Defaults (lowest)
     """
@@ -242,15 +229,14 @@ def test_token_loading_priority_portscan(monkeypatch, tmp_path):
     monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat")
     monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "env_portscan")
 
-    # Create INI file with tokens
-    config_file = tmp_path / "config.ini"
-    config_file.write_text("""
-[heartbeat.uptime_kuma]
-token = ini_heartbeat
-
-[portscan.uptime_kuma]
-token = ini_portscan
-""")
+    # Create YAML file with tokens
+    config_file = tmp_path / "config.yaml"
+    yaml_data = {
+        "heartbeat": {"uptime_kuma": {"token": "ini_heartbeat"}},
+        "portscan": {"uptime_kuma": {"token": "ini_portscan"}},
+    }
+    with open(config_file, "w") as f:
+        yaml.dump(yaml_data, f)
 
     config = PortscanConfig()
 
@@ -262,8 +248,8 @@ token = ini_portscan
     assert config.heartbeat_token == "env_heartbeat"
     assert config.command_token == "env_portscan"
 
-    # Step 3: Load from INI (overrides env)
-    config.load_from_ini(str(config_file))
+    # Step 3: Load from YAML (overrides env)
+    config.load_from_yaml(str(config_file))
     assert config.heartbeat_token == "ini_heartbeat"
     assert config.command_token == "ini_portscan"
 
@@ -276,20 +262,19 @@ token = ini_portscan
 
 
 def test_token_loading_priority_kopia(monkeypatch, tmp_path):
-    """Test token loading priority: CLI > INI > Env > Defaults for kopia."""
+    """Test token loading priority: CLI > YAML > Env > Defaults for kopia."""
     # Set environment variables
     monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat")
     monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN", "env_kopia")
 
-    # Create INI file with tokens
-    config_file = tmp_path / "config.ini"
-    config_file.write_text("""
-[heartbeat.uptime_kuma]
-token = ini_heartbeat
-
-[kopiasnapshotstatus.uptime_kuma]
-token = ini_kopia
-""")
+    # Create YAML file with tokens
+    config_file = tmp_path / "config.yaml"
+    yaml_data = {
+        "heartbeat": {"uptime_kuma": {"token": "ini_heartbeat"}},
+        "kopiasnapshotstatus": {"uptime_kuma": {"token": "ini_kopia"}},
+    }
+    with open(config_file, "w") as f:
+        yaml.dump(yaml_data, f)
 
     config = KopiaSnapshotConfig()
 
@@ -301,10 +286,10 @@ token = ini_kopia
     assert config.heartbeat_token == "env_heartbeat"
     assert config.command_token == "env_kopia"
 
-    # Step 3: Load from INI (overrides env)
-    config.load_from_ini(str(config_file))
+    # Step 3: Load from YAML (overrides env)
+    config.load_from_yaml(str(config_file))
     assert config.heartbeat_token == "ini_heartbeat"
-    assert config.command_token == "ini_kopia"  # INI overrides env
+    assert config.command_token == "ini_kopia"  # YAML overrides env
 
     # Step 4: Load from CLI args (overrides everything)
     config.load_from_args(

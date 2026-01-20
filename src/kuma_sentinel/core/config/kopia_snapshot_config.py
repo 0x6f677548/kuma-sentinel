@@ -23,23 +23,18 @@ class KopiaSnapshotConfig(ConfigBase):
             {
                 "kopiasnapshotstatus_snapshot_paths": FieldMapping(
                     arg_key="snapshot_paths",
-                    ini_section="kopiasnapshotstatus.targets",
-                    ini_option="snapshot_paths",
-                    converter=str,
-                    list_converter=True,
+                    yaml_path="kopiasnapshotstatus.targets.snapshot_paths",
                 ),
                 "kopiasnapshotstatus_max_age_hours": FieldMapping(
                     env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS",
                     arg_key="max_age_hours",
-                    ini_section="kopiasnapshotstatus.targets",
-                    ini_option="max_age_hours",
+                    yaml_path="kopiasnapshotstatus.targets.max_age_hours",
                     converter=int,
                 ),
                 "command_token": FieldMapping(
                     env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN",
                     arg_key="kopiasnapshotstatus_token",
-                    ini_section="kopiasnapshotstatus.uptime_kuma",
-                    ini_option="token",
+                    yaml_path="kopiasnapshotstatus.uptime_kuma.token",
                 ),
             }
         )

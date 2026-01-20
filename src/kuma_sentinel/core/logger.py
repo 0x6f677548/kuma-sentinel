@@ -6,14 +6,17 @@ import sys
 from pathlib import Path
 
 
-def setup_logging(log_file):
+def setup_logging(log_file, log_level="INFO"):
     """Configure logging with file, stdout, and journalctl.
 
     Args:
         log_file: Path to log file
+        log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
     logger = logging.getLogger("kuma_sentinel")
-    logger.setLevel(logging.INFO)
+    # Convert string log level to logging constant
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    logger.setLevel(level)
 
     # Remove existing handlers to avoid duplicates
     logger.handlers.clear()

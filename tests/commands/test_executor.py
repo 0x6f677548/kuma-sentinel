@@ -1,10 +1,6 @@
 """Tests for command executor orchestration."""
 
-from unittest.mock import MagicMock, Mock, patch, call
-import os
-import sys
-import yaml
-import tempfile
+from unittest.mock import MagicMock, Mock, patch
 
 import click
 import pytest
@@ -12,7 +8,6 @@ import pytest
 from kuma_sentinel.cli.commands.executor import CommandExecutor
 from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 from kuma_sentinel.core.config.portscan_config import PortscanConfig
-from kuma_sentinel.core.models import CheckResult
 
 
 class ConcreteExecutor(CommandExecutor):

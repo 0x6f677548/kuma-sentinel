@@ -1,7 +1,5 @@
 """Tests for HeartbeatService."""
 
-import threading
-import time
 from unittest.mock import Mock, patch
 
 from kuma_sentinel.core.heartbeat import HeartbeatService

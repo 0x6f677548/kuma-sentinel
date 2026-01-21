@@ -1,6 +1,6 @@
 """Kopia snapshot status command configuration."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from .base import ConfigBase, FieldMapping
 

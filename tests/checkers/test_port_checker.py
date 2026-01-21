@@ -240,6 +240,7 @@ def test_parse_nmap_xml_invalid_file():
     finally:
         os.unlink(xml_file)
 
+
 # Tests for PortChecker.execute() public method
 class TestPortCheckerExecute:
     """Test PortChecker.execute() - the public execution interface."""
@@ -270,8 +271,10 @@ class TestPortCheckerExecute:
             xml_file = f.name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=100):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -321,8 +324,10 @@ class TestPortCheckerExecute:
             xml_file = f.name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=100):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -349,7 +354,9 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
+        with patch(
+            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+        ) as mock_scan:
             mock_scan.return_value = (False, None)
 
             result = checker.execute()
@@ -372,11 +379,15 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        xml_file = tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False).name
+        xml_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ).name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=0):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=0):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -400,7 +411,9 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
+        with patch(
+            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+        ) as mock_scan:
             mock_scan.return_value = (True, "/nonexistent/file.xml")
 
             result = checker.execute()
@@ -431,8 +444,10 @@ class TestPortCheckerExecute:
             xml_file = f.name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=100):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -466,8 +481,10 @@ class TestPortCheckerExecute:
             xml_file = f.name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=100):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -490,7 +507,9 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
+        with patch(
+            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+        ) as mock_scan:
             mock_scan.side_effect = Exception("Unexpected error")
 
             result = checker.execute()
@@ -544,8 +563,10 @@ class TestPortCheckerExecute:
             xml_file = f.name
 
         try:
-            with patch('kuma_sentinel.core.checkers.port_checker._run_nmap_scan') as mock_scan:
-                with patch('os.path.getsize', return_value=100):
+            with patch(
+                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+            ) as mock_scan:
+                with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
 
                     result = checker.execute()
@@ -553,8 +574,12 @@ class TestPortCheckerExecute:
                     assert result.status == "down"
                     assert "Open ports found" in result.message
                     assert len(result.details["open_hosts"]) == 2
-                    assert any("192.168.1.10" in h for h in result.details["open_hosts"])
-                    assert any("192.168.1.20" in h for h in result.details["open_hosts"])
+                    assert any(
+                        "192.168.1.10" in h for h in result.details["open_hosts"]
+                    )
+                    assert any(
+                        "192.168.1.20" in h for h in result.details["open_hosts"]
+                    )
         finally:
             if os.path.exists(xml_file):
                 os.unlink(xml_file)

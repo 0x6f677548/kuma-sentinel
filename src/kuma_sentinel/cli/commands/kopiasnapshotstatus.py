@@ -56,5 +56,3 @@ class KopiaSnapshotStatusCommand(CommandExecutor):
                 "Heartbeat Enabled": "heartbeat_enabled",
             },
         }
-
-

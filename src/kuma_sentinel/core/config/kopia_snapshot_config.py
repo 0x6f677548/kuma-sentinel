@@ -26,16 +26,20 @@ class KopiaSnapshotConfig(ConfigBase):
         - Click tuples: ((path1, age1), (path2, age2), ...)
         - Environment string: "path1:age1,path2:age2"
         - Already converted list: [{"path": path1, "max_age_hours": age1}, ...]
-        
+
         Returns: [{"path": path1, "max_age_hours": age1}, ...]
         """
         if not snapshots_input:
             return []
-        
+
         # If already a list of dicts, return as-is
-        if isinstance(snapshots_input, list) and snapshots_input and isinstance(snapshots_input[0], dict):
+        if (
+            isinstance(snapshots_input, list)
+            and snapshots_input
+            and isinstance(snapshots_input[0], dict)
+        ):
             return snapshots_input
-        
+
         # If it's a string from environment (e.g., "/data:24,/backups:48")
         if isinstance(snapshots_input, str):
             result = []
@@ -43,13 +47,17 @@ class KopiaSnapshotConfig(ConfigBase):
                 item = item.strip()
                 if not item:
                     continue
-                parts = item.rsplit(":", 1)  # Split from right to handle paths with colons
+                parts = item.rsplit(
+                    ":", 1
+                )  # Split from right to handle paths with colons
                 if len(parts) == 2:
                     try:
-                        result.append({
-                            "path": parts[0].strip(),
-                            "max_age_hours": int(parts[1].strip())
-                        })
+                        result.append(
+                            {
+                                "path": parts[0].strip(),
+                                "max_age_hours": int(parts[1].strip()),
+                            }
+                        )
                     except ValueError:
                         # If can't parse age, skip this entry
                         continue
@@ -57,7 +65,7 @@ class KopiaSnapshotConfig(ConfigBase):
                     # Path without age - use default
                     result.append({"path": parts[0].strip()})
             return result
-        
+
         # If it's Click tuples ((path1, age1), (path2, age2), ...)
         try:
             return [
@@ -104,14 +112,16 @@ class KopiaSnapshotConfig(ConfigBase):
         snapshot_summary = []
         for snapshot in self.kopiasnapshotstatus_snapshots:
             path = snapshot.get("path", "")
-            max_age = snapshot.get("max_age_hours", self.kopiasnapshotstatus_max_age_hours)
+            max_age = snapshot.get(
+                "max_age_hours", self.kopiasnapshotstatus_max_age_hours
+            )
             snapshot_summary.append(f"{path}@{max_age}h")
 
         return {
             "log_file": self.log_file,
-            "kopiasnapshotstatus_snapshots": "; ".join(snapshot_summary)
-            if snapshot_summary
-            else "(using defaults)",
+            "kopiasnapshotstatus_snapshots": (
+                "; ".join(snapshot_summary) if snapshot_summary else "(using defaults)"
+            ),
             "kopiasnapshotstatus_max_age_hours_default": self.kopiasnapshotstatus_max_age_hours,
             "heartbeat_enabled": self.heartbeat_enabled,
             "heartbeat_interval": f"{self.heartbeat_interval}s",

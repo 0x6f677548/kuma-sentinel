@@ -212,13 +212,19 @@ class KopiaSnapshotChecker(Checker):
             for snapshot_config in snapshots:
                 path = snapshot_config.get("path")
                 if not path:
-                    self.logger.warning("⚠️  Snapshot config missing 'path' field, skipping")
+                    self.logger.warning(
+                        "⚠️  Snapshot config missing 'path' field, skipping"
+                    )
                     continue
 
                 # Get per-path max_age_hours or use default
-                max_age_hours = snapshot_config.get("max_age_hours", default_max_age_hours)
+                max_age_hours = snapshot_config.get(
+                    "max_age_hours", default_max_age_hours
+                )
 
-                self.logger.info(f"📋 Checking snapshot path: {path} (max age: {max_age_hours}h)")
+                self.logger.info(
+                    f"📋 Checking snapshot path: {path} (max age: {max_age_hours}h)"
+                )
 
                 age_hours, metadata = _get_latest_snapshot_age(self.logger, path)
 

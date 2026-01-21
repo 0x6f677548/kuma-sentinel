@@ -15,8 +15,12 @@ class FieldMapping:
 
     env_var: Optional[str] = None  # Environment variable name
     arg_key: Optional[str] = None  # CLI argument key
-    yaml_path: Optional[str] = None  # YAML path (dot-separated: "section.subsection.key")
-    converter: Callable[[Any], Any] = str  # Type converter function (can take any type, returns Any)
+    yaml_path: Optional[str] = (
+        None  # YAML path (dot-separated: "section.subsection.key")
+    )
+    converter: Callable[[Any], Any] = (
+        str  # Type converter function (can take any type, returns Any)
+    )
 
 
 # Hardcoded defaults are now inlined in field mappings and __init__ methods

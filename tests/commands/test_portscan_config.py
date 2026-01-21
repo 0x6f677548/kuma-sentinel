@@ -42,7 +42,11 @@ def test_portscan_config_load_from_yaml():
     """Test loading portscan configuration from YAML file."""
     yaml_content = {
         "logging": {"log_file": "/tmp/test.log"},
-        "heartbeat": {"enabled": True, "interval": 600, "uptime_kuma": {"token": "test_heartbeat"}},
+        "heartbeat": {
+            "enabled": True,
+            "interval": 600,
+            "uptime_kuma": {"token": "test_heartbeat"},
+        },
         "uptime_kuma": {"url": "http://localhost/api/push"},
         "portscan": {
             "uptime_kuma": {"token": "test_portscan"},
@@ -189,3 +193,269 @@ def test_token_loading_priority_portscan(monkeypatch, tmp_path):
     )
     assert config.heartbeat_token == "cli_heartbeat"
     assert config.command_token == "cli_portscan"
+
+
+# ============================================================================
+# Edge Case & Missing Coverage Tests
+# ============================================================================
+
+
+def test_portscan_config_parse_comma_separated_list_with_list_input():
+    """Test _parse_comma_separated_list handles list input directly."""
+    config = PortscanConfig()
+
+    input_list = ["192.168.1.0/24", "10.0.0.0/8"]
+    result = config._parse_comma_separated_list(input_list)  # type: ignore
+    assert result == input_list
+
+
+def test_portscan_config_parse_comma_separated_list_empty_strings():
+    """Test _parse_comma_separated_list filters empty strings."""
+    config = PortscanConfig()
+
+    result = config._parse_comma_separated_list("192.168.1.0/24,,10.0.0.0/8,")
+    assert result == ["192.168.1.0/24", "10.0.0.0/8"]
+
+
+def test_portscan_config_parse_bool_true_variants(monkeypatch):
+    """Test _parse_bool converts various true representations."""
+    config = PortscanConfig()
+
+    # Test with environment variable set to various truthy values
+    for truthy_value in ["true", "True", "TRUE", "1", "yes", "YES"]:
+        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT", truthy_value)
+        config = PortscanConfig()
+        config.load_from_env()
+        assert config.portscan_nmap_keep_xmloutput is True, f"Failed for {truthy_value}"
+
+
+def test_portscan_config_parse_bool_false_variants(monkeypatch):
+    """Test _parse_bool converts various false representations."""
+    config = PortscanConfig()
+
+    # Test with environment variable set to various falsy values
+    for falsy_value in ["false", "False", "FALSE", "0", "no", "NO", ""]:
+        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT", falsy_value)
+        config = PortscanConfig()
+        config.load_from_env()
+        assert config.portscan_nmap_keep_xmloutput is False, f"Failed for {falsy_value}"
+
+
+def test_portscan_config_load_bool_from_yaml(tmp_path):
+    """Test loading boolean flag from YAML."""
+    yaml_content = {
+        "portscan": {
+            "nmap": {"keep_xml_output": True},
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(yaml_content, f)
+        f.flush()
+        config_file = f.name
+
+    try:
+        config = PortscanConfig()
+        config.load_from_yaml(config_file)
+        assert config.portscan_nmap_keep_xmloutput is True
+    finally:
+        os.unlink(config_file)
+
+
+def test_portscan_config_nmap_timeout_int_conversion(monkeypatch):
+    """Test nmap timeout is converted to int from environment variable."""
+    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT", "7200")
+
+    config = PortscanConfig()
+    config.load_from_env()
+
+    assert config.portscan_nmap_timeout == 7200
+    assert isinstance(config.portscan_nmap_timeout, int)
+
+
+def test_portscan_config_get_summary_with_exclusions():
+    """Test get_summary includes exclusion list."""
+    config = PortscanConfig()
+    config.portscan_ip_ranges = ["192.168.1.0/24"]
+    config.portscan_exclude = ["192.168.1.1", "192.168.1.2"]
+    config.uptime_kuma_url = "http://localhost"
+    config.heartbeat_token = "hb_token"
+    config.command_token = "cmd_token"
+
+    summary = config.get_summary(mask_tokens=False)
+
+    assert summary["portscan_exclude"] == "192.168.1.1, 192.168.1.2"
+    assert summary["portscan_nmap_keep_xmloutput"] is False
+
+
+def test_portscan_config_get_summary_without_exclusions():
+    """Test get_summary shows (none) for empty exclusion list."""
+    config = PortscanConfig()
+    config.portscan_ip_ranges = ["192.168.1.0/24"]
+    config.uptime_kuma_url = "http://localhost"
+    config.heartbeat_token = "hb_token"
+    config.command_token = "cmd_token"
+
+    summary = config.get_summary()
+
+    assert summary["portscan_exclude"] == "(none)"
+
+
+def test_portscan_config_get_summary_without_nmap_arguments():
+    """Test get_summary shows (none) for empty nmap arguments."""
+    config = PortscanConfig()
+    config.portscan_ip_ranges = ["192.168.1.0/24"]
+    config.uptime_kuma_url = "http://localhost"
+    config.heartbeat_token = "hb_token"
+    config.command_token = "cmd_token"
+
+    summary = config.get_summary()
+
+    assert summary["portscan_nmap_arguments"] == "(none)"
+
+
+def test_portscan_config_get_summary_with_nmap_arguments():
+    """Test get_summary includes nmap arguments."""
+    config = PortscanConfig()
+    config.portscan_nmap_arguments = ["-A", "-v"]
+    config.portscan_ip_ranges = ["192.168.1.0/24"]
+    config.uptime_kuma_url = "http://localhost"
+    config.heartbeat_token = "hb_token"
+    config.command_token = "cmd_token"
+
+    summary = config.get_summary(mask_tokens=False)
+
+    assert summary["portscan_nmap_arguments"] == ["-A", "-v"]
+
+
+def test_portscan_config_load_nmap_arguments_from_yaml(tmp_path):
+    """Test loading nmap arguments from YAML."""
+    yaml_content = {
+        "portscan": {
+            "nmap": {"arguments": ["-A", "-sV"]},
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(yaml_content, f)
+        f.flush()
+        config_file = f.name
+
+    try:
+        config = PortscanConfig()
+        config.load_from_yaml(config_file)
+        assert config.portscan_nmap_arguments == ["-A", "-sV"]
+    finally:
+        os.unlink(config_file)
+
+
+def test_portscan_parse_comma_separated_with_list_input():
+    """Test _parse_comma_separated_list handles list input directly."""
+    config = PortscanConfig()
+    # This test specifically covers the isinstance(value, list) branch
+    input_list = ["192.168.1.1", "192.168.1.2", "192.168.1.3"]
+    result = config._parse_comma_separated_list(input_list)  # type: ignore
+    assert result == input_list
+
+
+def test_portscan_parse_comma_separated_edge_cases():
+    """Test _parse_comma_separated_list with edge cases."""
+    config = PortscanConfig()
+
+    # Only whitespace
+    assert config._parse_comma_separated_list("   ,  ,   ") == []
+
+    # Single item
+    assert config._parse_comma_separated_list("192.168.1.1") == ["192.168.1.1"]
+
+    # Trailing/leading whitespace
+    assert config._parse_comma_separated_list("  192.168.1.1  ,  192.168.1.2  ") == [
+        "192.168.1.1",
+        "192.168.1.2",
+    ]
+
+    # Empty string
+    assert config._parse_comma_separated_list("") == []
+
+    # None should be handled
+    assert config._parse_comma_separated_list(None) == []  # type: ignore
+
+
+def test_portscan_config_validation_success(monkeypatch):
+    """Test validation succeeds with all required fields."""
+    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "heartbeat_token_123")
+    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "command_token_456")
+    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_IP_RANGES", "192.168.1.0/24")
+
+    config = PortscanConfig()
+    config.uptime_kuma_url = (
+        "http://kuma:3001/api/push"  # Set directly since not in env vars
+    )
+    config.load_from_env()
+
+    # Should not raise
+    config.validate()
+
+
+def test_portscan_config_validation_missing_uptime_url():
+    """Test validation fails when URL is missing."""
+    config = PortscanConfig()
+    config.uptime_kuma_url = None
+    config.heartbeat_token = "token"
+    config.command_token = "token"
+
+    with pytest.raises(ValueError) as exc_info:
+        config.validate()
+
+    assert "Uptime Kuma URL" in str(exc_info.value)
+
+
+def test_portscan_config_validation_missing_heartbeat_token():
+    """Test validation fails when heartbeat token is missing."""
+    config = PortscanConfig()
+    config.uptime_kuma_url = "http://kuma"
+    config.heartbeat_token = None
+    config.command_token = "token"
+
+    with pytest.raises(ValueError) as exc_info:
+        config.validate()
+
+    assert "Heartbeat push token" in str(exc_info.value)
+
+
+def test_portscan_config_validation_missing_command_token():
+    """Test validation fails when command token is missing."""
+    config = PortscanConfig()
+    config.uptime_kuma_url = "http://kuma"
+    config.heartbeat_token = "token"
+    config.command_token = None
+
+    with pytest.raises(ValueError) as exc_info:
+        config.validate()
+
+    assert "Command push token" in str(exc_info.value)
+
+
+def test_portscan_config_yaml_file_not_found():
+    """Test loading from non-existent YAML file raises FileNotFoundError."""
+    config = PortscanConfig()
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        config.load_from_yaml("/nonexistent/path/config.yaml")
+
+    assert "Configuration file not found" in str(exc_info.value)
+
+
+def test_portscan_config_yaml_invalid_format():
+    """Test loading from invalid YAML file raises RuntimeError."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write("{ invalid: yaml: content:")
+        f.flush()
+        config_file = f.name
+
+    try:
+        config = PortscanConfig()
+        with pytest.raises(RuntimeError) as exc_info:
+            config.load_from_yaml(config_file)
+
+        assert "Failed to parse config file" in str(exc_info.value)
+    finally:
+        os.unlink(config_file)

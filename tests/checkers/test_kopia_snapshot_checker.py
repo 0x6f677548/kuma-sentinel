@@ -405,7 +405,7 @@ class TestKopiaSnapshotChecker:
         metadata1 = self.create_metadata()
         metadata2 = self.create_metadata()
         mock_age.side_effect = [
-            (5.0, metadata1),   # /data: 5h < 24h (OK)
+            (5.0, metadata1),  # /data: 5h < 24h (OK)
             (30.0, metadata2),  # /backups: 30h < 48h (OK, using per-path threshold)
         ]
 

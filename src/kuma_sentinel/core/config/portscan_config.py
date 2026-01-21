@@ -23,9 +23,17 @@ class PortscanConfig(ConfigBase):
 
     @staticmethod
     def _parse_comma_separated_list(value: str) -> List[str]:
-        """Parse comma-separated string into list, handling both strings and lists."""
-        if isinstance(value, list):
-            return value
+        """Parse comma-separated string into list, handling both strings and lists.
+
+        Args:
+            value: A string, list, or tuple to parse
+
+        Returns:
+            List of strings with whitespace trimmed
+        """
+        # Handle lists and tuples (from Click's multiple=True)
+        if isinstance(value, (list, tuple)):
+            return list(value)
         if not value:
             return []
         return [item.strip() for item in value.split(",") if item.strip()]

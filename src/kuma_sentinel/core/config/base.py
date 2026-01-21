@@ -179,6 +179,9 @@ class ConfigBase(ABC):
         - List[str] fields: Converts tuples from Click's multiple=True to lists
         - Fields with converter: Applies the converter function
         - Simple fields: Uses value as-is
+
+        Note: Empty lists/tuples from Click's multiple=True are treated as "not provided"
+        and don't override YAML or environment configurations.
         """
         mappings = self._get_field_mappings()
         type_hints = get_type_hints(self.__class__)
@@ -190,6 +193,12 @@ class ConfigBase(ABC):
             arg_value = args.get(mapping.arg_key)
             if arg_value is None:
                 continue
+
+            # Skip empty collections - these come from Click's multiple=True when no args provided
+            # We don't want empty tuples/lists to override YAML or env var values
+            if isinstance(arg_value, (list, tuple)) and not arg_value:
+                continue
+
             # Get the field's expected type from type hints
             field_type = type_hints.get(field_name)
 

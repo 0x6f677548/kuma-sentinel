@@ -170,7 +170,7 @@ class ConfigBase(ABC):
 
     def _apply_field_mappings_from_args(self, args: dict) -> None:
         """Apply field mappings from command-line arguments with intelligent type handling.
-        
+
         Handles:
         - List[str] fields: Converts tuples from Click's multiple=True to lists
         - Fields with converter: Applies the converter function
@@ -178,7 +178,7 @@ class ConfigBase(ABC):
         """
         mappings = self._get_field_mappings()
         type_hints = get_type_hints(self.__class__)
-        
+
         for field_name, mapping in mappings.items():
             if not mapping.arg_key:
                 continue
@@ -186,22 +186,21 @@ class ConfigBase(ABC):
             arg_value = args.get(mapping.arg_key)
             if arg_value is None:
                 continue
-            
             # Get the field's expected type from type hints
             field_type = type_hints.get(field_name)
-            
+
             # Handle List[str] fields - convert tuple from Click to list
             if field_type == List[str]:
                 value = list(arg_value) if arg_value else []
-            
+
             # Handle converter function from mapping (if not default str converter)
             elif mapping.converter is not str:
                 value = mapping.converter(arg_value)
-            
+
             # For str type with no explicit converter, use value as-is
             else:
                 value = arg_value
-            
+
             setattr(self, field_name, value)
 
     @staticmethod

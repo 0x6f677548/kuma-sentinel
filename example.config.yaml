@@ -47,18 +47,17 @@ portscan:
     # Keep nmap XML output file (default: false)
     keep_xml_output: false
   
-  targets:
-    # Port range to scan (default: 1-1000)
-    ports: 1-1000
-    
-    # IPs/ranges to exclude from scan (as list)
-    # Example: ["192.168.1.1", "192.168.2.0/24"]
-    exclude: []
-    
-    # IP ranges to scan as a list
-    # Example: ["192.168.1.0/24", "10.0.0.0/8"]
-    ip_ranges:
-      - 192.168.1.0/24
+  # Port range to scan (default: 1-1000)
+  ports: 1-1000
+  
+  # IPs/ranges to exclude from scan (as list)
+  # Example: ["192.168.1.1", "192.168.2.0/24"]
+  exclude: []
+  
+  # IP ranges to scan as a list
+  # Example: ["192.168.1.0/24", "10.0.0.0/8"]
+  ip_ranges:
+    - 192.168.1.0/24
 
 # === KOPIA SNAPSHOT COMMAND CONFIGURATION ===
 
@@ -67,16 +66,15 @@ kopiasnapshotstatus:
     # Push token for kopia snapshot status alerts
     token: your_kopiasnapshotstatus_token_here
   
-  targets:
-    # List of snapshots with per-path maximum age thresholds
-    # Format: each snapshot has 'path' and optional 'max_age_hours'
-    # If 'max_age_hours' is omitted, uses the default value below
-    snapshots:
-      - path: /data
-        max_age_hours: 24
-      - path: /backups
-        max_age_hours: 48
-    
-    # Global default maximum age in hours for snapshots (default: 24)
-    # Used for any snapshot path that doesn't specify max_age_hours
-    max_age_hours: 24
+  # List of snapshots with per-path maximum age thresholds
+  # Format: each snapshot has 'path' and optional 'max_age_hours'
+  # If 'max_age_hours' is omitted, uses the default value below
+  snapshots:
+    - path: /data
+      max_age_hours: 24
+    - path: /backups
+      max_age_hours: 48
+  
+  # Global default maximum age in hours for snapshots (default: 24)
+  # Used for any snapshot path that doesn't specify max_age_hours
+  max_age_hours: 24

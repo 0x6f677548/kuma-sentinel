@@ -224,16 +224,18 @@ docker-compose up -d
 kopiasnapshotstatus:
   uptime_kuma:
     token: your-kopia-token
-  targets:
-    snapshots:
-      - path: /data
-        max_age_hours: 24      # Critical data - must be backed up daily
-      - path: /backups
-        max_age_hours: 48      # Important - allow 2 days
-      - path: /archive
-        max_age_hours: 168     # Archive - allow 1 week
-    max_age_hours: 24          # Global default
+  
+  snapshots:
+    - path: /data
+      max_age_hours: 24      # Critical data - must be backed up daily
+    - path: /backups
+      max_age_hours: 48      # Important - allow 2 days
+    - path: /archive
+      max_age_hours: 168     # Archive - allow 1 week
+  max_age_hours: 24          # Global default
 ```
+
+**See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration options**
 
 **Result**:
 - ✅ If all snapshots are fresh (within their thresholds) → Uptime Kuma shows UP
@@ -297,6 +299,10 @@ kuma-sentinel kopiasnapshotstatus --help
 
 Default location: `/etc/kuma-sentinel/config.yaml`
 
+**For detailed configuration options and examples, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)**
+
+Basic structure:
+
 ```yaml
 logging:
   log_file: /var/log/kuma-sentinel.log
@@ -321,59 +327,31 @@ portscan:
     keep_xml_output: false
     timeout: 3600
   
-  targets:
-    ports: 1-1000
-    exclude: [192.168.1.1, 192.168.1.254]
-    ip_ranges:
-      - 192.168.1.0/24
-      - 10.0.0.0/8
+  ports: 1-1000
+  exclude: [192.168.1.1, 192.168.1.254]
+  ip_ranges:
+    - 192.168.1.0/24
+    - 10.0.0.0/8
 
 kopiasnapshotstatus:
   uptime_kuma:
     token: your-kopia-token
   
-  targets:
-    # List of snapshots with per-path maximum age thresholds
-    # Each snapshot can have a different age requirement
-    snapshots:
-      - path: /data
-        max_age_hours: 24
-      - path: /backups
-        max_age_hours: 48
-      - path: /archive
-        # Omit max_age_hours to use the global default (24)
-    
-    # Global default for snapshots without explicit max_age_hours
-    max_age_hours: 24
+  snapshots:
+    - path: /data
+      max_age_hours: 24
+    - path: /backups
+      max_age_hours: 48
+  max_age_hours: 24
 ```
+
+See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration with per-path thresholds and examples.
 
 ### Environment Variables
 
-```bash
-# Logging
-KUMA_SENTINEL_LOG_FILE=/var/log/kuma-sentinel.log
-KUMA_SENTINEL_LOG_LEVEL=INFO
+For complete environment variable reference and examples, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#environment-variables)
 
-# Heartbeat (shared across all commands)
-KUMA_SENTINEL_HEARTBEAT_ENABLED=true
-KUMA_SENTINEL_HEARTBEAT_INTERVAL=300
-KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
-
-# Port Scan Command
-KUMA_SENTINEL_PORTSCAN_NMAP_PORTS=1-1000
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T3
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT=3600
-KUMA_SENTINEL_PORTSCAN_EXCLUDE="192.168.1.1,192.168.1.254"
-KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS=--script vuln
-KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT=false
-KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
-
-# Kopia Snapshot Status Command
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
-```
-
-**Configuration Priority**: CLI arguments > YAML file > Environment variables > Defaults
+**Configuration Priority** (highest to lowest): CLI arguments > YAML file > Environment variables > Defaults
 
 ### CLI Arguments
 

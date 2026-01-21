@@ -32,14 +32,16 @@ def test_portscan_config_defaults():
 
 def test_portscan_config_load_from_env(monkeypatch):
     """Test loading portscan configuration from environment variables."""
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_PORTS", "22,80,443")
+    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_PORTS", "22,80,443")
     monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_TIMING", "T4")
+    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_IP_RANGES", "192.168.1.0/24,10.0.0.0/8")
 
     config = PortscanConfig()
     config.load_from_env()
 
     assert config.portscan_nmap_ports == "22,80,443"
     assert config.portscan_nmap_timing == "T4"
+    assert config.portscan_ip_ranges == ["192.168.1.0/24", "10.0.0.0/8"]
 
 
 def test_portscan_config_load_from_yaml():
@@ -51,11 +53,9 @@ def test_portscan_config_load_from_yaml():
         "portscan": {
             "uptime_kuma": {"token": "test_portscan"},
             "nmap": {"timing": "T2"},
-            "targets": {
-                "ports": "1-10000",
-                "exclude": ["192.168.1.1"],
-                "ip_ranges": ["192.168.1.0/24", "10.0.0.0/8"],
-            },
+            "ports": "1-10000",
+            "exclude": ["192.168.1.1"],
+            "ip_ranges": ["192.168.1.0/24", "10.0.0.0/8"],
         },
     }
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -139,13 +139,11 @@ def test_kopia_config_load_from_yaml():
         "uptime_kuma": {"url": "http://localhost/api/push"},
         "heartbeat": {"uptime_kuma": {"token": "test_heartbeat"}},
         "kopiasnapshotstatus": {
-            "targets": {
-                "snapshots": [
-                    {"path": "/data", "max_age_hours": 24},
-                    {"path": "/backups", "max_age_hours": 48},
-                ],
-                "max_age_hours": 24,
-            },
+            "snapshots": [
+                {"path": "/data", "max_age_hours": 24},
+                {"path": "/backups", "max_age_hours": 48},
+            ],
+            "max_age_hours": 24,
             "uptime_kuma": {"token": "test_kopia"},
         },
     }
@@ -215,11 +213,16 @@ def test_kopia_config_load_heartbeat_token_from_env(monkeypatch):
 def test_kopia_config_load_kopia_token_from_env(monkeypatch):
     """Test loading kopia snapshot token from environment variable."""
     monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN", "env_kopia_token")
+    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS", "/data:24,/backups:48")
 
     config = KopiaSnapshotConfig()
     config.load_from_env()
 
     assert config.command_token == "env_kopia_token"
+    assert config.kopiasnapshotstatus_snapshots == [
+        {"path": "/data", "max_age_hours": 24},
+        {"path": "/backups", "max_age_hours": 48},
+    ]
 
 
 def test_token_loading_priority_portscan(monkeypatch, tmp_path):

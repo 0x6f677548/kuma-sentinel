@@ -21,15 +21,24 @@ class PortscanConfig(ConfigBase):
         self.portscan_ip_ranges: List[str] = []
         self.portscan_nmap_keep_xmloutput = False
 
+    @staticmethod
+    def _parse_comma_separated_list(value: str) -> List[str]:
+        """Parse comma-separated string into list, handling both strings and lists."""
+        if isinstance(value, list):
+            return value
+        if not value:
+            return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for portscan configuration."""
         mappings = super()._get_field_mappings()
         mappings.update(
             {
                 "portscan_nmap_ports": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_NMAP_PORTS",
+                    env_var="KUMA_SENTINEL_PORTSCAN_PORTS",
                     arg_key="ports",
-                    yaml_path="portscan.targets.ports",
+                    yaml_path="portscan.ports",
                 ),
                 "portscan_nmap_timing": FieldMapping(
                     env_var="KUMA_SENTINEL_PORTSCAN_NMAP_TIMING",
@@ -45,8 +54,8 @@ class PortscanConfig(ConfigBase):
                 "portscan_exclude": FieldMapping(
                     env_var="KUMA_SENTINEL_PORTSCAN_EXCLUDE",
                     arg_key="exclude",
-                    yaml_path="portscan.targets.exclude",
-                    converter=list,
+                    yaml_path="portscan.exclude",
+                    converter=self._parse_comma_separated_list,
                 ),
                 "portscan_nmap_keep_xmloutput": FieldMapping(
                     env_var="KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT",
@@ -63,8 +72,10 @@ class PortscanConfig(ConfigBase):
                     yaml_path="portscan.uptime_kuma.token",
                 ),
                 "portscan_ip_ranges": FieldMapping(
+                    env_var="KUMA_SENTINEL_PORTSCAN_IP_RANGES",
                     arg_key="ip_ranges",
-                    yaml_path="portscan.targets.ip_ranges",
+                    yaml_path="portscan.ip_ranges",
+                    converter=self._parse_comma_separated_list,
                 ),
             }
         )

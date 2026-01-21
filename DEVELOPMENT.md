@@ -193,10 +193,9 @@ heartbeat:
     token: heartbeat-token
 
 portscan:
-  targets:
-    ports: 1-1000
-    ip_ranges:
-      - 192.168.1.0/24
+  ports: 1-1000
+  ip_ranges:
+    - 192.168.1.0/24
 ```
 
 Lists are natively supported in YAML, eliminating need for comma-separated string parsing.
@@ -209,24 +208,25 @@ The Kopia snapshot checker demonstrates advanced configuration with **per-path t
 kopiasnapshotstatus:
   uptime_kuma:
     token: your-kopia-token
-  targets:
-    # Structured list with path and per-path max_age_hours
-    snapshots:
-      - path: /data
-        max_age_hours: 24          # Critical: must be fresh daily
-      - path: /backups
-        max_age_hours: 48          # Important: allow 2 days
-      - path: /archive
-        # Omit max_age_hours to use global default
-    # Global default for snapshots without explicit threshold
-    max_age_hours: 24
+  # Structured list with path and per-path max_age_hours
+  snapshots:
+    - path: /data
+      max_age_hours: 24          # Critical: must be fresh daily
+    - path: /backups
+      max_age_hours: 48          # Important: allow 2 days
+    - path: /archive
+      # Omit max_age_hours to use global default
+  # Global default for snapshots without explicit threshold
+  max_age_hours: 24
 ```
+
+**For detailed Kopia snapshot configuration examples and advanced usage, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)**
 
 This is loaded via the `FieldMapping` system in [src/kuma_sentinel/core/config/kopia_snapshot_config.py](src/kuma_sentinel/core/config/kopia_snapshot_config.py):
 
 ```python
 "kopiasnapshotstatus_snapshots": FieldMapping(
-    yaml_path="kopiasnapshotstatus.targets.snapshots",
+    yaml_path="kopiasnapshotstatus.snapshots",
 ),
 ```
 

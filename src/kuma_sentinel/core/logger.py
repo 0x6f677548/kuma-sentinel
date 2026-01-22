@@ -25,11 +25,15 @@ def setup_logging(log_file, log_level="INFO"):
     log_date_format = "%Y-%m-%d %H:%M:%S"
 
     # File handler
-    log_path = Path(log_file)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(logging.Formatter(log_format, datefmt=log_date_format))
-    logger.addHandler(file_handler)
+    try:
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter(log_format, datefmt=log_date_format))
+        logger.addHandler(file_handler)
+    except (PermissionError, OSError) as e:
+        # Fallback to console if file logging is not possible
+        print(f"\033[93mWarning: Could not set up file logging to {log_file}: {e}\033[0m", file=sys.stderr)
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -44,9 +48,10 @@ def setup_logging(log_file, log_level="INFO"):
         syslog_format = logging.Formatter("kuma-sentinel[%(process)d]: %(message)s")
         syslog_handler.setFormatter(syslog_format)
         logger.addHandler(syslog_handler)
-    except Exception:
+    except Exception as e:
         # Syslog not available on all systems (e.g., Windows)
-        pass
+        # Fallback to console if syslog logging is not possible
+        print(f"\033[93mWarning: Could not set up syslog logging: {e}. This is expected on non-Unix systems.\033[0m", file=sys.stderr)
 
     return logger
 

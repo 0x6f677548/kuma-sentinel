@@ -281,7 +281,7 @@ class TestPortCheckerExecute:
 
                     assert isinstance(result, CheckResult)
                     assert result.status == "up"
-                    assert result.message == "No open ports found"
+                    assert result.message == "[portscan] ✓ No open ports found"
                     assert result.check_name == "portscan"
                     assert result.duration_seconds >= 0
         finally:
@@ -363,7 +363,7 @@ class TestPortCheckerExecute:
 
             assert isinstance(result, CheckResult)
             assert result.status == "down"
-            assert result.message == "Port scan execution failed"
+            assert result.message == "[portscan] ✗ Port scan execution failed"
             assert result.check_name == "portscan"
             assert "scan_execution_failed" in result.details.get("error", "")
 
@@ -394,7 +394,7 @@ class TestPortCheckerExecute:
 
                     assert isinstance(result, CheckResult)
                     assert result.status == "up"
-                    assert result.message == "No open ports found"
+                    assert result.message == "[portscan] ✓ No open ports found"
         finally:
             if os.path.exists(xml_file):
                 os.unlink(xml_file)
@@ -420,7 +420,7 @@ class TestPortCheckerExecute:
 
             assert isinstance(result, CheckResult)
             assert result.status == "up"
-            assert result.message == "No open ports found"
+            assert result.message == "[portscan] ✓ No open ports found"
 
     def test_execute_xml_cleanup_when_keep_disabled(self):
         """Test that XML file is removed when keep_xmloutput is False."""

@@ -119,17 +119,9 @@ class CommandExecutor(Command):
         check_start = time.time()
         logger.info(f"🔍 Starting {self._command_name} check")
 
-        # Send initial heartbeat
-        send_push(
-            logger,
-            cfg.uptime_kuma_url,
-            cfg.heartbeat_token,
-            f"{self._command_name} starting...",
-            command=self._command_name,
-        )
-
         try:
             # Create and execute checker with config object
+            # Checker handles heartbeat messages via execute_with_heartbeat()
             checker = self._checker_class(logger, cfg)
             result = checker.execute_with_heartbeat()
 
@@ -138,16 +130,8 @@ class CommandExecutor(Command):
             check_duration = int(check_end - check_start)
             check_minutes = check_duration // 60
 
-            # Send final heartbeat
-            send_push(
-                logger,
-                cfg.uptime_kuma_url,
-                cfg.heartbeat_token,
-                f"{self._command_name} complete after {check_minutes}m",
-                command=self._command_name,
-            )
-
             # Send alert based on result
+            # (Heartbeat messages already sent by checker's execute_with_heartbeat())
             self._send_result_alert(
                 logger, cfg, self._command_name, result, check_minutes
             )

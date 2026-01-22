@@ -199,7 +199,7 @@ class KopiaSnapshotChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message="No snapshots configured",
+                    message=f"[{self.name}] ✗ No snapshots configured",
                     duration_seconds=int(time.time() - check_start),
                     details={"error": "no_snapshots"},
                 )
@@ -251,7 +251,7 @@ class KopiaSnapshotChecker(Checker):
 
             # Determine overall status
             if failed_paths:
-                msg = f"Failed to check snapshots: {', '.join(failed_paths)}"
+                msg = f"[{self.name}] ✗ Failed to check snapshots: {', '.join(failed_paths)}"
                 self.logger.error(f"❌ {msg}")
                 return CheckResult(
                     check_name=self.name,
@@ -266,7 +266,7 @@ class KopiaSnapshotChecker(Checker):
                     f"{path}: {age:.1f}h > {threshold}h"
                     for path, age, threshold, _ in old_snapshots
                 ]
-                msg = f"Snapshots too old: {'; '.join(details)}"
+                msg = f"[{self.name}] ✗ Snapshots too old: {'; '.join(details)}"
                 self.logger.warning(f"⚠️  {msg}")
                 return CheckResult(
                     check_name=self.name,
@@ -292,7 +292,7 @@ class KopiaSnapshotChecker(Checker):
                 for path, (success, age, _) in all_results.items()
                 if success
             ]
-            msg = f"All snapshots fresh: {'; '.join(fresh_details)}"
+            msg = f"[{self.name}] ✓ All snapshots fresh: {'; '.join(fresh_details)}"
             self.logger.info(f"✅ {msg}")
             return CheckResult(
                 check_name=self.name,
@@ -318,7 +318,7 @@ class KopiaSnapshotChecker(Checker):
             return CheckResult(
                 check_name=self.name,
                 status="down",
-                message=f"Snapshot check error: {str(e)}",
+                message=f"[{self.name}] ✗ Snapshot check error: {str(e)}",
                 duration_seconds=check_duration,
                 details={"error": str(e)},
             )

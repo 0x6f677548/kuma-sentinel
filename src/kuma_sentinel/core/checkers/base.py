@@ -83,11 +83,11 @@ class Checker(ABC):
 
             result = self.execute()
 
-            # Send end message with result and duration
+            # Send end message with only status and duration (no detailed results)
             if self.heartbeat:
                 status_emoji = "✅" if result.status == "up" else "❌"
                 self.heartbeat.send_message(
-                    f"{status_emoji} {self.name} check completed in {result.duration_seconds}s: {result.message}"
+                    f"{status_emoji} {self.name} completed in {result.duration_seconds}s"
                 )
 
             return result

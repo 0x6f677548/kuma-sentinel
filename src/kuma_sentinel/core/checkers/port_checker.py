@@ -264,7 +264,7 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message="Port scan execution failed",
+                    message=f"[{self.name}] ✗ Port scan execution failed",
                     duration_seconds=scan_duration,
                     details={"error": "scan_execution_failed"},
                 )
@@ -274,7 +274,7 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message=f"Open ports found: {open_ports_str}",
+                    message=f"[{self.name}] ✗ Open ports found: {open_ports_str}",
                     duration_seconds=scan_duration,
                     details={"open_hosts": hosts_with_ports},
                 )
@@ -283,7 +283,7 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="up",
-                    message="No open ports found",
+                    message=f"[{self.name}] ✓ No open ports found",
                     duration_seconds=scan_duration,
                 )
 
@@ -294,7 +294,7 @@ class PortChecker(Checker):
             return CheckResult(
                 check_name=self.name,
                 status="down",
-                message=f"Port scan error: {str(e)}",
+                message=f"[{self.name}] ✗ Port scan error: {str(e)}",
                 duration_seconds=scan_duration,
                 details={"error": str(e)},
             )

@@ -121,7 +121,7 @@ class ZfsPoolStatusChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message="No ZFS pools configured",
+                    message=f"[{self.name}] ✗ No ZFS pools configured",
                     duration_seconds=int(time.time() - check_start),
                     details={"error": "no_pools"},
                 )
@@ -189,7 +189,7 @@ class ZfsPoolStatusChecker(Checker):
 
             if failed_pools:
                 failed_names = [name for name, _ in failed_pools]
-                message = f"Failed to check pools: {', '.join(failed_names)}"
+                message = f"[{self.name}] ✗ Failed to check pools: {', '.join(failed_names)}"
                 return CheckResult(
                     check_name=self.name,
                     status="down",
@@ -202,7 +202,7 @@ class ZfsPoolStatusChecker(Checker):
                 )
 
             if unhealthy_pools:
-                message = f"Unhealthy pools: {', '.join(unhealthy_pools)}"
+                message = f"[{self.name}] ✗ Unhealthy pools: {', '.join(unhealthy_pools)}"
                 return CheckResult(
                     check_name=self.name,
                     status="down",
@@ -219,7 +219,7 @@ class ZfsPoolStatusChecker(Checker):
                     f"{pool}: {free:.1f}% < {threshold}%"
                     for pool, free, threshold in low_space_pools
                 ]
-                message = f"Low free space: {'; '.join(details_list)}"
+                message = f"[{self.name}] ✗ Low free space: {'; '.join(details_list)}"
                 return CheckResult(
                     check_name=self.name,
                     status="down",
@@ -236,7 +236,7 @@ class ZfsPoolStatusChecker(Checker):
                 f"{name}: {data['free_percent']:.1f}% free"
                 for name, data in pool_details.items()
             ]
-            message = f"All pools healthy: {'; '.join(pool_summary)}"
+            message = f"[{self.name}] ✓ All pools healthy: {'; '.join(pool_summary)}"
             return CheckResult(
                 check_name=self.name,
                 status="up",
@@ -250,7 +250,7 @@ class ZfsPoolStatusChecker(Checker):
             return CheckResult(
                 check_name=self.name,
                 status="down",
-                message=f"ZFS pool check error: {str(e)}",
+                message=f"[{self.name}] ✗ ZFS pool check error: {str(e)}",
                 duration_seconds=int(time.time() - check_start),
                 details={"error": str(e)},
             )

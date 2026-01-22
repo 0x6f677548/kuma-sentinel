@@ -203,7 +203,9 @@ class CmdCheckConfig(ConfigBase):
 
         return errors
 
-    def _validate_command_config(self, idx: int, cmd_config: Dict[str, Any]) -> List[str]:
+    def _validate_command_config(
+        self, idx: int, cmd_config: Dict[str, Any]
+    ) -> List[str]:
         """Validate a single command configuration."""
         errors: List[str] = []
 
@@ -217,12 +219,18 @@ class CmdCheckConfig(ConfigBase):
 
         errors.extend(self._validate_command_field(idx, "timeout", cmd_config))
         errors.extend(self._validate_command_field(idx, "expect_exit_code", cmd_config))
-        errors.extend(self._validate_command_pattern(idx, "success_pattern", cmd_config))
-        errors.extend(self._validate_command_pattern(idx, "failure_pattern", cmd_config))
+        errors.extend(
+            self._validate_command_pattern(idx, "success_pattern", cmd_config)
+        )
+        errors.extend(
+            self._validate_command_pattern(idx, "failure_pattern", cmd_config)
+        )
 
         return errors
 
-    def _validate_command_field(self, idx: int, field: str, cmd_config: Dict[str, Any]) -> List[str]:
+    def _validate_command_field(
+        self, idx: int, field: str, cmd_config: Dict[str, Any]
+    ) -> List[str]:
         """Validate numeric command fields (timeout, exit_code)."""
         errors: List[str] = []
 
@@ -239,7 +247,9 @@ class CmdCheckConfig(ConfigBase):
 
         return errors
 
-    def _validate_command_pattern(self, idx: int, field: str, cmd_config: Dict[str, Any]) -> List[str]:
+    def _validate_command_pattern(
+        self, idx: int, field: str, cmd_config: Dict[str, Any]
+    ) -> List[str]:
         """Validate regex pattern command fields."""
         errors: List[str] = []
 

@@ -415,7 +415,7 @@ class TestShellExecution:
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="hello", stderr="")
 
-            result = checker.execute()
+            checker.execute()
 
             # Verify shell=True and /bin/bash were used
             mock_run.assert_called_once()

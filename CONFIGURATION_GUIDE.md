@@ -1,8 +1,482 @@
-# Per-Path max_age_hours Configuration Guide
+# Configuration Guide for Kuma Sentinel
 
-## Quick Start
+## Command Monitoring (cmdcheck)
 
-### Configuration File (YAML)
+Execute arbitrary shell commands on remote systems and monitor ANY condition. The universal monitoring command that enables unlimited use cases.
+
+### Quick Start
+
+#### Single Command - Simple Health Check
+
+**YAML Configuration:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+heartbeat:
+  uptime_kuma:
+    token: your-heartbeat-token
+cmdcheck:
+  command: "systemctl is-active nginx"
+  timeout: 10
+  uptime_kuma:
+    token: your-cmdcheck-token
+```
+
+**CLI:**
+```bash
+kuma-sentinel cmdcheck \
+  --command "systemctl is-active nginx" \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-cmdcheck-token
+```
+
+**Environment Variables:**
+```bash
+export UPTIME_KUMA_URL=http://uptimekuma:3001/api/push
+export KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
+export KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
+export KUMA_SENTINEL_CMDCHECK_TIMEOUT=10
+
+kuma-sentinel cmdcheck --command "systemctl is-active nginx"
+```
+
+#### Multiple Commands - All Must Pass
+
+**YAML Configuration:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+heartbeat:
+  uptime_kuma:
+    token: your-heartbeat-token
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: web_server
+      timeout: 10
+    
+    - command: "systemctl is-active postgresql"
+      name: database
+      timeout: 10
+    
+    - command: "test -f /var/run/app.pid"
+      name: app_running
+      timeout: 5
+  uptime_kuma:
+    token: your-cmdcheck-token
+```
+
+**Result**: DOWN if ANY command fails, UP only if ALL succeed
+
+#### Pattern Matching - Detect Conditions in Output
+
+**YAML Configuration:**
+```yaml
+cmdcheck:
+  command: "tail -n 100 /var/log/app.log"
+  failure_pattern: "ERROR|CRITICAL|PANIC"  # Detected → DOWN
+  success_pattern: "^healthy"              # Not detected (with failure) → DOWN
+  timeout: 10
+  capture_output: true
+  uptime_kuma:
+    token: your-cmdcheck-token
+```
+
+**CLI with Pattern:**
+```bash
+kuma-sentinel cmdcheck \
+  --command "systemctl status myapp" \
+  --failure-pattern "failed|error" \
+  --success-pattern "active.*running"
+```
+
+### Key Features
+
+✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
+✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
+✅ **Multiple Commands** — Run multiple independent checks, all must pass for UP
+✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
+✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
+✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
+✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in multiple mode
+✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
+
+### Configuration Reference
+
+#### Global Settings
+
+```yaml
+cmdcheck:
+  # Required: Either 'command' (single) or 'commands' (multiple)
+  command: "shell command to execute"        # Single command mode
+  # OR
+  multiple: true                              # Enable multiple command mode
+  commands:                                   # List of command objects (when multiple: true)
+    - command: "cmd1"
+      name: "optional name for reporting"
+      timeout: 10                             # Optional: per-command override
+      expect_exit_code: 0                     # Optional: per-command override
+      success_pattern: "pattern"              # Optional: per-command override
+      failure_pattern: "pattern"              # Optional: per-command override
+      capture_output: true                    # Optional: per-command override
+  
+  # Command-specific settings (single command mode)
+  timeout: 30                                 # Execution timeout in seconds (1-300, default 30)
+  expect_exit_code: 0                         # Expected success exit code (0-255, default 0)
+  capture_output: true                        # Capture stdout/stderr (default true, last 500 chars)
+  success_pattern: null                       # Regex pattern for success (optional)
+  failure_pattern: null                       # Regex pattern for failure (optional, takes precedence)
+  
+  uptime_kuma:
+    token: "your-cmdcheck-token"              # Required: push token for this command
+```
+
+#### Pattern Matching Logic
+
+```
+1. failure_pattern: If matches in output → Status: DOWN (highest priority)
+2. success_pattern: If matches in output → Status: UP
+                   If not matches → Status: DOWN (if provided, must match)
+3. Exit code:       exit_code == expect_exit_code → Status: UP (fallback)
+```
+
+**Examples:**
+```yaml
+# Example 1: Service status check (exit code only)
+cmdcheck:
+  command: "systemctl is-active myapp"
+  expect_exit_code: 0
+  timeout: 5
+
+# Example 2: Log error detection (failure pattern)
+cmdcheck:
+  command: "tail -n 500 /var/log/app.log"
+  failure_pattern: "ERROR|CRITICAL|PANIC"
+  timeout: 10
+
+# Example 3: Health endpoint with status line (success pattern)
+cmdcheck:
+  command: "curl -s http://localhost:8080/health"
+  success_pattern: '"status":\s*"healthy"'
+  timeout: 5
+
+# Example 4: Disk space check (custom exit code)
+cmdcheck:
+  command: "test $(df /var | tail -1 | awk '{print $4}') -gt 1000000"
+  expect_exit_code: 0
+  timeout: 5
+
+# Example 5: Multiple independent checks
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: nginx
+      timeout: 10
+    - command: "systemctl is-active postgresql"
+      name: postgresql
+      timeout: 10
+    - command: "curl -sf http://app.local/health"
+      name: app_health
+      timeout: 5
+      success_pattern: "OK"
+```
+
+### Use Cases
+
+#### 1. Service Health Monitoring
+
+Check if critical services are running:
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: web_server
+      timeout: 10
+    - command: "systemctl is-active postgresql"
+      name: database
+      timeout: 10
+    - command: "systemctl is-active redis-server"
+      name: cache
+      timeout: 10
+```
+
+#### 2. Custom Health Endpoints
+
+Monitor application health endpoints:
+```yaml
+cmdcheck:
+  command: "curl -s http://localhost:8080/api/health | grep -q 'healthy'"
+  success_pattern: "healthy"
+  timeout: 5
+```
+
+#### 3. File Existence Checks
+
+Alert if critical files are missing:
+```yaml
+cmdcheck:
+  command: "test -f /var/run/app.pid && test -f /var/spool/lock"
+  timeout: 5
+```
+
+#### 4. Disk Space Monitoring
+
+Ensure sufficient disk space:
+```yaml
+cmdcheck:
+  command: "test $(df / | tail -1 | awk '{print $4}') -gt 5000000"
+  timeout: 10
+```
+
+#### 5. Log Pattern Detection
+
+Alert on error patterns in logs:
+```yaml
+cmdcheck:
+  command: "journalctl -u myapp -n 1000 --no-pager"
+  failure_pattern: "ERROR|CRITICAL|FATAL"
+  success_pattern: "Running normally"
+  timeout: 10
+```
+
+#### 6. Database Connectivity
+
+Verify database health:
+```yaml
+cmdcheck:
+  command: "psql -h db.example.com -U monitoring -d health_check -c 'SELECT 1' -q"
+  expect_exit_code: 0
+  timeout: 10
+```
+
+#### 7. Custom Script Execution
+
+Run custom monitoring scripts:
+```yaml
+cmdcheck:
+  command: "/usr/local/bin/custom-health-check.sh"
+  success_pattern: "^HEALTHY"
+  timeout: 30
+```
+
+### Security Considerations
+
+⚠️ **CRITICAL SECURITY MODEL**: Kuma Sentinel assumes **configuration is admin-controlled**. Commands are defined in config files or CLI arguments, NOT from untrusted user input.
+
+
+#### Attack Vectors & Mitigations
+
+| Vector | Risk | Mitigation |
+|--------|------|-----------|
+| Shell Metacharacters (`;`, `&&`, `\|`) | Command chaining if input is uncontrolled | Config-only commands; admin responsibility |
+| PATH Manipulation | Malicious `ls` via hijacked PATH | Dedicated service user; use absolute paths in commands |
+| Privilege Escalation | Commands running as root | Run as dedicated low-privilege user |
+| Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits in container |
+| Output Leakage | Sensitive data in command output | Output truncated to 500 chars; document data sensitivity |
+
+#### Deployment Best Practices
+
+1. **Run under dedicated user:**
+   ```bash
+   useradd -r -s /bin/false kuma-sentinel
+   chown kuma-sentinel:kuma-sentinel /etc/kuma-sentinel/config.yaml
+   chmod 600 /etc/kuma-sentinel/config.yaml
+   ```
+
+2. **Use systemd service with restricted capabilities:**
+   ```ini
+   [Service]
+   User=kuma-sentinel
+   Group=kuma-sentinel
+   NoNewPrivileges=yes
+   ProtectSystem=strict
+   ProtectHome=yes
+   ReadWritePaths=/var/log/kuma-sentinel
+   ```
+
+3. **Enable sudo for specific commands if needed:**
+   ```bash
+   # /etc/sudoers.d/kuma-sentinel
+   kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl, /usr/bin/zpool
+   ```
+
+4. **Container deployment (recommended):**
+   ```dockerfile
+   FROM python:3.11-slim
+   RUN useradd -r -s /bin/false kuma-sentinel
+   COPY --chown=kuma-sentinel:kuma-sentinel config.yaml /etc/kuma-sentinel/
+   USER kuma-sentinel
+   ```
+
+5. **Centralized logging:**
+   ```bash
+   # Send all command output and errors to centralized logging
+   kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml 2>&1 | \
+     logger -t kuma-sentinel -s
+   ```
+
+#### What NOT to Do
+
+❌ Don't run commands that output passwords, API keys, or PII (output visible to Uptime Kuma)
+❌ Don't allow user-provided commands via web interfaces
+❌ Don't run kuma-sentinel as root unless absolutely necessary
+❌ Don't expose Uptime Kuma push tokens in logs or metrics
+❌ Don't use shell=True with unchecked user input
+
+#### Output Sensitivity
+
+Command output is:
+- Truncated to 500 characters (last 500 chars retained)
+- Sent to Uptime Kuma in plaintext
+- Possibly stored in logs and dashboards
+- Visible to anyone with Uptime Kuma access
+
+**Example safe outputs:**
+✅ `active (running)` — Service status
+✅ `OK` — Health check result
+✅ `HEALTHY` — Custom application status
+✅ `1` — Database connectivity test
+
+**Example dangerous outputs:**
+❌ `password: abc123` — Credentials
+❌ `api_key: sk-1234567890` — API keys
+❌ `user@example.com` — PII
+❌ Database connection strings with passwords
+
+### Common Examples
+
+#### Monitor Multiple Services
+
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: nginx
+    - command: "systemctl is-active postgresql"
+      name: postgresql
+    - command: "systemctl is-active redis-server"
+      name: redis
+    - command: "systemctl is-active app"
+      name: app
+  timeout: 10
+  uptime_kuma:
+    token: your-token
+```
+
+#### Monitor Backup Completion
+
+```yaml
+cmdcheck:
+  command: "find /var/backups -name 'backup-*.tar' -mtime -1 | wc -l | grep -q '^[1-9]$'"
+  success_pattern: "^[1-9]"
+  failure_pattern: "^0"
+  timeout: 30
+```
+
+#### Check Application via Custom Script
+
+```yaml
+cmdcheck:
+  command: "/opt/monitoring/check_app_health.sh"
+  success_pattern: "HEALTHY"
+  failure_pattern: "ERROR|UNHEALTHY|TIMEOUT"
+  timeout: 60
+```
+
+#### Database Replica Lag Check
+
+```yaml
+cmdcheck:
+  command: "psql -h replica.db -U monitoring -c \"SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))\" | grep -E '^\\s+[0-9]{1,3}(\\.[0-9]+)?\\s*$'"
+  timeout: 15
+```
+
+### Result Message Format
+
+Uptime Kuma displays rich status messages with per-command visibility, allowing you to see exactly which commands passed or failed without inspecting logs.
+
+#### Single Command Results
+
+**Success:**
+```
+✓ Success pattern detected: 'healthy' | Output: active (running)
+```
+
+**Failure - Pattern Mismatch:**
+```
+✗ Pattern not found: expected 'OK' in output
+```
+
+**Failure - Exit Code:**
+```
+✗ Command failed (exit 1, expected 0)
+```
+
+**Failure - Timeout:**
+```
+✗ Command timeout after 30 seconds
+```
+
+#### Multiple Command Results
+
+**All Pass:**
+```
+✓ 3/3 commands succeeded: nginx ✓, postgresql ✓, redis ✓
+```
+
+**Some Fail:**
+```
+✗ 1/3 passed, 2/3 failed: nginx (exit 1); postgresql (pattern not found); redis ✓
+```
+
+**All Fail:**
+```
+✗ 0/3 passed, 3/3 failed: nginx (exit 1); postgresql (timeout); redis (error)
+```
+
+#### Reading Results in Uptime Kuma Dashboard
+
+The message field shows:
+- **Status symbol** — ✓ (UP) or ✗ (DOWN) at a glance
+- **Pass/fail ratio** — For multiple commands, see how many passed
+- **Failure reasons** — Top 3 failures with specific error reasons
+- **Command names** — When using named commands in multiple mode
+
+**Example workflow:**
+1. Uptime Kuma shows ✗ DOWN status in dashboard
+2. Click on the heartbeat to see the message
+3. Read "✗ 2/5 passed, 3/5 failed: database (exit 1); cache (timeout); backup (pattern not found)"
+4. Immediately know which 3 services have issues and why
+5. No need to SSH and inspect logs to diagnose the problem
+
+#### Logging for Detailed Debugging
+
+Full per-command breakdown is logged locally for detailed debugging:
+```
+[2024-01-15 14:32:15] cmdcheck executing 3 commands
+[2024-01-15 14:32:15] [nginx: ✓] [database: ✗ exit 1] [cache: ✗ timeout] 
+[2024-01-15 14:32:15] Result: 1/3 passed, 2/3 failed
+```
+
+Check logs with:
+```bash
+# All kuma-sentinel logs
+docker logs kuma-sentinel
+
+# Or journalctl if running as systemd service
+journalctl -u kuma-sentinel -n 100
+```
+
+---
+
+## Kopia Snapshot Monitoring (kopiasnapshotstatus)
+
+Monitor backup snapshot age and alert when backups are stale.
+
+### Quick Start
+
+#### Configuration File (YAML)
 ```yaml
 kopiasnapshotstatus:
   snapshots:

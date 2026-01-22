@@ -9,21 +9,49 @@
 
 # Kuma-Sentinel
 
-Extensible remote monitoring CLI tool for Uptime Kuma. Monitor various system conditions and push results to Uptime Kuma push monitors.
+**The CLI tool that acts as Uptime Kuma's missing agent.**
 
-Useful for evaluating system health on remote machines and reporting back to a central Uptime Kuma instance. Currently includes:
-- **Port scanning** - Checks for TCP open ports across IP ranges using nmap
-- **Backup monitoring** - Checks Kopia snapshot freshness and status
-- **ZFS pool monitoring** - Checks ZFS pool health and free space
+While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for external monitoring (HTTP, Ping, TCP), it lacks a native agent to monitor internal system states, processes, or run custom checking scripts.
 
-## Overview
-A Python CLI tool that monitors system conditions locally and reports the results to a central Uptime Kuma instance with separate push tokens for heartbeat monitoring and alerting. Install on remote machines and run via cron jobs, systemd timers, or custom services to periodically check conditions like:
-- **Port accessibility** - Verify expected ports are open/closed, detect exposed ports
-- **Backup freshness** - Monitor Kopia snapshot age and completeness
-- **Storage health** - Monitor ZFS pool health and free space with per-pool thresholds
-- **System health** - Extensible design supports additional checks (disk space, system metrics, etc.)
+**Kuma-Sentinel bridges this gap.** Designed as a CLI utility, it becomes a powerful monitoring agent when deployed via cron, systemd, or Docker. It runs on your servers to execute arbitrary shell commands, check backups, monitor storage, and scan ports—then pushes the health status back to Uptime Kuma.
 
-Designed to be extended with additional monitoring checks and custom checkers.
+**Monitor ANY system condition**: If you can check it with a shell command, Kuma-Sentinel can monitor it.
+
+## Quick Example
+
+```bash
+# Monitor multiple conditions on your server, push status to Uptime Kuma
+kuma-sentinel cmdcheck \
+  --command "systemctl is-active nginx" \
+  --command "test -f /var/run/app.pid" \
+  --command "curl -sf http://localhost:8080/health" \
+  http://uptime-kuma:3001/api/push \
+  heartbeat-token \
+  cmdcheck-token
+```
+
+If all checks pass → Uptime Kuma shows **UP**. If any fail → shows **DOWN** and triggers alerts.
+
+Deploy via `cron`, `systemd timer`, or `Docker` to run periodically on your servers.
+
+## Features
+
+- **Command Execution**: Execute arbitrary shell commands on remote systems and push results to Uptime Kuma (cmdcheck)
+- **Pattern Matching**: Use regex patterns for flexible success/failure detection in command output
+- **Multi-Command Support**: Run multiple independent checks and aggregate results
+- **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
+- **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
+- **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
+- **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
+- **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
+- **Flexible Configuration**: Support for YAML config files, environment variables, and CLI arguments with clear priority
+- **Multi-Source Configuration**:
+  1. Command-line arguments (highest priority)
+  2. YAML config file
+  3. Environment variables
+  4. Hardcoded defaults (lowest priority)
+- **Comprehensive Logging**: File, console, and syslog/journalctl output
+- **Extensible Architecture**: Built to support additional monitoring checks
 
 ## Diagram
 
@@ -32,9 +60,10 @@ Designed to be extended with additional monitoring checks and custom checkers.
 │   Monitoring Machine        │
 │   (Kuma Sentinel)           │
 │                             │
+│  • Command Execution        │
 │  • Port Scanning (nmap)     │
 │  • Backup Monitoring (Kopia)│
-│  • Custom Checks (extensible)
+│  • Storage Monitoring (ZFS) │
 └────────────┬────────────────┘
              │ Push results
              │ via HTTP
@@ -48,23 +77,6 @@ Designed to be extended with additional monitoring checks and custom checkers.
 │  • Track Metrics            │
 └─────────────────────────────┘
 ```
-
-
-## Features
-
-- **Remote Monitoring**: Execute monitoring checks on remote systems and push results to Uptime Kuma
-- **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
-- **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
-- **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
-- **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
-- **Flexible Configuration**: Support for YAML config files, environment variables, and CLI arguments with clear priority
-- **Multi-Source Configuration**:
-  1. Command-line arguments (highest priority)
-  2. YAML config file
-  3. Environment variables
-  4. Hardcoded defaults (lowest priority)
-- **Comprehensive Logging**: File, console, and syslog/journalctl output
-- **Extensible Architecture**: Built to support additional monitoring checks (ZFS pools, disk space, system metrics, etc.)
 
 ## Installation
 
@@ -143,6 +155,49 @@ docker run -it --rm `
 
 ## Usage
 
+### Command Execution (cmdcheck)
+
+Execute arbitrary shell commands on remote systems and push results to Uptime Kuma. The cornerstone feature enabling unlimited monitoring scenarios.
+
+**Single command check:**
+```bash
+kuma-sentinel cmdcheck \
+  --command "systemctl is-active nginx" \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-cmdcheck-token
+```
+
+**Multiple independent checks (all must pass for UP status):**
+```bash
+kuma-sentinel cmdcheck \
+  --command "systemctl is-active nginx" \
+  --command "test -f /var/run/app.pid" \
+  --command "df / | tail -1 | awk '{print \$4}' | awk '\$1 > 1000000 {exit 0} {exit 1}'" \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-cmdcheck-token
+```
+
+**With regex pattern matching:**
+```bash
+kuma-sentinel cmdcheck \
+  --command "tail -n 100 /var/log/app.log" \
+  --failure-pattern "ERROR|CRITICAL|PANIC" \
+  --success-pattern "healthy" \
+  --timeout 10 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-cmdcheck-token
+```
+
+**Using configuration file (recommended):**
+```bash
+kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml
+```
+
+See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
+
 ### Port Scan
 
 ```bash
@@ -198,9 +253,107 @@ kuma-sentinel zfspoolstatus \
 
 ## Use Cases
 
+### Universal Monitoring via Command Execution
+
+Monitor ANY condition on remote systems using standard shell commands. From service health to custom business logic, deploy once and monitor everything.
+
+**Scenario**: You need to monitor diverse conditions across your infrastructure - service health, database connectivity, custom application checks, disk space, log patterns, and more. Instead of building custom monitoring for each scenario, use cmdcheck to execute any shell command.
+
+**Traditional approach**: Build specialized monitoring tools and extensions for each unique condition.
+
+**With Kuma Sentinel cmdcheck**: Write a shell command that returns exit code 0 for "healthy" and non-zero for "unhealthy". Deploy once, monitor anything.
+
+**Example setup on monitoring machine**:
+```bash
+# Check multiple critical services and conditions
+kuma-sentinel cmdcheck \
+  --command "systemctl is-active nginx" \
+  --command "systemctl is-active postgresql" \
+  --command "test -f /var/lock/app.running" \
+  --timeout 10 \
+  http://uptime-kuma-instance:3001/api/push \
+  your-heartbeat-token \
+  your-cmdcheck-token
+```
+
+**Additional examples**:
+```bash
+# Check disk space
+kuma-sentinel cmdcheck \
+  --command "test $(df / | tail -1 | awk '{print $4}') -gt 1000000"
+
+# Check service with custom health endpoint
+kuma-sentinel cmdcheck \
+  --command "curl -sf http://localhost:8080/health"
+
+# Check log file for errors (last hour)
+kuma-sentinel cmdcheck \
+  --command "grep -q 'ERROR\|CRITICAL' <(journalctl -u myapp --since '1 hour ago')" \
+  --failure-pattern "^$"  # Fail if no errors found is NOT what we want... actually empty means success
+
+# Database connectivity check
+kuma-sentinel cmdcheck \
+  --command "psql -h db.example.com -U monitoring -d health_check -c 'SELECT 1'"
+
+# Custom script execution
+kuma-sentinel cmdcheck \
+  --command "/usr/local/bin/custom-health-check.sh"
+```
+
+**Result**:
+- ✅ If all checks pass (exit 0) → Uptime Kuma shows UP
+- ⚠️ If any check fails (non-zero exit) → Uptime Kuma shows DOWN and triggers alerts
+- 🔍 Pattern matching for advanced scenarios: detect specific error messages, parse output, etc.
+
+**Benefits**:
+- Unlimited monitoring scenarios with a single tool
+- No specialized monitoring code needed
+- Leverage existing scripts and tools (systemctl, curl, grep, custom apps)
+- Easy to test locally before deploying
+- Version control your monitoring logic
+
+See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#command-monitoring-cmdcheck) for comprehensive cmdcheck documentation including security considerations, multi-command scenarios, and pattern matching.
+
+### Per-Command Visibility in Uptime Kuma Dashboard
+
+One of the challenges with traditional monitoring is getting enough detail to troubleshoot quickly. Kuma Sentinel sends rich, human-readable status messages that show exactly which commands passed or failed.
+
+**Example - Single Command Result**:
+```
+✓ Success pattern detected: 'healthy' | Output: active (running)
+```
+Uptime Kuma dashboard shows the exact status in one line without needing to SSH and inspect logs.
+
+**Example - Multiple Commands Result**:
+```
+✗ 2/3 passed, 1/3 failed: nginx (exit 1); postgresql ✓; cache ✓
+```
+Immediately see which service is down and why (exit code, pattern not found, timeout, etc.).
+
+**Example - Diagnostic Output**:
+```
+✗ 0/5 passed, 5/5 failed: web (exit 1); db (timeout); cache (pattern not found); backup (error); app (exit 127)
+```
+The top 3 failures are shown inline; check logs for remaining failures. Each failure includes the specific error reason.
+
+**Benefits of rich status messages**:
+- ✅ One-glance status visibility without logs
+- ✅ Identify problematic services immediately
+- ✅ See failure reasons (exit code, pattern mismatch, timeout, etc.)
+- ✅ Reduced MTTR (mean time to resolution) through instant diagnosis
+- ✅ Works perfectly with Uptime Kuma's dashboard and alert messages
+
+**Logging for Deep Debugging**:
+When you need full details, check logs:
+```
+[2024-01-15 14:32:15] cmdcheck executing 5 commands
+[2024-01-15 14:32:15] [nginx: ✓] [postgresql: ✗ timeout] [cache: ✗ exit 1] [backup: ✓] [app: ✗ pattern not found]
+[2024-01-15 14:32:15] Result: 2/5 passed, 3/5 failed
+```
+
 ### Network Security Monitoring
 
-Monitor ports on your local machine or network to ensure no unauthorized ports are exposed. Deploy Kuma Sentinel on your watchdog/monitoring machines and schedule it to run periodically via cron or systemd timer to push results to your central Uptime Kuma instance.
+Monitor ports on your network to ensure no unauthorized ports are exposed. Deploy Kuma Sentinel on your watchdog/monitoring machines and schedule it to run periodically via cron or systemd timer to push results to your central Uptime Kuma instance.
 
 **Scenario**: You have multiple machines in your infrastructure that you want to monitor for exposed ports. Your watchdog machine should periodically scan a range of machines to ensure only expected ports are open.
 

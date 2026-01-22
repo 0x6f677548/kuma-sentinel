@@ -123,12 +123,10 @@ kuma-sentinel/
 
 **src/kuma_sentinel/core/checkers/** - Monitoring implementations
 - `base.py` - `Checker` abstract base class
-- Specific checkers (e.g., `port_checker.py`, `kopia_snapshot_checker.py`)
+- Specific checkers (e.g., `port_checker.py`, `kopia_snapshot_checker.py`, `cmdcheck_checker.py`)
 
 **tests/** - Test suite
 - Mirrors the `src/` structure
-- ~51 unit tests with 65% code coverage
-
 ## Key Configuration Files
 
 ### pyproject.toml

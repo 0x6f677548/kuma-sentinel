@@ -90,7 +90,7 @@ kuma-sentinel/
 │   ├── cli/                    # CLI commands (portscan, kopiasnapshotstatus, etc.)
 │   ├── core/                   # Core monitoring logic
 │   │   ├── config/            # Configuration management (base + command configs)
-│   │   ├── checkers/          # Monitoring implementations (portscan, kopia, etc.)
+│   │   ├── checkers/          # Monitoring implementations (portscan, kopia, zfs, etc.)
 │   │   ├── models.py          # Data models (CheckResult, etc.)
 │   │   ├── uptime_kuma.py     # Uptime Kuma API integration
 │   │   ├── heartbeat.py       # Heartbeat service
@@ -105,6 +105,7 @@ kuma-sentinel/
 │
 ├── pyproject.toml             # Project metadata, dependencies, tool configs
 ├── README.md                  # User documentation
+├── CONFIGURATION_GUIDE.md     # Configuration examples for all commands
 ├── DEVELOPMENT.md             # This file - development guide
 ├── LICENSE                    # MIT License
 ├── example.config.yaml        # Example configuration template

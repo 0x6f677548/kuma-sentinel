@@ -12,14 +12,16 @@
 Extensible remote monitoring CLI tool for Uptime Kuma. Monitor various system conditions and push results to Uptime Kuma push monitors.
 
 Useful for evaluating system health on remote machines and reporting back to a central Uptime Kuma instance. Currently includes:
-- **Port scanning** - Scan TCP ports across IP ranges using nmap
-- **Backup monitoring** - Check Kopia snapshot freshness and status
+- **Port scanning** - Checks for TCP open ports across IP ranges using nmap
+- **Backup monitoring** - Checks Kopia snapshot freshness and status
+- **ZFS pool monitoring** - Checks ZFS pool health and free space
 
 ## Overview
 A Python CLI tool that monitors system conditions locally and reports the results to a central Uptime Kuma instance with separate push tokens for heartbeat monitoring and alerting. Install on remote machines and run via cron jobs, systemd timers, or custom services to periodically check conditions like:
 - **Port accessibility** - Verify expected ports are open/closed, detect exposed ports
 - **Backup freshness** - Monitor Kopia snapshot age and completeness
-- **System health** - Extensible design supports additional checks (ZFS pools, disk space, etc.)
+- **Storage health** - Monitor ZFS pool health and free space with per-pool thresholds
+- **System health** - Extensible design supports additional checks (disk space, system metrics, etc.)
 
 Designed to be extended with additional monitoring checks and custom checkers.
 
@@ -51,7 +53,7 @@ Designed to be extended with additional monitoring checks and custom checkers.
 ## Features
 
 - **Remote Monitoring**: Execute monitoring checks on remote systems and push results to Uptime Kuma
-- **Port Scanning**: Scan TCP ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
+- **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
@@ -169,6 +171,31 @@ kuma-sentinel kopiasnapshotstatus \
   --snapshot /archive 168
 ```
 
+### ZFS Pool Status
+
+Monitor ZFS pool health and free space with per-pool thresholds:
+
+```bash
+# Using configuration file (recommended)
+kuma-sentinel zfspoolstatus --config /etc/kuma-sentinel/config.yaml
+
+# Or with CLI arguments
+kuma-sentinel zfspoolstatus \
+  --pool tank 10 \
+  --pool backup 20
+```
+
+Multiple pools with different free space thresholds:
+```bash
+kuma-sentinel zfspoolstatus \
+  --pool tank 10 \
+  --pool backup 20 \
+  --pool archive 30 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-zfs-token
+```
+
 ## Use Cases
 
 ### Network Security Monitoring
@@ -242,6 +269,49 @@ kopiasnapshotstatus:
 - ⚠️ If any snapshot is stale → Uptime Kuma shows DOWN and triggers alerts
 - 📊 Details include age of each snapshot and its threshold for visibility
 
+### Storage Health Monitoring
+
+Monitor ZFS pool health and free space across multiple pools with different thresholds. Ensure pools remain operational and have adequate free space for continued operation.
+
+**Scenario**: You have multiple ZFS pools with different purposes and acceptable minimum free space levels. A data pool should always have at least 10% free, while an archive pool can tolerate 30% free space.
+
+**Traditional approach**: Manually check pool status via SSH or rely on generic disk space alerts.
+
+**With Kuma Sentinel**: Deploy on your storage server and run periodic ZFS pool status checks that report to Uptime Kuma.
+
+**Example setup on a storage server**:
+```bash
+# Deploy in Docker
+docker-compose up -d
+
+# Schedule with cron to run every hour
+0 * * * * kuma-sentinel zfspoolstatus --config /etc/kuma-sentinel/config.yaml
+```
+
+**Configuration example** (`/etc/kuma-sentinel/config.yaml`):
+```yaml
+zfspoolstatus:
+  uptime_kuma:
+    token: your-zfs-token
+  
+  pools:
+    - name: tank
+      free_space_percent_min: 10      # Critical: must stay operational
+    - name: backup
+      free_space_percent_min: 20      # Important: needs space for incremental backups
+    - name: archive
+      free_space_percent_min: 30      # Archive: more relaxed threshold
+  free_space_percent_default: 10
+```
+
+**See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced ZFS pool configuration options**
+
+**Result**:
+- ✅ If all pools are ONLINE with sufficient free space → Uptime Kuma shows UP
+- ⚠️ If any pool is unhealthy (DEGRADED, FAULTED, OFFLINE, etc.) → Uptime Kuma shows DOWN and triggers alerts
+- ⚠️ If any pool has insufficient free space → Uptime Kuma shows DOWN and triggers alerts
+- 📊 Details include health status and free space for each pool
+
 ### Common Usage Examples
 
 #### With Custom Ports and Timing
@@ -291,6 +361,7 @@ kuma-sentinel portscan \
 kuma-sentinel --help
 kuma-sentinel portscan --help
 kuma-sentinel kopiasnapshotstatus --help
+kuma-sentinel zfspoolstatus --help
 ```
 
 ## Configuration
@@ -343,9 +414,20 @@ kopiasnapshotstatus:
     - path: /backups
       max_age_hours: 48
   max_age_hours: 24
+
+zfspoolstatus:
+  uptime_kuma:
+    token: your-zfs-token
+  
+  pools:
+    - name: tank
+      free_space_percent_min: 10
+    - name: backup
+      free_space_percent_min: 20
+  free_space_percent_default: 10
 ```
 
-See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration with per-path thresholds and examples.
+See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
 
 ### Environment Variables
 
@@ -467,6 +549,7 @@ Example log output:
 **Per-Command Requirements:**
 - **portscan**: nmap (must be installed on system and in PATH)
 - **kopiasnapshotstatus**: Kopia backup tool (must be installed and configured on system)
+- **zfspoolstatus**: ZFS tools (zpool command, available with ZFS installation)
 
 ## Development
 

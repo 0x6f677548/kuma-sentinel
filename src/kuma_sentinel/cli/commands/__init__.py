@@ -44,10 +44,12 @@ from kuma_sentinel.cli.commands.kopiasnapshotstatus import (  # noqa: E402
     KopiaSnapshotStatusCommand,
 )  # noqa: E402
 from kuma_sentinel.cli.commands.portscan import PortscanCommand  # noqa: E402
+from kuma_sentinel.cli.commands.zfspoolstatus import ZfsPoolStatusCommand  # noqa: E402
 
 __all__ = [
     "PortscanCommand",
     "KopiaSnapshotStatusCommand",
+    "ZfsPoolStatusCommand",
     "register_command",
     "_COMMAND_REGISTRY",
 ]

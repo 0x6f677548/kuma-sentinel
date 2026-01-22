@@ -14,7 +14,7 @@ from kuma_sentinel.core.config.portscan_config import PortscanConfig
     "portscan",
     checker_class=PortChecker,
     config_class=PortscanConfig,
-    help_text="Scan TCP ports on target ranges",
+    help_text="Scans for TCP open ports on target ranges",
 )
 class PortscanCommand(CommandExecutor):
     """Port scanning command using unified executor."""

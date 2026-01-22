@@ -444,6 +444,215 @@ A: Yes, set `keep_xml_output: true` in config or use `KUMA_SENTINEL_PORTSCAN_NMA
 
 ---
 
+# ZFS Pool Status Configuration Guide
+
+## Quick Start
+
+### Configuration File (YAML)
+```yaml
+zfspoolstatus:
+  pools:
+    - name: tank
+      free_space_percent_min: 10
+    - name: backup
+      free_space_percent_min: 20
+    - name: archive
+      # Omits free_space_percent_min → uses global default
+  free_space_percent_default: 10
+  uptime_kuma:
+    token: your-zfs-token
+```
+
+### Command Line
+```bash
+# Monitor multiple pools with thresholds
+kuma-sentinel zfspoolstatus \
+  --pool tank 10 \
+  --pool backup 20 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-zfs-token
+```
+
+### Environment Variables
+```bash
+# Format: pool1:min_free%,pool2:min_free%
+KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20,archive:15"
+KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=10
+KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+```
+
+## Key Features
+
+✅ **Per-pool thresholds** — Each pool can have different minimum free space requirements
+✅ **Global fallback** — Pools without explicit threshold use global default (10% by default)
+✅ **Health monitoring** — Detects unhealthy pools (DEGRADED, FAULTED, OFFLINE)
+✅ **Individual failures** — One failing pool doesn't prevent checking others
+✅ **CLI override** — CLI `--pool` flags replace YAML config entirely
+✅ **Type-safe** — Structured YAML format prevents configuration errors
+
+## Configuration Reference
+
+### Structure
+```
+zfspoolstatus:
+  pools:                          # List of pool configurations
+    - name: <string>              # Required: pool name (e.g., "tank")
+      free_space_percent_min: <int>  # Optional: min free space % (falls back to global default)
+  free_space_percent_default: <int>  # Global default (default: 10)
+  uptime_kuma:
+    token: <string>               # Uptime Kuma API token
+```
+
+### Environment Variables
+
+**Parsing rules:**
+- Comma-separated lists: `pool1:10,pool2:20,pool3:15`
+- Whitespace is trimmed automatically
+- Pools without threshold use global default
+- Examples:
+  ```bash
+  KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20"
+  KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10, backup:20"  # Spaces handled
+  KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=10
+  ```
+
+### CLI Arguments
+
+```bash
+# Single pool
+kuma-sentinel zfspoolstatus --pool tank 10
+
+# Multiple pools
+kuma-sentinel zfspoolstatus \
+  --pool tank 10 \
+  --pool backup 20 \
+  --pool archive 15
+
+# With config file
+kuma-sentinel zfspoolstatus \
+  --config /etc/kuma-sentinel/config.yaml
+
+# Override global default
+kuma-sentinel zfspoolstatus \
+  --pool tank 10 \
+  --free-space-percent 15
+```
+
+## Pool Health Status
+
+Only `ONLINE` status is considered healthy. Any other status triggers an alert:
+
+| Status | Description | Alert |
+|--------|-------------|-------|
+| ONLINE | Pool is healthy and operational | ✅ OK if free space >= threshold |
+| DEGRADED | Pool operational but reduced redundancy (missing disk) | ⚠️ DOWN |
+| FAULTED | Pool has encountered fatal errors | ⚠️ DOWN |
+| OFFLINE | Pool is offline (user request) | ⚠️ DOWN |
+| REMOVED | Pool was removed | ⚠️ DOWN |
+
+**Note:** All non-ONLINE states immediately trigger DOWN status, regardless of free space.
+
+## Examples
+
+### Single pool with default threshold
+```yaml
+zfspoolstatus:
+  pools:
+    - name: tank
+  free_space_percent_default: 10
+```
+
+### Multiple pools with different thresholds
+```yaml
+zfspoolstatus:
+  pools:
+    - name: tank
+      free_space_percent_min: 10      # Critical: needs 10% free
+    - name: backup
+      free_space_percent_min: 20      # Important: needs 20% free
+    - name: archive
+      free_space_percent_min: 30      # Archive: more relaxed
+  free_space_percent_default: 10
+```
+
+```bash
+KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20,archive:30"
+```
+
+### Mix pools with and without explicit thresholds
+```yaml
+zfspoolstatus:
+  pools:
+    - name: tank
+      free_space_percent_min: 10
+    - name: backup                   # Uses global default (15%)
+    - name: archive                  # Uses global default (15%)
+  free_space_percent_default: 15
+```
+
+```bash
+KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup,archive"
+KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=15
+```
+
+## Alert Messages
+
+### All pools healthy
+```
+✅ All pools healthy: tank: 25.0% free; backup: 50.0% free
+```
+
+### Pool with low free space
+```
+⚠️ Low free space: tank: 8.0% < 10%; backup: 12.0% < 20%
+```
+
+### Unhealthy pool status
+```
+⚠️ Unhealthy pools: tank (status: FAULTED), backup (status: DEGRADED)
+```
+
+### Per-pool details in result
+```json
+{
+  "pool_details": {
+    "tank": {
+      "status": "ONLINE",
+      "free_percent": 25.0,
+      "threshold": 10
+    },
+    "backup": {
+      "status": "DEGRADED",
+      "free_percent": 40.0,
+      "threshold": 20
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+**Q: Why is the command failing with "zpool not found"?**
+A: ZFS tools must be installed on the system. Install with: `apt install zfsutils-linux` (Debian/Ubuntu) or `yum install zfs` (RHEL/CentOS)
+
+**Q: How do I check pool status manually?**
+A: Use: `zpool list -H -o name,size,alloc,free,cap,health POOL_NAME`
+
+**Q: Can I omit free_space_percent_min for some pools?**
+A: Yes! They'll use the global `free_space_percent_default` value.
+
+**Q: Do CLI flags merge with YAML config?**
+A: No. CLI `--pool` flags **replace** the YAML config entirely.
+
+**Q: What if a pool doesn't exist?**
+A: The command reports it as a failed pool and returns DOWN status.
+
+**Q: Can I set free_space_percent to 0?**
+A: Yes, but pools must have >0% free space. A value of 0 means the pool must never be completely full.
+
+---
+
 ## Shared Configuration
 
 All commands support these shared settings:

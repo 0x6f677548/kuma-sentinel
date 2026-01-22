@@ -125,8 +125,19 @@ class CmdCheckConfig(ConfigBase):
         super().validate()
 
         errors = []
+        errors.extend(self._validate_command_specification())
+        errors.extend(self._validate_timeout_and_exit_code())
+        errors.extend(self._validate_regex_patterns())
+        errors.extend(self._validate_individual_commands())
 
-        # Must have either command or commands, not both
+        if errors:
+            raise ValueError(
+                "Configuration validation failed:\n  " + "\n  ".join(errors)
+            )
+
+    def _validate_command_specification(self) -> List[str]:
+        """Validate that exactly one command specification is provided."""
+        errors: List[str] = []
         has_command = bool(self.cmdcheck_command)
         has_commands = bool(self.cmdcheck_commands)
 
@@ -140,19 +151,28 @@ class CmdCheckConfig(ConfigBase):
                 "Cannot specify both 'command' and 'commands' - use one or the other"
             )
 
-        # Validate timeout
+        return errors
+
+    def _validate_timeout_and_exit_code(self) -> List[str]:
+        """Validate timeout and exit code values."""
+        errors: List[str] = []
+
         if self.cmdcheck_timeout <= 0 or self.cmdcheck_timeout > 300:
             errors.append(
                 f"Timeout must be between 1 and 300 seconds, got {self.cmdcheck_timeout}"
             )
 
-        # Validate exit code
         if self.cmdcheck_expect_exit_code < 0 or self.cmdcheck_expect_exit_code > 255:
             errors.append(
                 f"Exit code must be between 0 and 255, got {self.cmdcheck_expect_exit_code}"
             )
 
-        # Validate regex patterns
+        return errors
+
+    def _validate_regex_patterns(self) -> List[str]:
+        """Validate success and failure regex patterns."""
+        errors: List[str] = []
+
         if self.cmdcheck_success_pattern:
             try:
                 re.compile(self.cmdcheck_success_pattern)
@@ -165,52 +185,73 @@ class CmdCheckConfig(ConfigBase):
             except re.error as e:
                 errors.append(f"Invalid failure_pattern regex: {e}")
 
-        # Validate individual commands in multiple mode
-        if self.cmdcheck_commands:
-            for idx, cmd_config in enumerate(self.cmdcheck_commands):
-                if not isinstance(cmd_config, dict):
-                    errors.append(f"Command {idx} must be a dictionary")
-                    continue
+        return errors
 
-                if "command" not in cmd_config:
-                    errors.append(f"Command {idx} missing 'command' field")
+    def _validate_individual_commands(self) -> List[str]:
+        """Validate individual command configurations in multiple mode."""
+        errors: List[str] = []
 
-                if "command" in cmd_config and not cmd_config["command"]:
-                    errors.append(f"Command {idx} has empty command string")
+        if not self.cmdcheck_commands:
+            return errors
 
-                # Validate timeout per command if specified
-                if "timeout" in cmd_config:
-                    timeout = cmd_config["timeout"]
-                    if timeout <= 0 or timeout > 300:
-                        errors.append(
-                            f"Command {idx} timeout must be 1-300, got {timeout}"
-                        )
+        for idx, cmd_config in enumerate(self.cmdcheck_commands):
+            if not isinstance(cmd_config, dict):
+                errors.append(f"Command {idx} must be a dictionary")
+                continue
 
-                # Validate exit code per command if specified
-                if "expect_exit_code" in cmd_config:
-                    exit_code = cmd_config["expect_exit_code"]
-                    if exit_code < 0 or exit_code > 255:
-                        errors.append(
-                            f"Command {idx} exit code must be 0-255, got {exit_code}"
-                        )
+            errors.extend(self._validate_command_config(idx, cmd_config))
 
-                # Validate patterns per command if specified
-                if "success_pattern" in cmd_config:
-                    try:
-                        re.compile(cmd_config["success_pattern"])
-                    except re.error as e:
-                        errors.append(f"Command {idx} invalid success_pattern: {e}")
+        return errors
 
-                if "failure_pattern" in cmd_config:
-                    try:
-                        re.compile(cmd_config["failure_pattern"])
-                    except re.error as e:
-                        errors.append(f"Command {idx} invalid failure_pattern: {e}")
+    def _validate_command_config(self, idx: int, cmd_config: Dict[str, Any]) -> List[str]:
+        """Validate a single command configuration."""
+        errors: List[str] = []
 
-        if errors:
-            raise ValueError(
-                "Configuration validation failed:\n  " + "\n  ".join(errors)
-            )
+        # Validate command field presence and value
+        if "command" not in cmd_config:
+            errors.append(f"Command {idx} missing 'command' field")
+            return errors
+
+        if not cmd_config["command"]:
+            errors.append(f"Command {idx} has empty command string")
+
+        errors.extend(self._validate_command_field(idx, "timeout", cmd_config))
+        errors.extend(self._validate_command_field(idx, "expect_exit_code", cmd_config))
+        errors.extend(self._validate_command_pattern(idx, "success_pattern", cmd_config))
+        errors.extend(self._validate_command_pattern(idx, "failure_pattern", cmd_config))
+
+        return errors
+
+    def _validate_command_field(self, idx: int, field: str, cmd_config: Dict[str, Any]) -> List[str]:
+        """Validate numeric command fields (timeout, exit_code)."""
+        errors: List[str] = []
+
+        if field not in cmd_config:
+            return errors
+
+        value = cmd_config[field]
+        if field == "timeout":
+            if value <= 0 or value > 300:
+                errors.append(f"Command {idx} timeout must be 1-300, got {value}")
+        elif field == "expect_exit_code":
+            if value < 0 or value > 255:
+                errors.append(f"Command {idx} exit code must be 0-255, got {value}")
+
+        return errors
+
+    def _validate_command_pattern(self, idx: int, field: str, cmd_config: Dict[str, Any]) -> List[str]:
+        """Validate regex pattern command fields."""
+        errors: List[str] = []
+
+        if field not in cmd_config:
+            return errors
+
+        try:
+            re.compile(cmd_config[field])
+        except re.error as e:
+            errors.append(f"Command {idx} invalid {field}: {e}")
+
+        return errors
 
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get command check configuration summary for logging.

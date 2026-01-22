@@ -61,8 +61,8 @@ class CmdCheckChecker(Checker):
                 check_name=self.name,
                 status="down",
                 message="No command configured",
-                duration_seconds=duration,
-                details=None,
+                duration_seconds=int(duration),
+                details={},
             )
 
         except Exception as e:
@@ -72,8 +72,8 @@ class CmdCheckChecker(Checker):
                 check_name=self.name,
                 status="down",
                 message=f"Error: {str(e)}",
-                duration_seconds=duration,
-                details=None,
+                duration_seconds=int(duration),
+                details={},
             )
 
     def _execute_single(self, check_start: float) -> CheckResult:
@@ -84,6 +84,16 @@ class CmdCheckChecker(Checker):
         capture_output = self.config.cmdcheck_capture_output
         success_pattern = self.config.cmdcheck_success_pattern
         failure_pattern = self.config.cmdcheck_failure_pattern
+
+        if not command:
+            duration = time.time() - check_start
+            return CheckResult(
+                check_name=self.name,
+                status="down",
+                message="No command configured",
+                duration_seconds=int(duration),
+                details={},
+            )
 
         self.logger.debug(f"Running command: {command}")
 
@@ -116,9 +126,9 @@ class CmdCheckChecker(Checker):
             duration = time.time() - check_start
 
             # Build detailed message for Uptime Kuma with visibility
-            symbol = '✓' if status == 'up' else '✗'
+            symbol = "✓" if status == "up" else "✗"
             # Include command for clarity (truncate long commands to ~60 chars)
-            cmd_display = (command or "")
+            cmd_display = command or ""
             if len(cmd_display) > 60:
                 cmd_display = cmd_display[:57] + "..."
             message = f"[{self.name}] {symbol} [{cmd_display}] {reason}"
@@ -127,7 +137,9 @@ class CmdCheckChecker(Checker):
             if output_truncated and len(output_truncated) <= 100:
                 message += f" | Output: {output_truncated[:100]}"
 
-            self.logger.info(f"{'✅' if status == 'up' else '❌'} Single command check: {message}")
+            self.logger.info(
+                f"{'✅' if status == 'up' else '❌'} Single command check: {message}"
+            )
 
             return CheckResult(
                 check_name=self.name,
@@ -137,9 +149,9 @@ class CmdCheckChecker(Checker):
                 details={
                     "command": command,
                     "exit_code": result.returncode,
-                    "output": output_truncated[:200]
-                    if output_truncated
-                    else "(no output)",
+                    "output": (
+                        output_truncated[:200] if output_truncated else "(no output)"
+                    ),
                     "reason": reason,
                 },
             )
@@ -208,7 +220,9 @@ class CmdCheckChecker(Checker):
 
             # Get per-command overrides or use defaults
             timeout = cmd_config.get("timeout", timeout_default)
-            expect_exit_code = cmd_config.get("expect_exit_code", expect_exit_code_default)
+            expect_exit_code = cmd_config.get(
+                "expect_exit_code", expect_exit_code_default
+            )
             success_pattern = cmd_config.get("success_pattern", success_pattern_default)
             failure_pattern = cmd_config.get("failure_pattern", failure_pattern_default)
             capture_output = cmd_config.get("capture_output", capture_output_default)
@@ -244,7 +258,9 @@ class CmdCheckChecker(Checker):
                     "command": command,
                     "status": status,
                     "exit_code": result.returncode,
-                    "output": output_truncated[:200] if output_truncated else "(no output)",
+                    "output": (
+                        output_truncated[:200] if output_truncated else "(no output)"
+                    ),
                     "duration_seconds": duration,
                 }
 
@@ -299,14 +315,16 @@ class CmdCheckChecker(Checker):
                     bracket_start = failure.index("[") + 1
                     bracket_end = failure.index("]")
                     cmd = failure[bracket_start:bracket_end]
-                    reason = failure[bracket_end + 2:-1]  # Skip "] ("
+                    reason = failure[bracket_end + 2 : -1]  # Skip "] ("
                     # Truncate command if too long
                     if len(cmd) > 30:
                         cmd = cmd[:27] + "..."
-                    formatted_failures.append(f"{failure.split('[')[0]}[{cmd}] ({reason})")
+                    formatted_failures.append(
+                        f"{failure.split('[')[0]}[{cmd}] ({reason})"
+                    )
                 else:
                     formatted_failures.append(failure)
-            
+
             failure_summary = "; ".join(formatted_failures)
             if failed_count > 3:
                 failure_summary += f"; +{failed_count - 3} more"
@@ -321,7 +339,9 @@ class CmdCheckChecker(Checker):
         status_breakdown = "; ".join(
             [f"[{r['name']}: {'✓' if r['status'] == 'up' else '✗'}]" for r in results]
         )
-        self.logger.info(f"✅ Multiple commands check completed: {message} | {status_breakdown}")
+        self.logger.info(
+            f"✅ Multiple commands check completed: {message} | {status_breakdown}"
+        )
 
         return CheckResult(
             check_name=self.name,

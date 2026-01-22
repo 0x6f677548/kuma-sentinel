@@ -189,7 +189,9 @@ class ZfsPoolStatusChecker(Checker):
 
             if failed_pools:
                 failed_names = [name for name, _ in failed_pools]
-                message = f"[{self.name}] ✗ Failed to check pools: {', '.join(failed_names)}"
+                message = (
+                    f"[{self.name}] ✗ Failed to check pools: {', '.join(failed_names)}"
+                )
                 return CheckResult(
                     check_name=self.name,
                     status="down",
@@ -202,7 +204,9 @@ class ZfsPoolStatusChecker(Checker):
                 )
 
             if unhealthy_pools:
-                message = f"[{self.name}] ✗ Unhealthy pools: {', '.join(unhealthy_pools)}"
+                message = (
+                    f"[{self.name}] ✗ Unhealthy pools: {', '.join(unhealthy_pools)}"
+                )
                 return CheckResult(
                     check_name=self.name,
                     status="down",

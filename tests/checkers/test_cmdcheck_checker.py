@@ -1,6 +1,5 @@
 """Tests for cmdcheck checker."""
 
-import re
 import time
 from unittest.mock import MagicMock, patch
 
@@ -8,7 +7,6 @@ import pytest
 
 from kuma_sentinel.core.checkers.cmdcheck_checker import CmdCheckChecker
 from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
-from kuma_sentinel.core.models import CheckResult
 
 
 @pytest.fixture
@@ -71,9 +69,7 @@ class TestSingleCommandExecution:
         checker.config.cmdcheck_expect_exit_code = 1
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
 
             result = checker.execute()
 
@@ -91,7 +87,6 @@ class TestSingleCommandExecution:
             assert result.status == "down"
             assert "timed" in result.message.lower()
             assert "30" in result.message
-
 
     def test_command_not_found(self, checker):
         """Test command not found error."""
@@ -195,9 +190,7 @@ class TestPatternMatching:
 
         with patch("subprocess.run") as mock_run:
             # Output matches both patterns
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="FAIL OK", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout="FAIL OK", stderr="")
 
             result = checker.execute()
 
@@ -211,9 +204,7 @@ class TestPatternMatching:
 
         with patch("subprocess.run") as mock_run:
             # Non-zero exit but matches success pattern
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="SUCCESS", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=1, stdout="SUCCESS", stderr="")
 
             result = checker.execute()
 
@@ -228,9 +219,7 @@ class TestPatternMatching:
         checker.config.cmdcheck_expect_exit_code = 42
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=42, stdout="", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=42, stdout="", stderr="")
 
             result = checker.execute()
 
@@ -271,9 +260,7 @@ class TestPatternMatching:
         checker.config.cmdcheck_success_pattern = r"^\d+\.\d+\.\d+$"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="1.2.3", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=1, stdout="1.2.3", stderr="")
 
             result = checker.execute()
 
@@ -314,6 +301,7 @@ class TestMultipleCommands:
         ]
 
         with patch("subprocess.run") as mock_run:
+
             def side_effect(*args, **kwargs):
                 # Return based on which command
                 if "false" in args[0]:
@@ -345,7 +333,9 @@ class TestMultipleCommands:
             assert result.status == "down"
             assert "✗" in result.message  # Failure symbol
             assert "0/2 passed" in result.message or "2/2 failed" in result.message
-            assert "cmd1" in result.message or "cmd2" in result.message  # Command names included
+            assert (
+                "cmd1" in result.message or "cmd2" in result.message
+            )  # Command names included
 
     def test_multiple_commands_per_command_timeout(self, checker):
         """Test per-command timeout settings."""
@@ -359,6 +349,7 @@ class TestMultipleCommands:
         ]
 
         with patch("subprocess.run") as mock_run:
+
             def side_effect(*args, **kwargs):
                 timeout = kwargs.get("timeout", 10)
                 if "sleep 100" in args[0] and timeout <= 2:
@@ -382,6 +373,7 @@ class TestMultipleCommands:
         ]
 
         with patch("subprocess.run") as mock_run:
+
             def side_effect(*args, **kwargs):
                 if "notfound" in args[0]:
                     return MagicMock(returncode=1, stdout="", stderr="")
@@ -433,7 +425,9 @@ class TestShellExecution:
 
     def test_shell_redirects(self, checker):
         """Test shell redirects work."""
-        checker.config.cmdcheck_command = "echo test > /tmp/test.txt && test -f /tmp/test.txt"
+        checker.config.cmdcheck_command = (
+            "echo test > /tmp/test.txt && test -f /tmp/test.txt"
+        )
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
@@ -471,7 +465,9 @@ class TestEdgeCases:
         """Test that empty command string behavior when passed to subprocess."""
         # Empty command actually runs in shell (it's just ""), which typically succeeds
         # This tests the actual behavior rather than validation
-        checker.config.cmdcheck_command = "true"  # Use true instead to avoid validation issues
+        checker.config.cmdcheck_command = (
+            "true"  # Use true instead to avoid validation issues
+        )
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")

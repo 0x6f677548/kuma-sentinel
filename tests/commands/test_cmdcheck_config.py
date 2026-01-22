@@ -32,8 +32,7 @@ class TestYAMLLoading:
     def test_load_single_command_from_yaml(self, config, tmp_path):
         """Test loading single command from YAML."""
         yaml_file = tmp_path / "config.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 logging:
   log_file: /var/log/test.log
 uptime_kuma:
@@ -48,8 +47,7 @@ cmdcheck:
   capture_output: true
   uptime_kuma:
     token: cmdcheck-token
-"""
-        )
+""")
 
         config.load_from_yaml(str(yaml_file))
 
@@ -62,8 +60,7 @@ cmdcheck:
     def test_load_multiple_commands_from_yaml(self, config, tmp_path):
         """Test loading multiple commands from YAML."""
         yaml_file = tmp_path / "config.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 uptime_kuma:
   url: http://localhost:3001/api/push
 heartbeat:
@@ -80,8 +77,7 @@ cmdcheck:
       timeout: 15
   uptime_kuma:
     token: cmdcheck-token
-"""
-        )
+""")
 
         config.load_from_yaml(str(yaml_file))
 
@@ -94,8 +90,7 @@ cmdcheck:
     def test_load_patterns_from_yaml(self, config, tmp_path):
         """Test loading regex patterns from YAML."""
         yaml_file = tmp_path / "config.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 uptime_kuma:
   url: http://localhost:3001/api/push
 heartbeat:
@@ -107,8 +102,7 @@ cmdcheck:
   failure_pattern: "ERROR|CRITICAL"
   uptime_kuma:
     token: cmdcheck-token
-"""
-        )
+""")
 
         config.load_from_yaml(str(yaml_file))
 
@@ -207,8 +201,7 @@ class TestEnvironmentVariables:
     def test_env_vars_override_yaml(self, config, tmp_path, monkeypatch):
         """Test environment variables override YAML config."""
         yaml_file = tmp_path / "config.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 uptime_kuma:
   url: http://localhost:3001/api/push
 heartbeat:
@@ -219,8 +212,7 @@ cmdcheck:
   timeout: 60
   uptime_kuma:
     token: cmdcheck-token
-"""
-        )
+""")
 
         monkeypatch.setenv("KUMA_SENTINEL_CMDCHECK_TIMEOUT", "120")
 
@@ -233,8 +225,7 @@ cmdcheck:
     def test_cli_args_override_yaml_and_env(self, config, tmp_path, monkeypatch):
         """Test CLI args override YAML and env vars."""
         yaml_file = tmp_path / "config.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 uptime_kuma:
   url: http://localhost:3001/api/push
 heartbeat:
@@ -245,8 +236,7 @@ cmdcheck:
   timeout: 60
   uptime_kuma:
     token: cmdcheck-token
-"""
-        )
+""")
 
         monkeypatch.setenv("KUMA_SENTINEL_CMDCHECK_TIMEOUT", "120")
 
@@ -373,9 +363,7 @@ class TestValidation:
         config.heartbeat_token = "token"
         config.command_token = "token"
         config.cmdcheck_multiple = True
-        config.cmdcheck_commands = [
-            {"command": "test", "success_pattern": "[invalid("}
-        ]
+        config.cmdcheck_commands = [{"command": "test", "success_pattern": "[invalid("}]
 
         with pytest.raises(ValueError, match="invalid success_pattern"):
             config.validate()

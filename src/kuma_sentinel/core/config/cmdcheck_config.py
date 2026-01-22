@@ -247,8 +247,6 @@ class CmdCheckConfig(ConfigBase):
             "🔔 Uptime Kuma Integration": {
                 "URL": self.uptime_kuma_url or "Not configured",
                 "Heartbeat Enabled": "Yes" if self.heartbeat_enabled else "No",
-                "Command Token": self._mask_token(
-                    self.command_token, mask_tokens
-                ),
+                "Command Token": self._mask_token(self.command_token, mask_tokens),
             },
         }

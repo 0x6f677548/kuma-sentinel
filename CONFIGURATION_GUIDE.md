@@ -1,5 +1,82 @@
 # Configuration Guide for Kuma Sentinel
 
+## Overview: How Configuration Works
+
+Kuma Sentinel supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
+- Store sensitive tokens in environment variables
+- Use YAML files for detailed, reusable configurations
+- Override settings via command-line arguments for one-off executions
+
+### Configuration Priority (Highest to Lowest)
+
+1. **CLI Arguments** - Command-line flags override everything
+2. **YAML Config File** - Settings in `/etc/kuma-sentinel/config.yaml` (or custom path via `--config`)
+3. **Environment Variables** - Settings prefixed with `KUMA_SENTINEL_`
+4. **Hardcoded Defaults** - Built-in fallback values
+
+This means if you set a value in multiple places, CLI arguments win, followed by YAML, then environment variables.
+
+**Example Priority in Action:**
+```bash
+# Let's say config.yaml has timeout: 30
+# And environment variable has KUMA_SENTINEL_CMDCHECK_TIMEOUT=45
+# And CLI has --timeout 60
+
+# Result: timeout will be 60 (CLI wins)
+```
+
+### Configuration Methods
+
+**Method 1: YAML File (Recommended for production)**
+- Centralized configuration
+- Easy to version control and audit
+- Supports complex scenarios (multiple paths, pools, snapshots)
+- Default location: `/etc/kuma-sentinel/config.yaml`
+- Override location: `kuma-sentinel COMMAND --config /path/to/config.yaml`
+
+**Method 2: Environment Variables (Recommended for Docker/CI)**
+- Secure token storage
+- CI/CD friendly
+- Container-friendly (no files to mount)
+- All variables prefixed with `KUMA_SENTINEL_`
+
+**Method 3: CLI Arguments (Recommended for testing/one-off runs)**
+- Quick testing and debugging
+- No files needed
+- Perfect for cron jobs with inline parameters
+
+**Method 4: Defaults**
+- Built-in fallback values
+- Minimal required configuration
+
+### Global Configuration
+
+These settings apply to all monitoring commands:
+
+**Uptime Kuma Integration:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push  # Where to send push notifications
+```
+
+**Heartbeat Service:**
+```yaml
+heartbeat:
+  enabled: true                          # Enable/disable heartbeat pings
+  interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
+  uptime_kuma:
+    token: your-heartbeat-token          # Shared across all commands
+```
+
+**Logging:**
+```yaml
+logging:
+  log_file: /var/log/kuma-sentinel.log  # Log file path
+  log_level: INFO                        # DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+---
+
 ## Command Monitoring (cmdcheck)
 
 Execute arbitrary shell commands on remote systems and monitor ANY condition. The universal monitoring command that enables unlimited use cases.

@@ -3,26 +3,27 @@
 ## Overview: How Configuration Works
 
 Kuma Sentinel supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
-- Store sensitive tokens in environment variables
+- Store sensitive authentication tokens in environment variables
 - Use YAML files for detailed, reusable configurations
 - Override settings via command-line arguments for one-off executions
+
+**Important:** Only authentication tokens (variables ending in `_TOKEN`) are supported via environment variables. All other configuration must use YAML files or CLI arguments.
 
 ### Configuration Priority (Highest to Lowest)
 
 1. **CLI Arguments** - Command-line flags override everything
 2. **YAML Config File** - Settings in `/etc/kuma-sentinel/config.yaml` (or custom path via `--config`)
-3. **Environment Variables** - Settings prefixed with `KUMA_SENTINEL_`
+3. **Token Environment Variables** - Authentication tokens prefixed with `KUMA_SENTINEL_*_TOKEN`
 4. **Hardcoded Defaults** - Built-in fallback values
 
-This means if you set a value in multiple places, CLI arguments win, followed by YAML, then environment variables.
+This means if you set a value in multiple places, CLI arguments win, followed by YAML, then token environment variables.
 
 **Example Priority in Action:**
 ```bash
 # Let's say config.yaml has timeout: 30
-# And environment variable has KUMA_SENTINEL_CMDCHECK_TIMEOUT=45
 # And CLI has --timeout 60
 
-# Result: timeout will be 60 (CLI wins)
+# Result: timeout will be 60 (CLI wins, YAML provides fallback)
 ```
 
 ### Configuration Methods
@@ -34,11 +35,11 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 - Default location: `/etc/kuma-sentinel/config.yaml`
 - Override location: `kuma-sentinel COMMAND --config /path/to/config.yaml`
 
-**Method 2: Environment Variables (Recommended for Docker/CI)**
+**Method 2: Token Environment Variables (For authentication tokens only)**
 - Secure token storage
 - CI/CD friendly
 - Container-friendly (no files to mount)
-- All variables prefixed with `KUMA_SENTINEL_`
+- All token variables suffixed with `_TOKEN`
 
 **Method 3: CLI Arguments (Recommended for testing/one-off runs)**
 - Quick testing and debugging
@@ -106,16 +107,6 @@ kuma-sentinel cmdcheck \
   http://uptimekuma:3001/api/push \
   your-heartbeat-token \
   your-cmdcheck-token
-```
-
-**Environment Variables:**
-```bash
-export UPTIME_KUMA_URL=http://uptimekuma:3001/api/push
-export KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
-export KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
-export KUMA_SENTINEL_CMDCHECK_TIMEOUT=10
-
-kuma-sentinel cmdcheck --command "systemctl is-active nginx"
 ```
 
 #### Multiple Commands - All Must Pass
@@ -574,11 +565,8 @@ kuma-sentinel kopiasnapshotstatus \
   --snapshot /backups 48
 ```
 
-### Environment Variables
+### Authentication Token
 ```bash
-# Format: path1:age1,path2:age2
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS="/data:24,/backups:48"
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
 KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ```
 
@@ -607,10 +595,9 @@ kopiasnapshotstatus:
 Configuration is loaded in the following priority order (highest to lowest):
 1. **CLI arguments** - Command-line `--snapshot` and `--max-age-hours` flags (highest priority)
 2. **YAML file** - Configuration from config file
-3. **Environment variables** - `KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_*` variables
-4. **Defaults** - Built-in defaults (max_age_hours: 24)
+3. **Defaults** - Built-in defaults (max_age_hours: 24)
 
-**Note:** CLI arguments completely override YAML/environment config. Each layer fully replaces the previous one—they don't merge.
+**Note:** CLI arguments completely override YAML config. Each layer fully replaces the previous one—they don't merge.
 
 ### YAML Configuration
 
@@ -626,42 +613,12 @@ kopiasnapshotstatus:
   max_age_hours: 24
 ```
 
-### Environment Variables
+### Authentication Token
 
-Format: `VARIABLE_NAME=value`
+Only the token environment variable is supported:
 
 ```bash
-# Snapshots: comma-separated path:age pairs (age is hours)
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS="/data:24,/backups:48,/archive:168"
-
-# Global default for snapshots without explicit threshold
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
-
-# API token for Uptime Kuma
 KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
-
-# Shared settings (same for all commands)
-KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
-KUMA_SENTINEL_HEARTBEAT_INTERVAL=300
-KUMA_SENTINEL_UPTIME_KUMA_URL=http://uptimekuma:3001/api/push
-```
-
-**Environment variable format for snapshots:**
-- Format: `path1:age1,path2:age2`
-- Paths with colons (SSH paths): Split from the right, so `user@host:/data:24` → path=`user@host:/data`, age=`24`
-- Paths without age: Use global default (e.g., `/data` uses `KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS`)
-
-**Examples:**
-```bash
-# Simple local paths
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS="/data:24,/backups:48"
-
-# Remote SSH paths
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS="root@fileserver:/mnt/shares:48,user@backup:/archive:168"
-
-# Mixed with defaults (no age specified uses global default)
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS="/data:24,/backups"
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS=24
 ```
 
 ### CLI Arguments
@@ -814,30 +771,8 @@ kuma-sentinel portscan \
   192.168.1.0/24
 ```
 
-### Environment Variables
+### Authentication Token
 ```bash
-# Port ranges to scan (comma-separated)
-KUMA_SENTINEL_PORTSCAN_PORTS=1-1000
-
-# IP ranges to exclude (comma-separated)
-KUMA_SENTINEL_PORTSCAN_EXCLUDE="192.168.1.1,192.168.1.254"
-
-# IP ranges to scan (comma-separated)
-KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.1.0/24,10.0.0.0/8"
-
-# Nmap timing profile
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T3
-
-# Nmap timeout
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT=3600
-
-# Additional nmap arguments
-KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS=--script vuln
-
-# Keep nmap XML output
-KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT=false
-
-# API token
 KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
 ```
 
@@ -860,18 +795,7 @@ portscan:
   ip_ranges: [<range-list>]     # IP ranges to scan (e.g., 192.168.1.0/24)
 ```
 
-### Environment Variables
 
-**Parsing rules:**
-- Comma-separated lists: `192.168.1.0/24,10.0.0.0/8` or `192.168.1.1,192.168.1.254`
-- Whitespace is trimmed automatically
-- Examples:
-  ```bash
-  KUMA_SENTINEL_PORTSCAN_EXCLUDE="192.168.1.1, 192.168.1.254"  # Spaces handled
-  KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.1.0/24,10.0.0.0/8"
-  ```
-
-### CLI Arguments
 
 ```bash
 # Single IP range
@@ -923,10 +847,6 @@ portscan:
     - 192.168.1.0/24
 ```
 
-```bash
-KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.1.0/24"
-```
-
 ### Multi-range scan with exclusions
 ```yaml
 portscan:
@@ -939,13 +859,6 @@ portscan:
     - 10.0.0.0/8
   nmap:
     timing: T4
-```
-
-```bash
-KUMA_SENTINEL_PORTSCAN_PORTS="22,80,443,3306,3389"
-KUMA_SENTINEL_PORTSCAN_EXCLUDE="192.168.1.1,192.168.1.254"
-KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.1.0/24,10.0.0.0/8"
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T4
 ```
 
 ### Fast scan with custom arguments
@@ -1025,11 +938,8 @@ kuma-sentinel zfspoolstatus \
   your-zfs-token
 ```
 
-### Environment Variables
+### Authentication Token
 ```bash
-# Format: pool1:min_free%,pool2:min_free%
-KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20,archive:15"
-KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=10
 KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 ```
 
@@ -1055,20 +965,7 @@ zfspoolstatus:
     token: <string>               # Uptime Kuma API token
 ```
 
-### Environment Variables
 
-**Parsing rules:**
-- Comma-separated lists: `pool1:10,pool2:20,pool3:15`
-- Whitespace is trimmed automatically
-- Pools without threshold use global default
-- Examples:
-  ```bash
-  KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20"
-  KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10, backup:20"  # Spaces handled
-  KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=10
-  ```
-
-### CLI Arguments
 
 ```bash
 # Single pool

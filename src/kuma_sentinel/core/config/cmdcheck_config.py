@@ -38,24 +38,20 @@ class CmdCheckConfig(ConfigBase):
                     converter=self._commands_converter,
                 ),
                 "cmdcheck_multiple": FieldMapping(
-                    env_var="KUMA_SENTINEL_CMDCHECK_MULTIPLE",
                     yaml_path="cmdcheck.multiple",
                     converter=self._parse_bool,
                 ),
                 "cmdcheck_timeout": FieldMapping(
-                    env_var="KUMA_SENTINEL_CMDCHECK_TIMEOUT",
                     arg_key="timeout",
                     yaml_path="cmdcheck.timeout",
                     converter=int,
                 ),
                 "cmdcheck_expect_exit_code": FieldMapping(
-                    env_var="KUMA_SENTINEL_CMDCHECK_EXPECT_EXIT_CODE",
                     arg_key="expect_exit_code",
                     yaml_path="cmdcheck.expect_exit_code",
                     converter=int,
                 ),
                 "cmdcheck_capture_output": FieldMapping(
-                    env_var="KUMA_SENTINEL_CMDCHECK_CAPTURE_OUTPUT",
                     arg_key="capture_output",
                     yaml_path="cmdcheck.capture_output",
                     converter=self._parse_bool,

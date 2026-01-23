@@ -106,31 +106,18 @@ You can run Kuma Sentinel in a Docker container for isolated execution and easy 
 
 #### Using docker-compose (Recommended)
 
-1. Copy the example environment file:
+1. Create your configuration file:
 
 ```bash
-cp .env.example .env
+cp example.config.yaml config.yaml
 ```
 
-2. Edit `.env` with your configuration:
-
-```bash
-# Set your Uptime Kuma URL and tokens
-export UPTIME_KUMA_URL=http://uptimekuma:3001/api/push
-export UPTIME_KUMA_HEARTBEAT_TOKEN=your-heartbeat-token
-export UPTIME_KUMA_PORTSCAN_TOKEN=your-portscan-token
-```
+2. Edit `config.yaml` with your settings
 
 3. Build and run:
 
 ```bash
 docker-compose up --build -it
-```
-
-4. Run a scan inside the container:
-
-```bash
-docker-compose exec kuma-sentinel portscan 192.168.100.110-199 $UPTIME_KUMA_URL $UPTIME_KUMA_HEARTBEAT_TOKEN $UPTIME_KUMA_PORTSCAN_TOKEN
 ```
 
 #### Using docker run directly
@@ -142,15 +129,19 @@ docker build -t kuma-sentinel:latest .
 docker run -it --rm \
   -v $(pwd)/config.yaml:/etc/kuma-sentinel/config.yaml:ro \
   -v $(pwd)/logs:/var/log/kuma-sentinel \
+  -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token \
+  -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token \
   kuma-sentinel:latest \
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
+  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push
 
 # Windows (PowerShell)
 docker run -it --rm `
   -v ${pwd}/config.yaml:/etc/kuma-sentinel/config.yaml:ro `
   -v ${pwd}/logs:/var/log/kuma-sentinel `
+  -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token `
+  -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token `
   kuma-sentinel:latest `
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
+  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push
 ```
 
 ## Usage
@@ -525,7 +516,7 @@ kuma-sentinel zfspoolstatus --help
 
 ## Configuration
 
-### YAML File Format
+### YAML File Format (Recommended)
 
 Default location: `/etc/kuma-sentinel/config.yaml`
 
@@ -588,11 +579,18 @@ zfspoolstatus:
 
 See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
 
-### Environment Variables
+### Authentication Tokens (Environment Variables Only)
 
-For complete environment variable reference and examples, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#environment-variables)
+Only authentication tokens are supported via environment variables for security reasons. All other configuration must use YAML files or CLI arguments.
 
-**Configuration Priority** (highest to lowest): CLI arguments > YAML file > Environment variables > Defaults
+**Supported token environment variables:**
+- `KUMA_SENTINEL_HEARTBEAT_TOKEN` - Heartbeat push token
+- `KUMA_SENTINEL_CMDCHECK_TOKEN` - Command check push token
+- `KUMA_SENTINEL_PORTSCAN_TOKEN` - Port scan push token
+- `KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN` - Kopia snapshot push token
+- `KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN` - ZFS pool status push token
+
+**Configuration Priority** (highest to lowest): CLI arguments > YAML file > Token environment variables > Defaults
 
 ### CLI Arguments
 

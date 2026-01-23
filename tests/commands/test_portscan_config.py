@@ -24,20 +24,6 @@ def test_portscan_config_defaults():
     assert config.heartbeat_interval == 300
 
 
-def test_portscan_config_load_from_env(monkeypatch):
-    """Test loading portscan configuration from environment variables."""
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_PORTS", "22,80,443")
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_TIMING", "T4")
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_IP_RANGES", "192.168.1.0/24,10.0.0.0/8")
-
-    config = PortscanConfig()
-    config.load_from_env()
-
-    assert config.portscan_nmap_ports == "22,80,443"
-    assert config.portscan_nmap_timing == "T4"
-    assert config.portscan_ip_ranges == ["192.168.1.0/24", "10.0.0.0/8"]
-
-
 def test_portscan_config_load_from_yaml():
     """Test loading portscan configuration from YAML file."""
     yaml_content = {
@@ -217,30 +203,6 @@ def test_portscan_config_parse_comma_separated_list_empty_strings():
     assert result == ["192.168.1.0/24", "10.0.0.0/8"]
 
 
-def test_portscan_config_parse_bool_true_variants(monkeypatch):
-    """Test _parse_bool converts various true representations."""
-    config = PortscanConfig()
-
-    # Test with environment variable set to various truthy values
-    for truthy_value in ["true", "True", "TRUE", "1", "yes", "YES"]:
-        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT", truthy_value)
-        config = PortscanConfig()
-        config.load_from_env()
-        assert config.portscan_nmap_keep_xmloutput is True, f"Failed for {truthy_value}"
-
-
-def test_portscan_config_parse_bool_false_variants(monkeypatch):
-    """Test _parse_bool converts various false representations."""
-    config = PortscanConfig()
-
-    # Test with environment variable set to various falsy values
-    for falsy_value in ["false", "False", "FALSE", "0", "no", "NO", ""]:
-        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT", falsy_value)
-        config = PortscanConfig()
-        config.load_from_env()
-        assert config.portscan_nmap_keep_xmloutput is False, f"Failed for {falsy_value}"
-
-
 def test_portscan_config_load_bool_from_yaml(tmp_path):
     """Test loading boolean flag from YAML."""
     yaml_content = {
@@ -259,17 +221,6 @@ def test_portscan_config_load_bool_from_yaml(tmp_path):
         assert config.portscan_nmap_keep_xmloutput is True
     finally:
         os.unlink(config_file)
-
-
-def test_portscan_config_nmap_timeout_int_conversion(monkeypatch):
-    """Test nmap timeout is converted to int from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT", "7200")
-
-    config = PortscanConfig()
-    config.load_from_env()
-
-    assert config.portscan_nmap_timeout == 7200
-    assert isinstance(config.portscan_nmap_timeout, int)
 
 
 def test_portscan_config_get_summary_with_exclusions():
@@ -379,17 +330,27 @@ def test_portscan_parse_comma_separated_edge_cases():
     assert config._parse_comma_separated_list(None) == []  # type: ignore
 
 
-def test_portscan_config_validation_success(monkeypatch):
+def test_portscan_config_validation_success(monkeypatch, tmp_path):
     """Test validation succeeds with all required fields."""
     monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "heartbeat_token_123")
     monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "command_token_456")
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_IP_RANGES", "192.168.1.0/24")
+    
+    # Create YAML config with IP ranges since env vars only support tokens
+    config_file = tmp_path / "config.yaml"
+    yaml_content = {
+        "uptime_kuma": {"url": "http://kuma:3001/api/push"},
+        "heartbeat": {"uptime_kuma": {"token": "heartbeat_token_123"}},
+        "portscan": {
+            "ip_ranges": ["192.168.1.0/24"],
+            "uptime_kuma": {"token": "command_token_456"}
+        }
+    }
+    with open(config_file, "w") as f:
+        yaml.dump(yaml_content, f)
 
     config = PortscanConfig()
-    config.uptime_kuma_url = (
-        "http://kuma:3001/api/push"  # Set directly since not in env vars
-    )
     config.load_from_env()
+    config.load_from_yaml(str(config_file))
 
     # Should not raise
     config.validate()

@@ -8,11 +8,12 @@ services:
     image: kuma-sentinel:latest
     container_name: kuma-sentinel
     
-    # Load environment variables from .env file
+    # Load authentication tokens from .env file
+    # All other configuration must be provided via config.yaml file
     env_file:
       - .env
     
-    # Volume mounts for logs and data
+    # Volume mounts for logs, data, and configuration
     volumes:
       - ./logs:/var/log/kuma-sentinel
       - ./data:/data

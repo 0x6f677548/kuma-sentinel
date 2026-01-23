@@ -73,23 +73,6 @@ def test_kopia_config_load_heartbeat_token_from_env(monkeypatch):
     assert config.heartbeat_token == "env_heartbeat_token"
 
 
-def test_kopia_config_load_kopia_token_from_env(monkeypatch):
-    """Test loading kopia snapshot token from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN", "env_kopia_token")
-    monkeypatch.setenv(
-        "KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS", "/data:24,/backups:48"
-    )
-
-    config = KopiaSnapshotConfig()
-    config.load_from_env()
-
-    assert config.command_token == "env_kopia_token"
-    assert config.kopiasnapshotstatus_snapshots == [
-        {"path": "/data", "max_age_hours": 24},
-        {"path": "/backups", "max_age_hours": 48},
-    ]
-
-
 def test_token_loading_priority_kopia(monkeypatch, tmp_path):
     """Test token loading priority: CLI > YAML > Env > Defaults for kopia."""
     # Set environment variables
@@ -285,38 +268,6 @@ def test_kopia_config_get_summary_without_snapshots():
     summary = config.get_summary()
 
     assert "(using defaults)" in summary["kopiasnapshotstatus_snapshots"]
-
-
-def test_kopia_config_load_max_age_from_env(monkeypatch):
-    """Test loading max_age_hours from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS", "72")
-
-    config = KopiaSnapshotConfig()
-    config.load_from_env()
-
-    assert config.kopiasnapshotstatus_max_age_hours == 72
-
-
-def test_kopia_config_max_age_priority(monkeypatch, tmp_path):
-    """Test max_age_hours priority: CLI > YAML > Env > Defaults."""
-    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS", "72")
-
-    config_file = tmp_path / "config.yaml"
-    yaml_data = {"kopiasnapshotstatus": {"max_age_hours": 48}}
-    with open(config_file, "w") as f:
-        yaml.dump(yaml_data, f)
-
-    config = KopiaSnapshotConfig()
-    assert config.kopiasnapshotstatus_max_age_hours == 24  # default
-
-    config.load_from_env()
-    assert config.kopiasnapshotstatus_max_age_hours == 72  # env overrides default
-
-    config.load_from_yaml(str(config_file))
-    assert config.kopiasnapshotstatus_max_age_hours == 48  # YAML overrides env
-
-    config.load_from_args({"max_age_hours": 36})
-    assert config.kopiasnapshotstatus_max_age_hours == 36  # CLI overrides all
 
 
 def test_kopia_config_validation_success(monkeypatch):

@@ -131,26 +131,6 @@ def test_zfs_pool_config_validation_success():
     config.validate()
 
 
-def test_zfs_pool_config_load_from_env(monkeypatch):
-    """Test loading ZFS pool config from environment variables."""
-    monkeypatch.setenv("KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN", "env_zfs_token")
-    monkeypatch.setenv(
-        "KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS", "tank:10,backup:20,archive:5"
-    )
-    monkeypatch.setenv("KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT", "15")
-
-    config = ZfsPoolStatusConfig()
-    config.load_from_env()
-
-    assert config.command_token == "env_zfs_token"
-    assert config.zfspoolstatus_pools == [
-        {"name": "tank", "free_space_percent_min": 10},
-        {"name": "backup", "free_space_percent_min": 20},
-        {"name": "archive", "free_space_percent_min": 5},
-    ]
-    assert config.zfspoolstatus_free_space_percent_default == 15
-
-
 def test_zfs_pool_config_pool_converter_env_string():
     """Test _pool_converter with environment variable string format."""
     result = ZfsPoolStatusConfig._pool_converter("tank:10,backup:20")
@@ -278,38 +258,6 @@ def test_zfs_pool_config_get_summary_no_pools():
     summary = config.get_summary(mask_tokens=True)
 
     assert summary["zfspoolstatus_pools"] == "none"
-
-
-def test_zfs_pool_config_load_priority_yaml_over_env(monkeypatch, tmp_path):
-    """Test configuration loading priority: YAML overrides environment variables."""
-    # Set environment variables
-    monkeypatch.setenv("KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS", "env_tank:5")
-    monkeypatch.setenv("KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT", "5")
-
-    # Create YAML with different values
-    config_file = tmp_path / "config.yaml"
-    yaml_content = {
-        "zfspoolstatus": {
-            "pools": [{"name": "yaml_tank", "free_space_percent_min": 20}],
-            "free_space_percent_default": 20,
-            "uptime_kuma": {"token": "yaml_token"},
-        },
-        "uptime_kuma": {"url": "http://localhost"},
-        "heartbeat": {"uptime_kuma": {"token": "heartbeat"}},
-    }
-    with open(config_file, "w") as f:
-        yaml.dump(yaml_content, f)
-
-    config = ZfsPoolStatusConfig()
-    config.load_from_env()
-    config.load_from_yaml(str(config_file))
-
-    # YAML values should override environment
-    assert config.zfspoolstatus_pools == [
-        {"name": "yaml_tank", "free_space_percent_min": 20}
-    ]
-    assert config.zfspoolstatus_free_space_percent_default == 20
-    assert config.command_token == "yaml_token"
 
 
 def test_zfs_pool_config_load_args_priority(tmp_path):

@@ -44,34 +44,28 @@ class PortscanConfig(ConfigBase):
         mappings.update(
             {
                 "portscan_nmap_ports": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_PORTS",
                     arg_key="ports",
                     yaml_path="portscan.ports",
                 ),
                 "portscan_nmap_timing": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_NMAP_TIMING",
                     arg_key="timing",
                     yaml_path="portscan.nmap.timing",
                 ),
                 "portscan_nmap_timeout": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_NMAP_TIMEOUT",
                     arg_key="timeout",
                     yaml_path="portscan.nmap.timeout",
                     converter=int,
                 ),
                 "portscan_exclude": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_EXCLUDE",
                     arg_key="exclude",
                     yaml_path="portscan.exclude",
                     converter=self._parse_comma_separated_list,
                 ),
                 "portscan_nmap_keep_xmloutput": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT",
                     yaml_path="portscan.nmap.keep_xml_output",
                     converter=self._parse_bool,
                 ),
                 "portscan_nmap_arguments": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS",
                     yaml_path="portscan.nmap.arguments",
                 ),
                 "command_token": FieldMapping(
@@ -80,7 +74,6 @@ class PortscanConfig(ConfigBase):
                     yaml_path="portscan.uptime_kuma.token",
                 ),
                 "portscan_ip_ranges": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_IP_RANGES",
                     arg_key="ip_ranges",
                     yaml_path="portscan.ip_ranges",
                     converter=self._parse_comma_separated_list,

@@ -22,13 +22,11 @@ class ZfsPoolStatusConfig(ConfigBase):
         mappings.update(
             {
                 "zfspoolstatus_pools": FieldMapping(
-                    env_var="KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS",
                     arg_key="pools",
                     yaml_path="zfspoolstatus.pools",
                     converter=self._pool_converter,
                 ),
                 "zfspoolstatus_free_space_percent_default": FieldMapping(
-                    env_var="KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT",
                     arg_key="free_space_percent",
                     yaml_path="zfspoolstatus.free_space_percent_default",
                     converter=int,

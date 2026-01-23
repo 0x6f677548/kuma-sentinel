@@ -62,12 +62,10 @@ class ConfigBase(ABC):
         """
         return {
             "log_file": FieldMapping(
-                env_var="KUMA_SENTINEL_LOG_FILE",
                 arg_key="log_file",
                 yaml_path="logging.log_file",
             ),
             "log_level": FieldMapping(
-                env_var="KUMA_SENTINEL_LOG_LEVEL",
                 arg_key="log_level",
                 yaml_path="logging.log_level",
             ),
@@ -76,12 +74,10 @@ class ConfigBase(ABC):
                 yaml_path="uptime_kuma.url",
             ),
             "heartbeat_enabled": FieldMapping(
-                env_var="KUMA_SENTINEL_HEARTBEAT_ENABLED",
                 yaml_path="heartbeat.enabled",
                 converter=self._parse_bool,
             ),
             "heartbeat_interval": FieldMapping(
-                env_var="KUMA_SENTINEL_HEARTBEAT_INTERVAL",
                 yaml_path="heartbeat.interval",
                 converter=int,
             ),

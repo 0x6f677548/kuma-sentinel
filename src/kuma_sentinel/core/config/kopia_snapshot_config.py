@@ -81,13 +81,11 @@ class KopiaSnapshotConfig(ConfigBase):
         mappings.update(
             {
                 "kopiasnapshotstatus_snapshots": FieldMapping(
-                    env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_SNAPSHOTS",
                     arg_key="snapshots",
                     yaml_path="kopiasnapshotstatus.snapshots",
                     converter=self._snapshot_converter,
                 ),
                 "kopiasnapshotstatus_max_age_hours": FieldMapping(
-                    env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_MAX_AGE_HOURS",
                     arg_key="max_age_hours",
                     yaml_path="kopiasnapshotstatus.max_age_hours",
                     converter=int,

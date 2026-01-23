@@ -244,6 +244,15 @@ kuma-sentinel portscan \
 kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
 ```
 
+**Nmap Timing Profiles:**
+The `--timing` parameter controls scan speed and network load:
+- `T0`: Paranoid - Very slow, useful for IDS evasion
+- `T1`: Sneaky - Slow, IDS evasion
+- `T2`: Polite - Slowed to minimize network load
+- `T3`: Normal - Default, no delays
+- `T4`: Aggressive - Fast, assumes reasonable network
+- `T5`: Insane - Very fast, assumes excellent network
+
 ### Kopia Snapshot Status
 
 Monitor Kopia backup snapshot freshness with per-path age thresholds:
@@ -598,15 +607,6 @@ kuma-sentinel portscan \
   your-heartbeat-token \
   your-portscan-token
 ```
-
-## Nmap Timing Profiles
-
-- `T0`: Paranoid - Very slow, useful for IDS evasion
-- `T1`: Sneaky - Slow, IDS evasion
-- `T2`: Polite - Slowed to minimize network load
-- `T3`: Normal - Default, no delays
-- `T4`: Aggressive - Fast, assumes reasonable network
-- `T5`: Insane - Very fast, assumes excellent network
 
 ## Cron Job Example
 

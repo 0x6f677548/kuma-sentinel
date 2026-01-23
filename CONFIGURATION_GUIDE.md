@@ -161,14 +161,14 @@ kuma-sentinel cmdcheck \
 
 ### Key Features
 
-✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
-✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
-✅ **Multiple Commands** — Run multiple independent checks, all must pass for UP
-✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
-✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
-✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
-✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in multiple mode
-✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
+- ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
+- ✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
+- ✅ **Multiple Commands** — Run multiple independent checks, all must pass for UP
+- ✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
+- ✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
+- ✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
+- ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in multiple mode
+- ✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
 
 ### Configuration Reference
 

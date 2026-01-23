@@ -200,8 +200,48 @@ See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for comprehensive cmdcheck 
 
 ### Port Scan
 
+Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists.
+
+**Basic usage:**
 ```bash
 kuma-sentinel portscan 192.168.1.0/24 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
+```
+
+**With custom ports and timing:**
+```bash
+kuma-sentinel portscan \
+  --ports 22,80,443,3389 \
+  --timing T4 \
+  192.168.100.0/24 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-portscan-token
+```
+
+**Multiple IP ranges:**
+```bash
+kuma-sentinel portscan \
+  192.168.1.0/24 \
+  10.0.0.0/8 \
+  172.16.0.0/12 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-portscan-token
+```
+
+**With exclusions:**
+```bash
+kuma-sentinel portscan \
+  --exclude 192.168.1.1,192.168.1.254 \
+  192.168.1.0/24 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-portscan-token
+```
+
+**Using configuration file (recommended):**
+```bash
+kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
 ```
 
 ### Kopia Snapshot Status
@@ -464,49 +504,6 @@ zfspoolstatus:
 - ⚠️ If any pool is unhealthy (DEGRADED, FAULTED, OFFLINE, etc.) → Uptime Kuma shows DOWN and triggers alerts
 - ⚠️ If any pool has insufficient free space → Uptime Kuma shows DOWN and triggers alerts
 - 📊 Details include health status and free space for each pool
-
-### Common Usage Examples
-
-#### With Custom Ports and Timing
-
-```bash
-kuma-sentinel portscan \
-  --ports 22,80,443,3389 \
-  --timing T4 \
-  192.168.100.0/24 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
-```
-
-#### Multiple IP Ranges
-
-```bash
-kuma-sentinel portscan \
-  192.168.1.0/24 \
-  10.0.0.0/8 \
-  172.16.0.0/12 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
-```
-
-#### Using Configuration File
-
-```bash
-kuma-sentinel portscan --config /etc/kuma-sentinel/config.yaml
-```
-
-#### With Exclusions
-
-```bash
-kuma-sentinel portscan \
-  --exclude 192.168.1.1,192.168.1.254 \
-  192.168.1.0/24 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
-```
 
 ### Help
 

@@ -69,122 +69,135 @@ class CmdCheckChecker(Checker):
                 details={},
             )
 
+    def _execute_single_command(
+        self, cmd_config: Dict[str, Any], idx: int
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Execute a single command and return its result and optional failure message.
+
+        Returns:
+            Tuple of (result_dict, failure_message_or_none)
+        """
+        cmd_start = time.time()
+        command = cmd_config.get("command", "")
+        name = cmd_config.get("name", f"cmd_{idx}")
+
+        # Get per-command overrides or use defaults
+        timeout = cmd_config.get("timeout", self.config.cmdcheck_timeout)
+        expect_exit_code = cmd_config.get(
+            "expect_exit_code", self.config.cmdcheck_expect_exit_code
+        )
+        success_pattern = cmd_config.get(
+            "success_pattern", self.config.cmdcheck_success_pattern
+        )
+        failure_pattern = cmd_config.get(
+            "failure_pattern", self.config.cmdcheck_failure_pattern
+        )
+        capture_output = cmd_config.get(
+            "capture_output", self.config.cmdcheck_capture_output
+        )
+
+        self.logger.debug(f"Running command {idx + 1}: {name}")
+
+        try:
+            # Parse command string into argument list for safe execution
+            # shell=False prevents shell metacharacter interpretation (security)
+            try:
+                args = shlex.split(command)
+            except ValueError as e:
+                # shlex.split() raises ValueError for unclosed quotes
+                duration = time.time() - cmd_start
+                return (
+                    {
+                        "name": name,
+                        "command": command,
+                        "status": "down",
+                        "exit_code": None,
+                        "output": f"Invalid command syntax: {str(e)}",
+                        "duration_seconds": duration,
+                    },
+                    f"{name}[{command}] (Invalid command syntax)",
+                )
+
+            result = subprocess.run(
+                args,
+                shell=False,
+                capture_output=capture_output,
+                text=True,
+                timeout=timeout,
+            )
+
+            output = (result.stdout or "") + (result.stderr or "")
+            output_truncated = output[-500:] if len(output) > 500 else output
+
+            status, message = self._evaluate_result(
+                exit_code=result.returncode,
+                output=output_truncated,
+                expect_exit_code=expect_exit_code,
+                success_pattern=success_pattern,
+                failure_pattern=failure_pattern,
+            )
+
+            duration = time.time() - cmd_start
+
+            cmd_result = {
+                "name": name,
+                "command": command,
+                "status": status,
+                "exit_code": result.returncode,
+                "output": (
+                    output_truncated[:200] if output_truncated else "(no output)"
+                ),
+                "duration_seconds": duration,
+            }
+
+            failure_msg = None
+            if status == "down":
+                failure_msg = f"{name}[{command}] ({message})"
+
+            return cmd_result, failure_msg
+
+        except subprocess.TimeoutExpired:
+            duration = time.time() - cmd_start
+            return (
+                {
+                    "name": name,
+                    "command": command,
+                    "status": "down",
+                    "exit_code": None,
+                    "output": f"Timeout after {timeout}s",
+                    "duration_seconds": duration,
+                },
+                f"{name}[{command}] (timeout)",
+            )
+
+        except Exception as e:
+            duration = time.time() - cmd_start
+            return (
+                {
+                    "name": name,
+                    "command": command,
+                    "status": "down",
+                    "exit_code": None,
+                    "output": str(e),
+                    "duration_seconds": duration,
+                },
+                f"{name}[{command}] ({str(e)})",
+            )
+
     def _execute_commands(self, check_start: float) -> CheckResult:
         """Execute all commands - all must succeed for UP status.
-        
+
         Even for a single command, it's treated as a list for consistency.
         """
         commands = self.config.cmdcheck_commands
         results: List[Dict[str, Any]] = []
         failures = []
 
-        timeout_default = self.config.cmdcheck_timeout
-        expect_exit_code_default = self.config.cmdcheck_expect_exit_code
-        success_pattern_default = self.config.cmdcheck_success_pattern
-        failure_pattern_default = self.config.cmdcheck_failure_pattern
-        capture_output_default = self.config.cmdcheck_capture_output
-
         for idx, cmd_config in enumerate(commands):
-            cmd_start = time.time()
-            command = cmd_config.get("command", "")
-
-            # Get per-command overrides or use defaults
-            timeout = cmd_config.get("timeout", timeout_default)
-            expect_exit_code = cmd_config.get(
-                "expect_exit_code", expect_exit_code_default
-            )
-            success_pattern = cmd_config.get("success_pattern", success_pattern_default)
-            failure_pattern = cmd_config.get("failure_pattern", failure_pattern_default)
-            capture_output = cmd_config.get("capture_output", capture_output_default)
-            name = cmd_config.get("name", f"cmd_{idx}")
-
-            self.logger.debug(f"Running command {idx + 1}/{len(commands)}: {name}")
-
-            try:
-                # Parse command string into argument list for safe execution
-                # shell=False prevents shell metacharacter interpretation (security)
-                try:
-                    args = shlex.split(command)
-                except ValueError as e:
-                    # shlex.split() raises ValueError for unclosed quotes
-                    duration = time.time() - cmd_start
-                    results.append(
-                        {
-                            "name": name,
-                            "command": command,
-                            "status": "down",
-                            "exit_code": None,
-                            "output": f"Invalid command syntax: {str(e)}",
-                            "duration_seconds": duration,
-                        }
-                    )
-                    failures.append(f"{name}[{command}] (Invalid command syntax)")
-                    continue
-
-                result = subprocess.run(
-                    args,
-                    shell=False,
-                    capture_output=capture_output,
-                    text=True,
-                    timeout=timeout,
-                )
-
-                output = (result.stdout or "") + (result.stderr or "")
-                output_truncated = output[-500:] if len(output) > 500 else output
-
-                status, message = self._evaluate_result(
-                    exit_code=result.returncode,
-                    output=output_truncated,
-                    expect_exit_code=expect_exit_code,
-                    success_pattern=success_pattern,
-                    failure_pattern=failure_pattern,
-                )
-
-                duration = time.time() - cmd_start
-
-                cmd_result = {
-                    "name": name,
-                    "command": command,
-                    "status": status,
-                    "exit_code": result.returncode,
-                    "output": (
-                        output_truncated[:200] if output_truncated else "(no output)"
-                    ),
-                    "duration_seconds": duration,
-                }
-
-                results.append(cmd_result)
-
-                if status == "down":
-                    failures.append(f"{name}[{command}] ({message})")
-
-            except subprocess.TimeoutExpired:
-                duration = time.time() - cmd_start
-                results.append(
-                    {
-                        "name": name,
-                        "command": command,
-                        "status": "down",
-                        "exit_code": None,
-                        "output": f"Timeout after {timeout}s",
-                        "duration_seconds": duration,
-                    }
-                )
-                failures.append(f"{name}[{command}] (timeout)")
-
-            except Exception as e:
-                duration = time.time() - cmd_start
-                results.append(
-                    {
-                        "name": name,
-                        "command": command,
-                        "status": "down",
-                        "exit_code": None,
-                        "output": str(e),
-                        "duration_seconds": duration,
-                    }
-                )
-                failures.append(f"{name}[{command}] ({str(e)})")
+            cmd_result, failure_msg = self._execute_single_command(cmd_config, idx)
+            results.append(cmd_result)
+            if failure_msg:
+                failures.append(failure_msg)
 
         # Determine overall status and message
         duration = time.time() - check_start
@@ -228,9 +241,7 @@ class CmdCheckChecker(Checker):
         status_breakdown = "; ".join(
             [f"[{r['name']}: {'✓' if r['status'] == 'up' else '✗'}]" for r in results]
         )
-        self.logger.info(
-            f"✅ Commands check completed: {message} | {status_breakdown}"
-        )
+        self.logger.info(f"✅ Commands check completed: {message} | {status_breakdown}")
 
         return CheckResult(
             check_name=self.name,

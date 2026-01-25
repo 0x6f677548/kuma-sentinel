@@ -8,7 +8,7 @@ from .base import ConfigBase, FieldMapping
 
 class CmdCheckConfig(ConfigBase):
     """Configuration for cmdcheck command.
-    
+
     Commands are always stored as a list, even for single commands.
     Each command can override defaults for timeout, expect_exit_code,
     success_pattern, failure_pattern, and capture_output.
@@ -20,7 +20,7 @@ class CmdCheckConfig(ConfigBase):
 
         # Command check-specific attributes - always a list
         self.cmdcheck_commands: List[Dict[str, Any]] = []
-        
+
         # Default values used when not specified in individual commands
         self.cmdcheck_timeout = 30
         self.cmdcheck_expect_exit_code = 0
@@ -134,9 +134,7 @@ class CmdCheckConfig(ConfigBase):
         errors: List[str] = []
 
         if not self.cmdcheck_commands:
-            errors.append(
-                "Must specify at least one command in 'commands' list"
-            )
+            errors.append("Must specify at least one command in 'commands' list")
 
         return errors
 
@@ -264,11 +262,7 @@ class CmdCheckConfig(ConfigBase):
         elif len(self.cmdcheck_commands) == 1:
             cmd_config = self.cmdcheck_commands[0]
             cmd_text = cmd_config.get("command", "")
-            cmd_display = (
-                cmd_text[:60] + "..."
-                if len(cmd_text) > 60
-                else cmd_text
-            )
+            cmd_display = cmd_text[:60] + "..." if len(cmd_text) > 60 else cmd_text
             cmd_summary = f"1 command: '{cmd_display}'"
         else:
             cmd_summary = f"{len(self.cmdcheck_commands)} commands configured"

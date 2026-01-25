@@ -21,7 +21,7 @@ class CmdCheckCommand(CommandExecutor):
 
     def get_builtin_command(self, base_command: click.Command) -> click.Command:
         """Build cmdcheck command with arguments and options.
-        
+
         Note: CLI supports single command only. For multiple commands,
         use YAML configuration with cmdcheck.commands list.
         """

@@ -144,7 +144,9 @@ class CommandExecutor(Command):
             # Calculate partial duration from error time in milliseconds
             error_end = time.time()
             error_duration_ms = int((error_end - check_start) * 1000)
-            self._send_error_alert(logger, cfg, self._command_name, str(e), error_duration_ms)
+            self._send_error_alert(
+                logger, cfg, self._command_name, str(e), error_duration_ms
+            )
             sys.exit(1)
 
     def _load_and_validate_config(

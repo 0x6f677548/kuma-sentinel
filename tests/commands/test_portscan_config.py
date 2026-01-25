@@ -342,8 +342,8 @@ def test_portscan_config_validation_success(monkeypatch, tmp_path):
         "heartbeat": {"uptime_kuma": {"token": "heartbeat_token_123"}},
         "portscan": {
             "ip_ranges": ["192.168.1.0/24"],
-            "uptime_kuma": {"token": "command_token_456"}
-        }
+            "uptime_kuma": {"token": "command_token_456"},
+        },
     }
     with open(config_file, "w") as f:
         yaml.dump(yaml_content, f)

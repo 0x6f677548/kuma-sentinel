@@ -20,6 +20,272 @@ class CmdCheckChecker(Checker):
     name = "cmdcheck"
     description = "Executes shell commands and reports results to Uptime Kuma"
 
+    # Dangerous command patterns that should be executed only with read-only intent
+    # Maps tool names to configuration with trigger pattern and dangerous arguments
+    DANGEROUS_PATTERNS: Dict[str, Dict[str, Any]] = {
+        # System service management
+        "systemctl": {
+            "trigger": "systemctl",
+            "dangerous_args": [
+                "start",
+                "stop",
+                "restart",
+                "reload",
+                "enable",
+                "disable",
+                "reenable",
+                "reset-failed",
+            ],
+            "warning": "may modify system state",
+        },
+        "service": {
+            "trigger": "service",
+            "dangerous_args": [
+                "start",
+                "stop",
+                "restart",
+                "reload",
+                "enable",
+                "disable",
+            ],
+            "warning": "may modify system services",
+        },
+        # Package managers
+        "apt": {
+            "trigger": "apt",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "purge",
+                "autoremove",
+                "autoclean",
+                "upgrade",
+                "full-upgrade",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "apt-get": {
+            "trigger": "apt-get",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "purge",
+                "autoremove",
+                "autoclean",
+                "upgrade",
+                "dist-upgrade",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "yum": {
+            "trigger": "yum",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "erase",
+                "update",
+                "upgrade",
+                "downgrade",
+                "autoremove",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "dnf": {
+            "trigger": "dnf",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "erase",
+                "upgrade",
+                "downgrade",
+                "autoremove",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "pacman": {
+            "trigger": "pacman",
+            "dangerous_args": [
+                "-s",  # sync (install)
+                "--sync",
+                "-r",  # remove
+                "--remove",
+                "-u",  # upgrade
+                "--upgrade",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "brew": {
+            "trigger": "brew",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "uninstall",
+                "upgrade",
+                "update",
+            ],
+            "warning": "may install/remove packages",
+        },
+        "pip": {
+            "trigger": "pip",
+            "dangerous_args": [
+                "install",
+                "uninstall",
+                "upgrade",
+            ],
+            "warning": "may install/remove Python packages",
+        },
+        "npm": {
+            "trigger": "npm",
+            "dangerous_args": [
+                "install",
+                "remove",
+                "uninstall",
+                "update",
+                "upgrade",
+            ],
+            "warning": "may install/remove Node packages",
+        },
+        "gem": {
+            "trigger": "gem",
+            "dangerous_args": [
+                "install",
+                "uninstall",
+                "update",
+                "upgrade",
+            ],
+            "warning": "may install/remove Ruby gems",
+        },
+        "cargo": {
+            "trigger": "cargo",
+            "dangerous_args": [
+                "install",
+                "uninstall",
+                "update",
+            ],
+            "warning": "may install/remove Rust packages",
+        },
+        # File system modification
+        "rm": {
+            "trigger": "rm",
+            "dangerous_args": [""],  # rm itself is dangerous, any usage is flagged
+            "warning": "may delete files",
+        },
+        "mkfs": {
+            "trigger": "mkfs",
+            "dangerous_args": [""],  # mkfs itself is dangerous
+            "warning": "may format file systems",
+        },
+        "dd": {
+            "trigger": "dd",
+            "dangerous_args": [""],  # dd itself is dangerous
+            "warning": "may overwrite disk data",
+        },
+        "fdisk": {
+            "trigger": "fdisk",
+            "dangerous_args": [""],  # fdisk itself is dangerous
+            "warning": "may modify disk partitions",
+        },
+        "parted": {
+            "trigger": "parted",
+            "dangerous_args": [""],  # parted itself is dangerous
+            "warning": "may modify disk partitions",
+        },
+        # ZFS storage
+        "zpool": {
+            "trigger": "zpool",
+            "dangerous_args": [
+                "create",
+                "destroy",
+                "remove",
+                "clear",
+                "export",
+                "import",
+                "attach",
+                "detach",
+                "replace",
+            ],
+            "warning": "may modify ZFS pools",
+        },
+        "zfs": {
+            "trigger": "zfs",
+            "dangerous_args": [
+                "create",
+                "destroy",
+                "set",
+                "inherit",
+                "rollback",
+                "snapshot",
+                "clone",
+                "promote",
+                "rename",
+            ],
+            "warning": "may modify ZFS datasets",
+        },
+        # User and permission management
+        "useradd": {
+            "trigger": "useradd",
+            "dangerous_args": [""],  # useradd itself is dangerous
+            "warning": "may create user accounts",
+        },
+        "userdel": {
+            "trigger": "userdel",
+            "dangerous_args": [""],  # userdel itself is dangerous
+            "warning": "may delete user accounts",
+        },
+        "usermod": {
+            "trigger": "usermod",
+            "dangerous_args": [""],  # usermod itself is dangerous
+            "warning": "may modify user accounts",
+        },
+        "passwd": {
+            "trigger": "passwd",
+            "dangerous_args": [""],  # passwd itself is dangerous
+            "warning": "may change passwords",
+        },
+        "chmod": {
+            "trigger": "chmod",
+            "dangerous_args": [""],  # chmod itself is dangerous
+            "warning": "may modify file permissions",
+        },
+        "chown": {
+            "trigger": "chown",
+            "dangerous_args": [""],  # chown itself is dangerous
+            "warning": "may change file ownership",
+        },
+        # System shutdown/reboot
+        "reboot": {
+            "trigger": "reboot",
+            "dangerous_args": [""],  # reboot itself is dangerous
+            "warning": "may reboot the system",
+        },
+        "shutdown": {
+            "trigger": "shutdown",
+            "dangerous_args": [""],  # shutdown itself is dangerous
+            "warning": "may shut down the system",
+        },
+        "halt": {
+            "trigger": "halt",
+            "dangerous_args": [""],  # halt itself is dangerous
+            "warning": "may halt the system",
+        },
+        "poweroff": {
+            "trigger": "poweroff",
+            "dangerous_args": [""],  # poweroff itself is dangerous
+            "warning": "may power off the system",
+        },
+        # Process management
+        "kill": {
+            "trigger": "kill",
+            "dangerous_args": [""],  # kill itself is dangerous
+            "warning": "may terminate processes",
+        },
+        "killall": {
+            "trigger": "killall",
+            "dangerous_args": [""],  # killall itself is dangerous
+            "warning": "may terminate multiple processes",
+        },
+    }
+
     def __init__(self, logger: Logger, config: CmdCheckConfig):
         """Initialize command check checker.
 
@@ -81,6 +347,9 @@ class CmdCheckChecker(Checker):
         cmd_start = time.time()
         command = cmd_config.get("command", "")
         name = cmd_config.get("name", f"cmd_{idx}")
+
+        # Warn about potentially dangerous command patterns
+        self._check_dangerous_patterns(command, name)
 
         # Get per-command overrides or use defaults
         timeout = cmd_config.get("timeout", self.config.cmdcheck_timeout)
@@ -264,6 +533,65 @@ class CmdCheckChecker(Checker):
                 },
             },
         )
+
+    def _check_dangerous_patterns(self, command: str, name: str) -> None:
+        """Check for dangerous command patterns and log warnings.
+
+        Warns about commands that appear to modify system state when running
+        with elevated privileges. This helps prevent accidental or malicious
+        system modifications via compromised monitoring scripts.
+
+        Uses a dynamic pattern matching system that checks tool names and their
+        dangerous arguments without requiring code changes for new tools.
+
+        Args:
+            command: Command string to check
+            name: Command name for logging
+        """
+        command_lower = command.lower()
+
+        # Check all registered dangerous patterns
+        for tool_name, pattern_config in self.DANGEROUS_PATTERNS.items():
+            trigger = pattern_config["trigger"]
+            dangerous_args = pattern_config["dangerous_args"]
+            warning_msg = pattern_config["warning"]
+
+            # Build a pattern that matches the tool as a command (word boundary)
+            # This prevents false positives like "service" matching in "myservice"
+            if trigger == "zfs":
+                # Special handling for zfs: check "zfs " or start with "zfs"
+                trigger_found = "zfs " in command_lower or command_lower.startswith(
+                    "zfs"
+                )
+            else:
+                # For other tools, use regex word boundary to match as command
+                # Match at start of command or after whitespace
+                trigger_found = bool(
+                    re.search(rf"(^|\s){re.escape(trigger)}(\s|$)", command_lower)
+                )
+
+            if not trigger_found:
+                continue
+
+            # Some tools are inherently dangerous (empty string in dangerous_args)
+            # These don't require specific arguments to trigger a warning
+            if "" in dangerous_args:
+                self.logger.warning(
+                    f"⚠️  Command '{name}' {warning_msg}: "
+                    f"{tool_name} detected. "
+                    f"Ensure this is authorized and runs with read-only intent."
+                )
+                break  # Only warn once per tool
+
+            # Check if any dangerous argument is used with this tool
+            for dangerous_arg in dangerous_args:
+                if dangerous_arg in command_lower:
+                    self.logger.warning(
+                        f"⚠️  Command '{name}' {warning_msg}: "
+                        f"{tool_name} {dangerous_arg} detected. "
+                        f"Ensure this is authorized and runs with read-only intent."
+                    )
+                    break  # Only warn once per tool
 
     @staticmethod
     def _evaluate_result(

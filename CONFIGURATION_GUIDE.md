@@ -538,6 +538,88 @@ This separates data (configuration) from logic (scripts) and enables proper code
 | Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits |
 | Output Leakage | Sensitive data in command output | Output truncated to 500 chars; sanitize scripts |
 
+#### Dangerous Command Pattern Detection
+
+Kuma Sentinel monitors for and **warns about dangerous commands** that could modify system state when executed with elevated privileges (via sudo). This is a **non-blocking security feature** that helps prevent accidental or malicious system modifications.
+
+**Detection is automatic** - dangerous patterns trigger warning messages in logs but commands still execute. This allows administrators to review and audit commands while maintaining operational continuity.
+
+**Commands that trigger warnings:**
+
+| Category | Tools | Examples |
+|----------|-------|----------|
+| **Package Managers** | `apt`, `apt-get`, `yum`, `dnf`, `pacman`, `brew`, `pip`, `npm`, `gem`, `cargo` | Installing/removing/upgrading packages |
+| **System Services** | `systemctl`, `service` | Starting, stopping, restarting, enabling/disabling services |
+| **File System** | `rm`, `mkfs`, `dd`, `fdisk`, `parted` | Deleting files, formatting disks, modifying partitions |
+| **User Management** | `useradd`, `userdel`, `usermod`, `passwd`, `chmod`, `chown` | Creating/modifying users, changing permissions |
+| **System Control** | `reboot`, `shutdown`, `halt`, `poweroff` | Shutting down or rebooting the system |
+| **Process Management** | `kill`, `killall` | Terminating processes |
+| **ZFS Storage** | `zpool`, `zfs` | Creating/destroying pools or datasets, snapshots, rollbacks |
+
+**Example Warning Messages:**
+
+```
+⚠️  Command 'check_nginx' may modify system state: systemctl start detected. Ensure this is authorized and runs with read-only intent.
+⚠️  Command 'update_packages' may install/remove packages: apt install detected. Ensure this is authorized and runs with read-only intent.
+⚠️  Command 'cleanup' may delete files: rm detected. Ensure this is authorized and runs with read-only intent.
+```
+
+**Recommended Sudoers Configuration**
+
+Only grant sudo access to **read-only** commands that your monitoring actually needs:
+
+```sudoers
+# /etc/sudoers.d/kuma-sentinel
+# Allow monitoring user to check service status (read-only)
+kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl status *
+kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl is-active *
+
+# Allow checking ZFS pool status (read-only)
+kuma-sentinel ALL=(root) NOPASSWD: /usr/sbin/zpool list
+kuma-sentinel ALL=(root) NOPASSWD: /usr/sbin/zpool status
+
+# Do NOT grant write permissions to ANY tools
+# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl *  (too broad)
+# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/apt *        (package manager)
+# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /bin/rm *             (destructive)
+```
+
+**Safe Monitoring Patterns:**
+
+✅ **Good - Read-only checks:**
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"        # Status check
+    - command: "test -f /var/run/app.pid"         # File existence
+    - command: "df / | tail -1 | awk '{print $5}'" # Disk usage
+    - command: "zpool status tank"                # ZFS pool status
+    - command: "curl -s http://app:8080/health"   # Health endpoint
+```
+
+❌ **Dangerous - System modification:**
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl restart nginx"          # Modifies service
+    - command: "apt update && apt upgrade"        # Installs packages
+    - command: "rm -rf /tmp/cache"                # Deletes files
+    - command: "zpool destroy tank"               # Destroys storage
+    - command: "reboot"                           # Reboots system
+```
+
+**Best Practices:**
+
+1. **Use Read-Only Commands** - Prefer checking status/health instead of modifying systems
+2. **Grant Minimal Sudo** - Only grant access to specific commands you actually need
+3. **Use Full Paths** - Always specify absolute paths (e.g., `/usr/bin/systemctl`) in sudoers
+4. **Enable Audit Logging** - Configure sudo to log all executed commands:
+   ```sudoers
+   Defaults logfile=/var/log/sudo.log
+   ```
+5. **Monitor Warning Messages** - Check logs regularly for dangerous command warnings
+6. **Test in Non-Production** - Always test your monitoring setup in a non-production environment first
+
 #### Configuration File Permission Validation
 
 Kuma Sentinel **enforces** that your configuration file has **restricted permissions (0o600)** to prevent unauthorized access to sensitive tokens and credentials.

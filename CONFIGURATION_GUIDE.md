@@ -159,6 +159,20 @@ kuma-sentinel cmdcheck \
   --success-pattern "active.*running"
 ```
 
+#### Authentication Token
+
+**Environment Variable:**
+```bash
+KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
+```
+
+**Or in YAML:**
+```yaml
+cmdcheck:
+  uptime_kuma:
+    token: your-cmdcheck-token
+```
+
 ### Key Features
 
 - ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
@@ -874,13 +888,6 @@ portscan:
       - --min-rate 1000
 ```
 
-```bash
-KUMA_SENTINEL_PORTSCAN_PORTS="1-65535"
-KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.100.0/24"
-KUMA_SENTINEL_PORTSCAN_NMAP_TIMING=T5
-KUMA_SENTINEL_PORTSCAN_NMAP_ARGUMENTS="--script vuln,--min-rate 1000"
-```
-
 ## Common Port Ranges
 
 - **Well-known ports**: 1-1023
@@ -904,7 +911,7 @@ A: Higher numbers (T4, T5) scan faster but are more aggressive. Lower numbers (T
 A: The parser handles CSV correctly: `192.168.1.0/24, 10.0.0.0/8` (whitespace trimmed automatically)
 
 **Q: Can I keep the nmap XML output for further analysis?**
-A: Yes, set `keep_xml_output: true` in config or use `KUMA_SENTINEL_PORTSCAN_NMAP_KEEP_XMLOUTPUT=true`
+A: Yes, set `keep_xml_output: true` in the YAML config file.
 
 ---
 
@@ -1024,10 +1031,6 @@ zfspoolstatus:
   free_space_percent_default: 10
 ```
 
-```bash
-KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup:20,archive:30"
-```
-
 ### Mix pools with and without explicit thresholds
 ```yaml
 zfspoolstatus:
@@ -1037,11 +1040,6 @@ zfspoolstatus:
     - name: backup                   # Uses global default (15%)
     - name: archive                  # Uses global default (15%)
   free_space_percent_default: 15
-```
-
-```bash
-KUMA_SENTINEL_ZFSPOOLSTATUS_POOLS="tank:10,backup,archive"
-KUMA_SENTINEL_ZFSPOOLSTATUS_FREE_SPACE_PERCENT=15
 ```
 
 ## Alert Messages
@@ -1105,17 +1103,57 @@ A: Yes, but pools must have >0% free space. A value of 0 means the pool must nev
 
 All commands support these shared settings:
 
-### Logging
+### Authentication Tokens (Environment Variables Only)
+
+Only authentication tokens are supported via environment variables. All other configuration must use YAML files or CLI arguments.
+
+**Supported token environment variables:**
+- `KUMA_SENTINEL_HEARTBEAT_TOKEN` - Shared heartbeat notifications token
+- `KUMA_SENTINEL_CMDCHECK_TOKEN` - Command execution monitoring token
+- `KUMA_SENTINEL_PORTSCAN_TOKEN` - Port scan results token
+- `KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN` - Backup snapshot monitoring token
+- `KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN` - ZFS pool monitoring token
+
+**Example:**
+```bash
+export KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
+export KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
+export KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
+export KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+export KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+```
+
+**Or in YAML:**
+```yaml
+heartbeat:
+  uptime_kuma:
+    token: your-heartbeat-token
+
+cmdcheck:
+  uptime_kuma:
+    token: your-cmdcheck-token
+
+portscan:
+  uptime_kuma:
+    token: your-portscan-token
+
+kopiasnapshotstatus:
+  uptime_kuma:
+    token: your-kopia-token
+
+zfspoolstatus:
+  uptime_kuma:
+    token: your-zfs-token
+```
+
+### Logging (YAML Only)
 ```yaml
 logging:
   log_file: /var/log/kuma-sentinel.log
   log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
-```bash
-KUMA_SENTINEL_LOG_FILE=/var/log/kuma-sentinel.log
-KUMA_SENTINEL_LOG_LEVEL=INFO
-```
+**Note:** Logging configuration can only be set via YAML files or CLI arguments, not environment variables.
 
 ### Heartbeat (Uptime Kuma monitoring)
 ```yaml
@@ -1126,11 +1164,7 @@ heartbeat:
     token: your-heartbeat-token
 ```
 
-```bash
-KUMA_SENTINEL_HEARTBEAT_ENABLED=true
-KUMA_SENTINEL_HEARTBEAT_INTERVAL=300
-KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
-```
+**Note:** Enable/disable and interval settings can only be configured via YAML files or CLI arguments.
 
 ### Uptime Kuma URL
 ```yaml
@@ -1138,9 +1172,7 @@ uptime_kuma:
   url: http://uptimekuma:3001/api/push
 ```
 
-```bash
-KUMA_SENTINEL_UPTIME_KUMA_URL=http://uptimekuma:3001/api/push
-```
+**Note:** The base URL must be configured via YAML file or CLI arguments.
 
 ## Configuration Priority
 
@@ -1148,21 +1180,21 @@ Configuration is loaded in the following priority order (highest to lowest):
 
 1. **CLI arguments** - Command-line flags (highest priority)
 2. **YAML file** - Configuration from `--config` file
-3. **Environment variables** - `KUMA_SENTINEL_*` environment variables
+3. **Token Environment Variables** - Only `KUMA_SENTINEL_*_TOKEN` variables
 4. **Defaults** - Built-in default values (lowest priority)
 
 **Loading order in code:**
 ```
 Defaults (in __init__)
   ↓
-Environment variables (load_from_env)
+Token environment variables (load_from_env)
   ↓
 YAML file (load_from_yaml)
   ↓
 CLI arguments (load_from_args) ← Final value wins
 ```
 
-**Note:** Each layer completely replaces the previous one—values don't merge.
+**Note:** Each layer completely replaces the previous one—values don't merge. Only authentication tokens are supported via environment variables.
 
 ### Example Priority
 
@@ -1175,35 +1207,19 @@ portscan:
 ```
 
 ```bash
-# Environment variable (third highest)
-export KUMA_SENTINEL_PORTSCAN_PORTS="22,80,443"
-
 # CLI argument (highest priority - takes final effect)
 kuma-sentinel portscan --ports 1-65535
 ```
 
-**Result:** Scans ports `1-65535` (CLI argument wins over all others)
+**Result:** Scans ports `1-65535` (CLI argument wins)
 
 If you remove the CLI argument:
 ```bash
-unset KUMA_SENTINEL_PORTSCAN_PORTS
 kuma-sentinel portscan
 # Result: Scans ports 1-1000 (YAML file wins)
 ```
 
-If you also remove the YAML entry:
-```yaml
-# config.yaml: (no ports entry)
-portscan:
-  ip_ranges: [192.168.1.0/24]
-```
-
-Then environment variable wins:
-```bash
-export KUMA_SENTINEL_PORTSCAN_PORTS="22,80,443"
-kuma-sentinel portscan
-# Result: Scans ports 22,80,443 (environment variable wins)
-```
+**Note:** Non-token settings can only be configured via YAML files or CLI arguments. Environment variables are reserved for authentication tokens only.
 
 ---
 
@@ -1218,12 +1234,6 @@ python -c "import yaml; yaml.safe_load(open('config.yaml'))"
 ### Dry run with verbose logging
 ```bash
 kuma-sentinel portscan --log-level DEBUG --config config.yaml
-```
-
-### Test environment variables
-```bash
-export KUMA_SENTINEL_PORTSCAN_IP_RANGES="192.168.1.0/24"
-kuma-sentinel portscan
 ```
 
 ### Run configuration tests

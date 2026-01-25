@@ -299,15 +299,13 @@ class MyCheckConfig(ConfigBase):
         mappings = super()._get_field_mappings()
         mappings.update({
             "mycheck_enabled": FieldMapping(
-                env_var="KUMA_SENTINEL_MYCHECK_ENABLED",
-                arg_key="enabled",
                 yaml_path="mycheck.enabled",
+                arg_key="enabled",
                 converter=self._parse_bool,
             ),
             "mycheck_timeout": FieldMapping(
-                env_var="KUMA_SENTINEL_MYCHECK_TIMEOUT",
-                arg_key="timeout",
                 yaml_path="mycheck.timeout",
+                arg_key="timeout",
                 converter=int,
             ),
             "command_token": FieldMapping(
@@ -558,13 +556,13 @@ mycheck:
     token: your-mycheck-token
 ```
 
-### Environment Variables Example
+### Authentication Token Example
 
 ```bash
-export KUMA_SENTINEL_MYCHECK_ENABLED=true
-export KUMA_SENTINEL_MYCHECK_TIMEOUT=300
 export KUMA_SENTINEL_MYCHECK_TOKEN=your-token
 ```
+
+**Note:** Only authentication tokens (suffixed with `_TOKEN`) are supported via environment variables. All other configuration must use YAML files or CLI arguments.
 
 ### What Happens Automatically
 

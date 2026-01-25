@@ -59,6 +59,7 @@ class CommandExecutor(Command):
         These options are common across all monitoring commands:
         - --config: Configuration file path (YAML or INI depending on command)
         - --log-file: Log file path
+        - --ignore-file-permissions: Skip config file permission validation
 
         Returns:
             The decorated command with common options added
@@ -67,6 +68,11 @@ class CommandExecutor(Command):
             Options are added in reverse order (Click decorators apply inside-out).
         """
         # Add in reverse order (Click applies decorators inside-out)
+        base_command = click.option(
+            "--ignore-file-permissions",
+            is_flag=True,
+            help="Skip validation that config file has restricted permissions (0o600)",
+        )(base_command)
         base_command = click.option(
             "--log-file",
             type=click.Path(),
@@ -169,6 +175,18 @@ class CommandExecutor(Command):
             import os
 
             if os.path.exists(config_file):
+                # Check file permissions unless user explicitly ignores them
+                ignore_perms = args.get("ignore_file_permissions", False)
+                from kuma_sentinel.core.logger import get_logger
+                logger = get_logger()
+                try:
+                    self.config.__class__.validate_config_file_permissions(
+                        config_file, logger=logger, ignore_warning=ignore_perms
+                    )
+                except RuntimeError as e:
+                    click.secho(str(e), fg="red", err=True)
+                    sys.exit(1)
+
                 try:
                     click.secho(
                         f"📂 Loading YAML config file: {config_file}",

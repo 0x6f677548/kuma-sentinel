@@ -50,6 +50,7 @@ class ConfigBase(ABC):
         self.heartbeat_interval = 300
         self.heartbeat_token: Optional[str] = None
         self.command_token: Optional[str] = None
+        self.ignore_file_permissions = False  # Skip file permission checks if True
 
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for configuration.
@@ -85,6 +86,11 @@ class ConfigBase(ABC):
                 env_var="KUMA_SENTINEL_HEARTBEAT_TOKEN",
                 arg_key="heartbeat_token",
                 yaml_path="heartbeat.uptime_kuma.token",
+            ),
+            "ignore_file_permissions": FieldMapping(
+                arg_key="ignore_file_permissions",
+                yaml_path="logging.ignore_file_permissions",
+                converter=self._parse_bool,
             ),
         }
 
@@ -260,6 +266,56 @@ class ConfigBase(ABC):
         if isinstance(value, str):
             return value.lower() in ("true", "yes", "1", "on")
         return bool(value)
+
+    @staticmethod
+    def validate_config_file_permissions(
+        file_path: str, logger=None, ignore_warning: bool = False
+    ) -> bool:
+        """Validate that config file has restricted permissions (0o600).
+
+        Args:
+            file_path: Path to config file
+            logger: Logger instance (optional, for warning messages)
+            ignore_warning: If True, warn but don't raise; if False, raise exception
+
+        Returns:
+            True if permissions are secure (0o600)
+
+        Raises:
+            RuntimeError: If permissions are not 0o600 and ignore_warning is False
+        """
+        try:
+            file_stat = os.stat(file_path)
+            mode = file_stat.st_mode & 0o777
+
+            if mode != 0o600:
+                error_msg = (
+                    f"Config file {file_path} has overly permissive mode {oct(mode)}. "
+                    f"Recommended: 0o600. Run: chmod 600 {file_path}"
+                )
+
+                if ignore_warning:
+                    # Development/testing mode: just warn
+                    if logger:
+                        logger.warning(f"⚠️  {error_msg}")
+                    return False
+                else:
+                    # Production mode: fail hard
+                    if logger:
+                        logger.error(f"❌ {error_msg}")
+                    raise RuntimeError(
+                        f"Security check failed: {error_msg} "
+                        f"To bypass this check, use --ignore-file-permissions flag or "
+                        f"set logging.ignore_file_permissions: true in config."
+                    )
+            return True
+        except OSError as e:
+            error_msg = f"Failed to check config file permissions: {str(e)}"
+            if logger:
+                logger.error(error_msg)
+            if not ignore_warning:
+                raise RuntimeError(error_msg) from e
+            return False
 
     @abstractmethod
     def get_summary(self, mask_tokens: bool = True) -> dict:

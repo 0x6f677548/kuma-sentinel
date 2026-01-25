@@ -7,6 +7,12 @@ logging:
   
   # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
   log_level: INFO
+  
+  # Skip validation that config file has restricted permissions (0o600)
+  # Only set to true for development/testing in environments like Docker
+  # In production, always ensure config file has permissions 0o600
+  # Default: false (permissions are validated)
+  ignore_file_permissions: false
 
 # === SHARED CONFIGURATION ===
 # Settings used across all monitoring commands

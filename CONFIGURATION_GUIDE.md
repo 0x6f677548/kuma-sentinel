@@ -538,6 +538,34 @@ This separates data (configuration) from logic (scripts) and enables proper code
 | Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits |
 | Output Leakage | Sensitive data in command output | Output truncated to 500 chars; sanitize scripts |
 
+#### Configuration File Permission Validation
+
+Kuma Sentinel **enforces** that your configuration file has **restricted permissions (0o600)** to prevent unauthorized access to sensitive tokens and credentials.
+
+**What it checks:**
+- Config file should only be readable/writable by its owner
+- Typical location: `/etc/kuma-sentinel/config.yaml` (owner: kuma-sentinel)
+- Restrictive permissions prevent other users from reading your Uptime Kuma tokens
+
+**If validation fails**, execution **BLOCKS** with an error:
+```
+❌ Security check failed: Config file /etc/kuma-sentinel/config.yaml has overly permissive mode 0o644.
+Recommended: 0o600. Run: chmod 600 /etc/kuma-sentinel/config.yaml
+To bypass this check, use --ignore-file-permissions flag or set logging.ignore_file_permissions: true in config.
+```
+
+**To bypass this check** (development or testing only):
+```bash
+# Using CLI flag
+kuma-sentinel cmdcheck --ignore-file-permissions --config ./config.yaml
+
+# Using YAML configuration
+logging:
+  ignore_file_permissions: true
+```
+
+⚠️ **Security Note**: Only bypass this check during development or testing. Always ensure production configurations have proper permissions (0o600). A config file with world-readable permissions exposes your Uptime Kuma authentication tokens.
+
 #### Deployment Best Practices
 
 1. **Run under dedicated user:**

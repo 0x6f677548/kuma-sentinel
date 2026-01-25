@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
 from kuma_sentinel.core.models import CheckResult
+from kuma_sentinel.core.utils.sanitizer import DataSanitizer
 
 from .base import Checker
 
@@ -106,13 +107,14 @@ class CmdCheckChecker(Checker):
             except ValueError as e:
                 # shlex.split() raises ValueError for unclosed quotes
                 duration = time.time() - cmd_start
+                sanitized_error = DataSanitizer.sanitize_error_message(e)
                 return (
                     {
                         "name": name,
                         "command": command,
                         "status": "down",
                         "exit_code": None,
-                        "output": f"Invalid command syntax: {str(e)}",
+                        "output": f"Invalid command syntax: {sanitized_error}",
                         "duration_seconds": duration,
                     },
                     f"{name}[{command}] (Invalid command syntax)",
@@ -128,6 +130,10 @@ class CmdCheckChecker(Checker):
 
             output = (result.stdout or "") + (result.stderr or "")
             output_truncated = output[-500:] if len(output) > 500 else output
+
+            # Sanitize output if configured
+            if self.config.cmdcheck_sanitize_output:
+                output_truncated = DataSanitizer.sanitize_output(output_truncated)
 
             status, message = self._evaluate_result(
                 exit_code=result.returncode,
@@ -172,16 +178,17 @@ class CmdCheckChecker(Checker):
 
         except Exception as e:
             duration = time.time() - cmd_start
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
             return (
                 {
                     "name": name,
                     "command": command,
                     "status": "down",
                     "exit_code": None,
-                    "output": str(e),
+                    "output": sanitized_error,
                     "duration_seconds": duration,
                 },
-                f"{name}[{command}] ({str(e)})",
+                f"{name}[{command}] ({sanitized_error})",
             )
 
     def _execute_commands(self, check_start: float) -> CheckResult:

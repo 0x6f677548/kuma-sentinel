@@ -340,6 +340,7 @@ cmdcheck:
   capture_output: true                       # Default output capture (default true, last 500 chars)
   success_pattern: null                      # Default success pattern (optional)
   failure_pattern: null                      # Default failure pattern (optional, takes precedence)
+  sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
   
   uptime_kuma:
     token: "your-cmdcheck-token"             # Required: push token for this command
@@ -585,7 +586,48 @@ This separates data (configuration) from logic (scripts) and enables proper code
 - ❌ Don't run kuma-sentinel as root unless absolutely necessary
 - ❌ Don't expose Uptime Kuma push tokens in logs or metrics
 - ❌ Don't use shell=True with unchecked user input
-#### Output Sensitivity
+#### Automatic Output Sanitization
+
+⚠️ **SECURITY FEATURE**: Kuma Sentinel automatically sanitizes command output to prevent accidental exposure of sensitive data.
+
+**By default, the following patterns are masked with `[REDACTED]`:**
+- Passwords and secrets: `password=value`, `secret: value`, `api_key=...`
+- Authentication tokens: Bearer tokens, AWS keys, GitHub tokens
+- Email addresses (masked as `[REDACTED_EMAIL]`)
+- Credit card numbers (masked as `[REDACTED_CARD]`)
+- Database connection strings (masked as `[REDACTED_DB_CONNECTION]`)
+- Exception messages that contain sensitive data
+
+**Example - Automatic Sanitization:**
+
+If your command outputs:
+```
+Connected to mysql://admin:password123@db.local:3306/prod
+User: admin@example.com
+Status: OK
+```
+
+Uptime Kuma will see:
+```
+Connected to [REDACTED_DB_CONNECTION]
+User: [REDACTED_EMAIL]
+Status: OK
+```
+
+**Disable Sanitization (if needed for debugging):**
+
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl status myapp"
+  sanitize_output: false  # Default: true
+  uptime_kuma:
+    token: your-token
+```
+
+**⚠️ WARNING**: Only disable sanitization if you're confident the command output won't contain sensitive data.
+
+### Output Sensitivity
 
 Command output is:
 - Truncated to 500 characters (last 500 chars retained)

@@ -27,6 +27,7 @@ class CmdCheckConfig(ConfigBase):
         self.cmdcheck_capture_output = True
         self.cmdcheck_success_pattern: Optional[str] = None
         self.cmdcheck_failure_pattern: Optional[str] = None
+        self.cmdcheck_sanitize_output = True  # Mask sensitive data by default
 
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for command check configuration."""
@@ -60,6 +61,11 @@ class CmdCheckConfig(ConfigBase):
                 "cmdcheck_failure_pattern": FieldMapping(
                     arg_key="failure_pattern",
                     yaml_path="cmdcheck.failure_pattern",
+                ),
+                "cmdcheck_sanitize_output": FieldMapping(
+                    arg_key="sanitize_output",
+                    yaml_path="cmdcheck.sanitize_output",
+                    converter=self._parse_bool,
                 ),
                 "command_token": FieldMapping(
                     env_var="KUMA_SENTINEL_CMDCHECK_TOKEN",

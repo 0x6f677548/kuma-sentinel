@@ -82,8 +82,9 @@ cmdcheck:
   # Default output capture (last 500 chars sent to Uptime Kuma)
   capture_output: true
   
-  # Default expected exit code for success (used if not specified per-command)
-  expect_exit_code: 0
+  # Automatically sanitize sensitive data from output (default: true)
+  # Masks passwords, API keys, tokens, emails, credit cards, DB strings
+  sanitize_output: true
   
   # Optional: Pattern matching for output (takes precedence over exit code)
   # These are default patterns; can be overridden per-command

@@ -656,13 +656,37 @@ Configuration files may contain authentication tokens - they should only be read
 
 ### Handling Sensitive Data
 
-Command output is truncated to **500 characters** before being sent to Uptime Kuma. However:
+Command output is **automatically sanitized by default** to prevent credential leakage:
 
-- ⚠️ **Avoid outputting secrets** (passwords, API keys, tokens) in command output
-- ⚠️ **Sanitize scripts** to prevent leaking sensitive information
-- ⚠️ **Use pattern matching** instead of output capture when possible
+- ✅ **Automatic Masking**: Passwords, API keys, tokens, emails, and database connection strings are automatically masked
+- ✅ **Truncation**: Output is truncated to 500 characters before transmission
+- ✅ **Error Sanitization**: Exception messages are sanitized to remove sensitive data
 
-Example - Log errors without leaking stack traces:
+**Patterns Automatically Masked:**
+- Passwords: `password=...`, `secret: ...`, `api_key=...`
+- Tokens: Bearer tokens, AWS keys, GitHub tokens
+- Emails: `user@example.com` → `[REDACTED_EMAIL]`
+- Credit cards: `[REDACTED_CARD]`
+- Database URLs: Connection strings → `[REDACTED_DB_CONNECTION]`
+
+**Example:**
+```
+Command output: Connected to mysql://root:password@localhost
+After sanitization: Connected to [REDACTED_DB_CONNECTION]
+```
+
+**Disable Sanitization (if needed for debugging):**
+```yaml
+cmdcheck:
+  sanitize_output: false  # Default: true - NOT recommended for production
+```
+
+**Best Practices:**
+- ⚠️ **Avoid outputting secrets** - Rely on exit codes and pattern matching when possible
+- ⚠️ **Sanitize scripts** - Remove debug output containing sensitive data
+- ⚠️ **Use pattern matching** - Match on status indicators instead of capturing full output
+
+Example - Better approach:
 
 ```bash
 # ❌ BAD: May leak implementation details
@@ -672,9 +696,12 @@ curl http://api.internal:8080/health
 curl -s http://api.internal:8080/health | grep -q '"status":"ok"'
 ```
 
+This approach ensures only the success/failure is visible, not the actual response details.
+
 ### Further Reading
 
 For comprehensive security guidance, see [CONFIGURATION_GUIDE.md - Security Considerations](CONFIGURATION_GUIDE.md#security-considerations)
+
 
 ### Authentication Tokens (Environment Variables Only)
 

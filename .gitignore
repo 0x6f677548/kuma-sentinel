@@ -133,3 +133,4 @@ dmypy.json
 nmap_output_*.xml
 *.nmap
 test.config.yaml
+securityassessment.md

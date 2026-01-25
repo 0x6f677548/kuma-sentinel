@@ -251,8 +251,11 @@ class ZfsPoolStatusChecker(Checker):
 
         except Exception as e:
             from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ Unexpected error during ZFS pool check: {sanitized_error}")
+            self.logger.error(
+                f"❌ Unexpected error during ZFS pool check: {sanitized_error}"
+            )
             return CheckResult(
                 check_name=self.name,
                 status="down",

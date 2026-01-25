@@ -96,6 +96,7 @@ def _run_kopia_command(
         return False, None, "Command timed out"
     except Exception as e:
         from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
         sanitized_error = DataSanitizer.sanitize_error_message(e)
         logger.error(f"❌ Error running kopia: {sanitized_error}")
         return False, None, sanitized_error
@@ -382,8 +383,11 @@ class KopiaSnapshotChecker(Checker):
 
         except Exception as e:
             from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ Unexpected error during snapshot check: {sanitized_error}")
+            self.logger.error(
+                f"❌ Unexpected error during snapshot check: {sanitized_error}"
+            )
             check_end = time.time()
             check_duration = int(check_end - check_start)
             return CheckResult(

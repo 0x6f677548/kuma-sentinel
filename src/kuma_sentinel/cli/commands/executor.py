@@ -215,9 +215,12 @@ class CommandExecutor(Command):
             self.config.validate()
         except ValueError as e:
             from kuma_sentinel.core.logger import get_logger
+
             logger = get_logger()
             logger.error(f"Configuration error: {e}")
-            logger.info(f"Use 'kuma-sentinel {command_name} --help' for usage information")
+            logger.info(
+                f"Use 'kuma-sentinel {command_name} --help' for usage information"
+            )
             sys.exit(1)
 
         return self.config

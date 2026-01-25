@@ -220,6 +220,7 @@ def _run_nmap_scan(
 
     except Exception as e:
         from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
         sanitized_error = DataSanitizer.sanitize_error_message(e)
         logger.error(f"❌ Error running nmap: {sanitized_error}")
         return False, nmap_xml
@@ -291,8 +292,11 @@ class PortChecker(Checker):
 
         except Exception as e:
             from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ Unexpected error during port scan: {sanitized_error}")
+            self.logger.error(
+                f"❌ Unexpected error during port scan: {sanitized_error}"
+            )
             scan_end = time.time()
             scan_duration = int(scan_end - scan_start)
             return CheckResult(

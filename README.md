@@ -174,8 +174,10 @@ cmdcheck:
     - command: "test -f /var/run/app.pid"
       name: "app_pid"
       timeout: 5
-    - command: "df / | tail -1 | awk '{print $4}' | awk '$1 > 1000000 {exit 0} {exit 1}'"
+    - command: "df"
+      args: ["/"]
       name: "disk_space"
+      success_pattern: "(\\d{2,}|[1-9]\\d{5,})"  # Match if available space exists
       timeout: 10
   uptime_kuma:
     token: your-cmdcheck-token
@@ -686,17 +688,40 @@ cmdcheck:
 - ⚠️ **Sanitize scripts** - Remove debug output containing sensitive data
 - ⚠️ **Use pattern matching** - Match on status indicators instead of capturing full output
 
-Example - Better approach:
+Example - Better approach using pattern matching:
 
-```bash
-# ❌ BAD: May leak implementation details
-curl http://api.internal:8080/health
+Since `shell=False` prevents piping, use pattern matching in your config instead:
 
-# ✅ GOOD: Pattern match on success marker only
-curl -s http://api.internal:8080/health | grep -q '"status":"ok"'
+```yaml
+# In config file - check API health with pattern matching
+cmdcheck:
+  commands:
+    - command: "curl -s http://api.internal:8080/health"
+      name: "api_health"
+      success_pattern: '"status":"ok"'    # Match only this pattern
+      failure_pattern: '"error"'           # Fail if error detected
+      timeout: 10
+  uptime_kuma:
+    token: your-cmdcheck-token
 ```
 
-This approach ensures only the success/failure is visible, not the actual response details.
+**Why this is better:**
+- ✅ Only the matched pattern determines pass/fail, not the full output
+- ✅ Sensitive details in the response are masked by default (sanitization)
+- ✅ Clear intent: you care about status success, not the full API response
+- ✅ Works with `shell=False` (no pipes needed)
+
+**For complex logic that needs pipes**: Wrap your command in a shell script:
+```bash
+# myscript.sh
+#!/bin/bash
+curl -s http://api.internal:8080/health | jq -e '.status == "ok"' > /dev/null
+
+# Then in config:
+commands:
+  - command: "/usr/local/bin/myscript.sh"
+    name: "api_health"
+```
 
 ### Further Reading
 

@@ -130,11 +130,15 @@ class Checker(ABC):
 
             return result
         except TimeoutError as e:
-            self.logger.error(f"❌ {self.name} check timed out: {str(e)}")
+            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
+            self.logger.error(f"❌ {self.name} check timed out: {sanitized_error}")
             raise
         except Exception as e:
+            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(
-                f"❌ {self.name} check failed with unexpected error: {str(e)}"
+                f"❌ {self.name} check failed with unexpected error: {sanitized_error}"
             )
             raise
         finally:

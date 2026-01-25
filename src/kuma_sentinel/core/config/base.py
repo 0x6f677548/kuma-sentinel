@@ -404,7 +404,7 @@ class ConfigBase(ABC):
             return False
 
     @staticmethod
-    def validate_uptime_kuma_url(url: str) -> None:
+    def validate_uptime_kuma_url(url: Optional[str]) -> None:
         """Validate Uptime Kuma API URL format.
 
         Args:

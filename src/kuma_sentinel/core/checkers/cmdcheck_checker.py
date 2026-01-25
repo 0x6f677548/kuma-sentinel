@@ -327,11 +327,12 @@ class CmdCheckChecker(Checker):
 
         except Exception as e:
             duration = time.time() - check_start
-            self.logger.error(f"❌ Unexpected error: {e}")
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
+            self.logger.error(f"❌ Unexpected error: {sanitized_error}")
             return CheckResult(
                 check_name=self.name,
                 status="down",
-                message=f"Error: {str(e)}",
+                message=f"Error: {sanitized_error}",
                 duration_seconds=int(duration),
                 details={},
             )

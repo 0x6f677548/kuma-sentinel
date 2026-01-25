@@ -26,6 +26,43 @@ heartbeat:
     # Push token for heartbeat monitor
     token: your_heartbeat_token_here
 
+# === COMMAND CHECK CONFIGURATION ===
+# Execute arbitrary shell commands and monitor the results
+
+cmdcheck:
+  uptime_kuma:
+    # Push token for cmdcheck command
+    token: your_cmdcheck_token_here
+  
+  # SINGLE COMMAND MODE
+  # Uncomment one of the following:
+  
+  # Example 1: Simple command with exit code
+  command: "systemctl is-active nginx"
+  timeout: 10
+  expect_exit_code: 0
+  
+  # MULTIPLE COMMANDS MODE
+  # Uncomment to use multiple independent checks (all must pass)
+  # multiple: true
+  # commands:
+  #   - command: "systemctl is-active nginx"
+  #     name: web_server
+  #     timeout: 10
+  #   - command: "systemctl is-active postgresql"
+  #     name: database
+  #     timeout: 10
+  #   - command: "test -f /var/run/app.pid"
+  #     name: app_running
+  #     timeout: 5
+  
+  # Optional: Pattern matching for output (takes precedence over exit code)
+  # success_pattern: "active.*running"
+  # failure_pattern: "ERROR|CRITICAL|PANIC"
+  
+  # Optional: Capture command output (default: true)
+  capture_output: true
+
 # === PORT SCAN COMMAND CONFIGURATION ===
 
 portscan:
@@ -78,3 +115,24 @@ kopiasnapshotstatus:
   # Global default maximum age in hours for snapshots (default: 24)
   # Used for any snapshot path that doesn't specify max_age_hours
   max_age_hours: 24
+
+# === ZFS POOL STATUS COMMAND CONFIGURATION ===
+# Monitor ZFS pool health and free space
+
+zfspoolstatus:
+  uptime_kuma:
+    # Push token for ZFS pool status alerts
+    token: your_zfspoolstatus_token_here
+  
+  # List of pools to monitor
+  # Each pool can have its own free space threshold
+  pools:
+    - name: tank
+      free_space_percent_min: 10      # Alert if less than 10% free
+    - name: backup
+      free_space_percent_min: 20      # Alert if less than 20% free
+    # - name: archive                  # Will use global default
+  
+  # Global default minimum free space percentage (default: 10)
+  # Used for pools without explicit threshold
+  free_space_percent_default: 10

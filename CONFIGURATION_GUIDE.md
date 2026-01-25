@@ -386,12 +386,11 @@ cmdcheck:
 
 #### What NOT to Do
 
-❌ Don't run commands that output passwords, API keys, or PII (output visible to Uptime Kuma)
-❌ Don't allow user-provided commands via web interfaces
-❌ Don't run kuma-sentinel as root unless absolutely necessary
-❌ Don't expose Uptime Kuma push tokens in logs or metrics
-❌ Don't use shell=True with unchecked user input
-
+- ❌ Don't run commands that output passwords, API keys, or PII (output visible to Uptime Kuma)
+- ❌ Don't allow user-provided commands via web interfaces
+- ❌ Don't run kuma-sentinel as root unless absolutely necessary
+- ❌ Don't expose Uptime Kuma push tokens in logs or metrics
+- ❌ Don't use shell=True with unchecked user input
 #### Output Sensitivity
 
 Command output is:
@@ -401,16 +400,16 @@ Command output is:
 - Visible to anyone with Uptime Kuma access
 
 **Example safe outputs:**
-✅ `active (running)` — Service status
-✅ `OK` — Health check result
-✅ `HEALTHY` — Custom application status
-✅ `1` — Database connectivity test
+- ✅ `active (running)` — Service status
+- ✅ `OK` — Health check result
+- ✅ `HEALTHY` — Custom application status
+- ✅ `1` — Database connectivity test
 
 **Example dangerous outputs:**
-❌ `password: abc123` — Credentials
-❌ `api_key: sk-1234567890` — API keys
-❌ `user@example.com` — PII
-❌ Database connection strings with passwords
+- ❌ `password: abc123` — Credentials
+- ❌ `api_key: sk-1234567890` — API keys
+- ❌ `user@example.com` — PII
+- ❌ Database connection strings with passwords
 
 ### Common Examples
 
@@ -572,12 +571,12 @@ KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 
 ## Key Features
 
-✅ **Per-path thresholds** — Each snapshot can have different age requirements
-✅ **Global fallback** — Paths without explicit threshold use global default
-✅ **SSH support** — Handles remote paths like `user@host:/path`
-✅ **CLI override** — CLI `--snapshot` flags replace YAML config entirely
-✅ **Type-safe** — Structured YAML format prevents configuration errors
-✅ **Multi-source config** — Load from YAML files, environment variables, or CLI arguments
+- ✅ **Per-path thresholds** — Each snapshot can have different age requirements
+- ✅ **Global fallback** — Paths without explicit threshold use global default
+- ✅ **SSH support** — Handles remote paths like `user@host:/path`
+- ✅ **CLI override** — CLI `--snapshot` flags replace YAML config entirely
+- ✅ **Type-safe** — Structured YAML format prevents configuration errors
+- ✅ **Multi-source config** — Load from YAML files, environment variables, or CLI arguments
 
 ## Configuration Reference
 
@@ -945,12 +944,12 @@ KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 
 ## Key Features
 
-✅ **Per-pool thresholds** — Each pool can have different minimum free space requirements
-✅ **Global fallback** — Pools without explicit threshold use global default (10% by default)
-✅ **Health monitoring** — Detects unhealthy pools (DEGRADED, FAULTED, OFFLINE)
-✅ **Individual failures** — One failing pool doesn't prevent checking others
-✅ **CLI override** — CLI `--pool` flags replace YAML config entirely
-✅ **Type-safe** — Structured YAML format prevents configuration errors
+- ✅ **Per-pool thresholds** — Each pool can have different minimum free space requirements
+- ✅ **Global fallback** — Pools without explicit threshold use global default (10% by default)
+- ✅ **Health monitoring** — Detects unhealthy pools (DEGRADED, FAULTED, OFFLINE)
+- ✅ **Individual failures** — One failing pool doesn't prevent checking others
+- ✅ **CLI override** — CLI `--pool` flags replace YAML config entirely
+- ✅ **Type-safe** — Structured YAML format prevents configuration errors
 
 ## Configuration Reference
 

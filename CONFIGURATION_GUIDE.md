@@ -741,6 +741,7 @@ A: The parser splits on the **rightmost** space between PATH and MAX_AGE_HOURS, 
 
 **Q: Can I set max_age_hours to 0?**
 A: Yes, but snapshots must be fresher than 0 hours (essentially never allowed). Use with caution.
+
 ---
 
 # Port Scan Configuration Guide

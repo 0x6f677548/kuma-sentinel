@@ -31,13 +31,9 @@ class CmdCheckChecker(Checker):
     def execute(self) -> CheckResult:
         """Execute command check(s) and return result.
 
-        For single command:
-        - Runs command with configured timeout
-        - Applies pattern matching (failure > success > exit code)
-
-        For multiple commands:
+        Commands are always stored as a list, even for single commands.
         - Runs all commands; ALL must succeed for UP status
-        - Aggregates results
+        - Applies pattern matching (failure > success > exit code)
 
         Returns:
             CheckResult with status "up" or "down"
@@ -47,23 +43,19 @@ class CmdCheckChecker(Checker):
         try:
             self.logger.info("🔍 Starting command check")
 
-            # Multiple commands mode
-            if self.config.cmdcheck_multiple and self.config.cmdcheck_commands:
-                return self._execute_multiple(check_start)
+            # Always use list-based execution
+            if not self.config.cmdcheck_commands:
+                # Should not reach here if validation passed
+                duration = time.time() - check_start
+                return CheckResult(
+                    check_name=self.name,
+                    status="down",
+                    message="No commands configured",
+                    duration_seconds=int(duration),
+                    details={},
+                )
 
-            # Single command mode
-            if self.config.cmdcheck_command:
-                return self._execute_single(check_start)
-
-            # Should not reach here if validation passed
-            duration = time.time() - check_start
-            return CheckResult(
-                check_name=self.name,
-                status="down",
-                message="No command configured",
-                duration_seconds=int(duration),
-                details={},
-            )
+            return self._execute_commands(check_start)
 
         except Exception as e:
             duration = time.time() - check_start
@@ -76,134 +68,11 @@ class CmdCheckChecker(Checker):
                 details={},
             )
 
-    def _execute_single(self, check_start: float) -> CheckResult:
-        """Execute single command and return result."""
-        command = self.config.cmdcheck_command
-        timeout = self.config.cmdcheck_timeout
-        expect_exit_code = self.config.cmdcheck_expect_exit_code
-        capture_output = self.config.cmdcheck_capture_output
-        success_pattern = self.config.cmdcheck_success_pattern
-        failure_pattern = self.config.cmdcheck_failure_pattern
-
-        if not command:
-            duration = time.time() - check_start
-            return CheckResult(
-                check_name=self.name,
-                status="down",
-                message="No command configured",
-                duration_seconds=int(duration),
-                details={},
-            )
-
-        self.logger.debug(f"Running command: {command}")
-
-        try:
-            # Execute command with shell
-            result = subprocess.run(
-                command,
-                shell=True,
-                executable="/bin/bash",
-                capture_output=capture_output,
-                text=True,
-                timeout=timeout,
-            )
-
-            # Combine stdout and stderr for pattern matching
-            output = (result.stdout or "") + (result.stderr or "")
-
-            # Truncate to last 500 chars
-            output_truncated = output[-500:] if len(output) > 500 else output
-
-            # Apply pattern matching logic
-            status, reason = self._evaluate_result(
-                exit_code=result.returncode,
-                output=output_truncated,
-                expect_exit_code=expect_exit_code,
-                success_pattern=success_pattern,
-                failure_pattern=failure_pattern,
-            )
-
-            duration = time.time() - check_start
-
-            # Build detailed message for Uptime Kuma with visibility
-            symbol = "✓" if status == "up" else "✗"
-            # Include command for clarity (truncate long commands to ~60 chars)
-            cmd_display = command or ""
-            if len(cmd_display) > 60:
-                cmd_display = cmd_display[:57] + "..."
-            message = f"[{self.name}] {symbol} [{cmd_display}] {reason}"
-
-            # Add output sample if available (truncate to keep URL param reasonable)
-            if output_truncated and len(output_truncated) <= 100:
-                message += f" | Output: {output_truncated[:100]}"
-
-            self.logger.info(
-                f"{'✅' if status == 'up' else '❌'} Single command check: {message}"
-            )
-
-            return CheckResult(
-                check_name=self.name,
-                status=status,
-                message=message,
-                duration_seconds=int(duration),
-                details={
-                    "command": command,
-                    "exit_code": result.returncode,
-                    "output": (
-                        output_truncated[:200] if output_truncated else "(no output)"
-                    ),
-                    "reason": reason,
-                },
-            )
-
-        except subprocess.TimeoutExpired:
-            duration = time.time() - check_start
-            msg = f"[{self.name}] ✗ Command timed out after {timeout}s"
-            self.logger.error(f"❌ {msg}")
-            return CheckResult(
-                check_name=self.name,
-                status="down",
-                message=msg,
-                duration_seconds=int(duration),
-                details={
-                    "command": command,
-                    "error": "timeout",
-                    "timeout_seconds": timeout,
-                },
-            )
-
-        except FileNotFoundError:
-            duration = time.time() - check_start
-            msg = f"[{self.name}] ✗ Command not found or /bin/bash not available"
-            self.logger.error(f"❌ {msg}")
-            return CheckResult(
-                check_name=self.name,
-                status="down",
-                message=msg,
-                duration_seconds=int(duration),
-                details={
-                    "command": command,
-                    "error": "command_not_found",
-                },
-            )
-
-        except Exception as e:
-            duration = time.time() - check_start
-            msg = f"[{self.name}] ✗ Command execution failed: {str(e)}"
-            self.logger.error(f"❌ {msg}")
-            return CheckResult(
-                check_name=self.name,
-                status="down",
-                message=msg,
-                duration_seconds=int(duration),
-                details={
-                    "command": command,
-                    "error": str(e),
-                },
-            )
-
-    def _execute_multiple(self, check_start: float) -> CheckResult:
-        """Execute multiple commands - all must succeed for UP status."""
+    def _execute_commands(self, check_start: float) -> CheckResult:
+        """Execute all commands - all must succeed for UP status.
+        
+        Even for a single command, it's treated as a list for consistency.
+        """
         commands = self.config.cmdcheck_commands
         results: List[Dict[str, Any]] = []
         failures = []
@@ -340,7 +209,7 @@ class CmdCheckChecker(Checker):
             [f"[{r['name']}: {'✓' if r['status'] == 'up' else '✗'}]" for r in results]
         )
         self.logger.info(
-            f"✅ Multiple commands check completed: {message} | {status_breakdown}"
+            f"✅ Commands check completed: {message} | {status_breakdown}"
         )
 
         return CheckResult(

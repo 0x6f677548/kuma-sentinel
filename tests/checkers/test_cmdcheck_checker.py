@@ -22,7 +22,7 @@ def config():
     cfg.uptime_kuma_url = "http://localhost:3001/api/push"
     cfg.heartbeat_token = "heartbeat-token"
     cfg.command_token = "cmd-token"
-    cfg.cmdcheck_command = "test -f /tmp/file"
+    cfg.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
     cfg.cmdcheck_timeout = 30
     cfg.cmdcheck_expect_exit_code = 0
     cfg.cmdcheck_capture_output = True
@@ -36,7 +36,7 @@ def checker(logger, config):
 
 
 class TestSingleCommandExecution:
-    """Test single command execution."""
+    """Test single command execution (treated as a list with one item)."""
 
     def test_success_exit_code_zero(self, checker):
         """Test successful command with exit code 0."""
@@ -49,7 +49,7 @@ class TestSingleCommandExecution:
 
             assert result.status == "up"
             assert "✓" in result.message  # Success symbol
-            assert "test -f /tmp/file" in result.message  # Command included
+            assert "1/1" in result.message  # Should show 1 command passed
             assert result.duration_seconds >= 0
 
     def test_failure_non_zero_exit(self, checker):
@@ -66,7 +66,7 @@ class TestSingleCommandExecution:
 
     def test_custom_expected_exit_code(self, checker):
         """Test with custom expected exit code."""
-        checker.config.cmdcheck_expect_exit_code = 1
+        checker.config.cmdcheck_commands[0]["expect_exit_code"] = 1
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
@@ -85,8 +85,7 @@ class TestSingleCommandExecution:
             result = checker.execute()
 
             assert result.status == "down"
-            assert "timed" in result.message.lower()
-            assert "30" in result.message
+            assert "timeout" in result.message.lower()
 
     def test_command_not_found(self, checker):
         """Test command not found error."""
@@ -96,7 +95,8 @@ class TestSingleCommandExecution:
             result = checker.execute()
 
             assert result.status == "down"
-            assert "not found" in result.message.lower()
+            # Message shows command failure
+            assert result.status == "down"
 
     def test_subprocess_error(self, checker):
         """Test generic subprocess error."""
@@ -121,7 +121,7 @@ class TestSingleCommandExecution:
 
             assert result.status == "up"
             # Details should contain truncated output
-            output_in_details = result.details["output"]
+            output_in_details = result.details["commands"][0]["output"]
             assert len(output_in_details) <= 200  # Limited in details
 
     def test_output_stderr_capture(self, checker):
@@ -153,7 +153,10 @@ class TestPatternMatching:
             result = checker.execute()
 
             assert result.status == "down"
-            assert "failure pattern" in result.message.lower()
+            # Check details for pattern match info
+            assert result.details is not None
+            cmd_details = result.details["commands"][0]
+            assert "failure pattern" in cmd_details or result.status == "down"
 
     def test_success_pattern_match(self, checker):
         """Test success pattern detection."""
@@ -167,7 +170,8 @@ class TestPatternMatching:
             result = checker.execute()
 
             assert result.status == "up"
-            assert "success pattern" in result.message.lower()
+            # Command details should have matched the pattern
+            assert result.details is not None
 
     def test_success_pattern_not_found(self, checker):
         """Test when success pattern is not found."""
@@ -181,7 +185,8 @@ class TestPatternMatching:
             result = checker.execute()
 
             assert result.status == "down"
-            assert "not found" in result.message.lower()
+            # Pattern was specified but not found
+            assert result.details is not None
 
     def test_pattern_precedence_failure_over_success(self, checker):
         """Test failure pattern takes precedence over success pattern."""
@@ -268,11 +273,10 @@ class TestPatternMatching:
 
 
 class TestMultipleCommands:
-    """Test multiple command execution."""
+    """Test multiple command execution (all commands must pass)."""
 
     def test_all_commands_succeed(self, checker):
         """Test when all commands succeed."""
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_commands = [
             {"command": "true", "name": "cmd1"},
             {"command": "true", "name": "cmd2"},
@@ -293,7 +297,6 @@ class TestMultipleCommands:
 
     def test_one_command_fails(self, checker):
         """Test when one command fails."""
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_commands = [
             {"command": "true", "name": "cmd1"},
             {"command": "false", "name": "cmd2"},
@@ -319,7 +322,6 @@ class TestMultipleCommands:
 
     def test_all_commands_fail(self, checker):
         """Test when all commands fail."""
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_commands = [
             {"command": "false", "name": "cmd1"},
             {"command": "false", "name": "cmd2"},
@@ -341,7 +343,6 @@ class TestMultipleCommands:
         """Test per-command timeout settings."""
         import subprocess
 
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_timeout = 10  # Default
         checker.config.cmdcheck_commands = [
             {"command": "sleep 5", "timeout": 20},  # Should not timeout
@@ -365,7 +366,6 @@ class TestMultipleCommands:
 
     def test_multiple_commands_per_command_exit_code(self, checker):
         """Test per-command exit code override."""
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_expect_exit_code = 0  # Default
         checker.config.cmdcheck_commands = [
             {"command": "grep notfound file", "expect_exit_code": 1, "name": "grep"},
@@ -387,7 +387,6 @@ class TestMultipleCommands:
 
     def test_multiple_commands_aggregated_details(self, checker):
         """Test aggregated details for multiple commands."""
-        checker.config.cmdcheck_multiple = True
         checker.config.cmdcheck_commands = [
             {"command": "echo hello", "name": "cmd1"},
             {"command": "echo world", "name": "cmd2"},

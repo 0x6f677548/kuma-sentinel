@@ -20,11 +20,12 @@ While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for ex
 ## Quick Example
 
 ```bash
-# Monitor multiple conditions on your server, push status to Uptime Kuma
+# Monitor via YAML config (supports multiple commands)
+kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml
+
+# Or monitor single condition via CLI
 kuma-sentinel cmdcheck \
   --command "systemctl is-active nginx" \
-  --command "test -f /var/run/app.pid" \
-  --command "curl -sf http://localhost:8080/health" \
   http://uptime-kuma:3001/api/push \
   heartbeat-token \
   cmdcheck-token
@@ -33,6 +34,8 @@ kuma-sentinel cmdcheck \
 If all checks pass → Uptime Kuma shows **UP**. If any fail → shows **DOWN** and triggers alerts.
 
 Deploy via `cron`, `systemd timer`, or `Docker` to run periodically on your servers.
+
+For multiple commands, use YAML config with `cmdcheck.commands` list.
 
 ## Features
 
@@ -150,7 +153,7 @@ docker run -it --rm `
 
 Execute arbitrary shell commands on remote systems and push results to Uptime Kuma. The cornerstone feature enabling unlimited monitoring scenarios.
 
-**Single command check:**
+**Single command check (CLI):**
 ```bash
 kuma-sentinel cmdcheck \
   --command "systemctl is-active nginx" \
@@ -159,18 +162,25 @@ kuma-sentinel cmdcheck \
   your-cmdcheck-token
 ```
 
-**Multiple independent checks (all must pass for UP status):**
-```bash
-kuma-sentinel cmdcheck \
-  --command "systemctl is-active nginx" \
-  --command "test -f /var/run/app.pid" \
-  --command "df / | tail -1 | awk '{print \$4}' | awk '\$1 > 1000000 {exit 0} {exit 1}'" \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-cmdcheck-token
+**Multiple independent checks (YAML config only - all must pass for UP):**
+```yaml
+# In config file: /etc/kuma-sentinel/config.yaml
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: "web_server"
+      timeout: 10
+    - command: "test -f /var/run/app.pid"
+      name: "app_pid"
+      timeout: 5
+    - command: "df / | tail -1 | awk '{print $4}' | awk '$1 > 1000000 {exit 0} {exit 1}'"
+      name: "disk_space"
+      timeout: 10
+  uptime_kuma:
+    token: your-cmdcheck-token
 ```
 
-**With regex pattern matching:**
+**With regex pattern matching (CLI):**
 ```bash
 kuma-sentinel cmdcheck \
   --command "tail -n 100 /var/log/app.log" \
@@ -182,10 +192,12 @@ kuma-sentinel cmdcheck \
   your-cmdcheck-token
 ```
 
-**Using configuration file (recommended):**
+**Using configuration file (recommended for multiple commands):**
 ```bash
 kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml
 ```
+
+**Note**: CLI supports single commands only. For multiple commands, use YAML configuration with `cmdcheck.commands` list.
 
 See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
 

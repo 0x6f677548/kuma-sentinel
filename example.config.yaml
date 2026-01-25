@@ -28,39 +28,46 @@ heartbeat:
 
 # === COMMAND CHECK CONFIGURATION ===
 # Execute arbitrary shell commands and monitor the results
+# Commands are always stored as a list, even for single commands.
+# Each command can override defaults for timeout, exit code expectations, and patterns.
 
 cmdcheck:
   uptime_kuma:
     # Push token for cmdcheck command
     token: your_cmdcheck_token_here
   
-  # SINGLE COMMAND MODE
-  # Uncomment one of the following:
+  # Commands list (required) - always a list, even for single command
+  commands:
+    # Single command example:
+    - command: "systemctl is-active nginx"
+      name: "nginx_status"
+      timeout: 10
+      expect_exit_code: 0
+      capture_output: true
+      success_pattern: null
+      failure_pattern: null
+    
+    # Multiple commands example (uncomment to use):
+    # - command: "systemctl is-active postgresql"
+    #   name: "database_status"
+    #   timeout: 15
+    #   expect_exit_code: 0
+    # - command: "test -f /var/run/app.pid"
+    #   name: "app_running"
+    #   timeout: 5
   
-  # Example 1: Simple command with exit code
-  command: "systemctl is-active nginx"
-  timeout: 10
+  # Default timeout for all commands (used if not specified per-command)
+  timeout: 30
+  
+  # Default expected exit code for success (used if not specified per-command)
   expect_exit_code: 0
   
-  # MULTIPLE COMMANDS MODE
-  # Uncomment to use multiple independent checks (all must pass)
-  # multiple: true
-  # commands:
-  #   - command: "systemctl is-active nginx"
-  #     name: web_server
-  #     timeout: 10
-  #   - command: "systemctl is-active postgresql"
-  #     name: database
-  #     timeout: 10
-  #   - command: "test -f /var/run/app.pid"
-  #     name: app_running
-  #     timeout: 5
-  
   # Optional: Pattern matching for output (takes precedence over exit code)
-  # success_pattern: "active.*running"
-  # failure_pattern: "ERROR|CRITICAL|PANIC"
+  # These are default patterns; can be overridden per-command
+  success_pattern: null
+  failure_pattern: null
   
-  # Optional: Capture command output (default: true)
+  # Optional: Capture command output by default (default: true)
   capture_output: true
 
 # === PORT SCAN COMMAND CONFIGURATION ===

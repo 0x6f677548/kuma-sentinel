@@ -7,16 +7,21 @@ from .base import ConfigBase, FieldMapping
 
 
 class CmdCheckConfig(ConfigBase):
-    """Configuration for cmdcheck command."""
+    """Configuration for cmdcheck command.
+    
+    Commands are always stored as a list, even for single commands.
+    Each command can override defaults for timeout, expect_exit_code,
+    success_pattern, failure_pattern, and capture_output.
+    """
 
     def __init__(self):
         """Initialize command check configuration with defaults."""
         super().__init__()
 
-        # Command check-specific attributes
-        self.cmdcheck_command: Optional[str] = None
+        # Command check-specific attributes - always a list
         self.cmdcheck_commands: List[Dict[str, Any]] = []
-        self.cmdcheck_multiple = False
+        
+        # Default values used when not specified in individual commands
         self.cmdcheck_timeout = 30
         self.cmdcheck_expect_exit_code = 0
         self.cmdcheck_capture_output = True
@@ -28,18 +33,10 @@ class CmdCheckConfig(ConfigBase):
         mappings = super()._get_field_mappings()
         mappings.update(
             {
-                "cmdcheck_command": FieldMapping(
-                    arg_key="command",
-                    yaml_path="cmdcheck.command",
-                ),
                 "cmdcheck_commands": FieldMapping(
-                    arg_key="commands",
+                    arg_key="command",
                     yaml_path="cmdcheck.commands",
-                    converter=self._commands_converter,
-                ),
-                "cmdcheck_multiple": FieldMapping(
-                    yaml_path="cmdcheck.multiple",
-                    converter=self._parse_bool,
+                    converter=self._normalize_commands,
                 ),
                 "cmdcheck_timeout": FieldMapping(
                     arg_key="timeout",
@@ -73,46 +70,47 @@ class CmdCheckConfig(ConfigBase):
         return mappings
 
     @staticmethod
-    def _commands_converter(commands_input: Any) -> List[Dict[str, Any]]:
-        """Convert commands input to normalized format.
+    def _normalize_commands(commands_input: Any) -> List[Dict[str, Any]]:
+        """Normalize commands input to list of command dicts.
 
         Handles:
+        - Single command string (wraps in list)
         - List of dicts from YAML
-        - Tuple of tuples from Click CLI
+        - Tuple from Click CLI
         - Already converted lists
 
         Args:
             commands_input: Input in one of the formats above
 
         Returns:
-            Normalized list of command dicts
+            Normalized list of command dicts with defaults applied
         """
+        if not commands_input:
+            return []
+
+        # Single command string from CLI
+        if isinstance(commands_input, str):
+            return [{"command": commands_input}]
+
+        # List input
         if isinstance(commands_input, list):
-            # From YAML or already converted
             result = []
             for cmd in commands_input:
                 if isinstance(cmd, dict):
                     result.append(cmd)
+                elif isinstance(cmd, str):
+                    result.append({"command": cmd})
                 elif isinstance(cmd, (tuple, list)):
-                    # Convert tuple to dict
+                    # Convert tuple/list to dict
                     cmd_dict = {"command": cmd[0]} if len(cmd) > 0 else {}
-                    if len(cmd) > 1:
-                        cmd_dict.update(cmd[1])  # Merge additional properties
+                    if len(cmd) > 1 and isinstance(cmd[1], dict):
+                        cmd_dict.update(cmd[1])
                     result.append(cmd_dict)
             return result
 
-        # Try to parse as Click tuples (from --command repeatable)
-        try:
-            if isinstance(commands_input, (tuple, list)):
-                result = []
-                for item in commands_input:
-                    if isinstance(item, dict):
-                        result.append(item)
-                    else:
-                        result.append({"command": str(item)})
-                return result
-        except (TypeError, ValueError):
-            pass
+        # Tuple from Click (repeatable argument)
+        if isinstance(commands_input, tuple):
+            return [{"command": str(item)} for item in commands_input]
 
         return []
 
@@ -132,19 +130,12 @@ class CmdCheckConfig(ConfigBase):
             )
 
     def _validate_command_specification(self) -> List[str]:
-        """Validate that exactly one command specification is provided."""
+        """Validate that at least one command is provided."""
         errors: List[str] = []
-        has_command = bool(self.cmdcheck_command)
-        has_commands = bool(self.cmdcheck_commands)
 
-        if not has_command and not has_commands:
+        if not self.cmdcheck_commands:
             errors.append(
-                "Must specify either 'command' (single) or 'commands' (multiple)"
-            )
-
-        if has_command and has_commands:
-            errors.append(
-                "Cannot specify both 'command' and 'commands' - use one or the other"
+                "Must specify at least one command in 'commands' list"
             )
 
         return errors
@@ -268,23 +259,23 @@ class CmdCheckConfig(ConfigBase):
         Returns:
             Dictionary with configuration summary
         """
-        if self.cmdcheck_multiple:
-            cmd_summary = f"{len(self.cmdcheck_commands)} commands configured"
-        elif self.cmdcheck_command:
-            # Truncate command to 60 chars for display
+        if not self.cmdcheck_commands:
+            cmd_summary = "No commands configured"
+        elif len(self.cmdcheck_commands) == 1:
+            cmd_config = self.cmdcheck_commands[0]
+            cmd_text = cmd_config.get("command", "")
             cmd_display = (
-                self.cmdcheck_command[:60] + "..."
-                if len(self.cmdcheck_command) > 60
-                else self.cmdcheck_command
+                cmd_text[:60] + "..."
+                if len(cmd_text) > 60
+                else cmd_text
             )
-            cmd_summary = f"'{cmd_display}'"
+            cmd_summary = f"1 command: '{cmd_display}'"
         else:
-            cmd_summary = "No command configured"
+            cmd_summary = f"{len(self.cmdcheck_commands)} commands configured"
 
         return {
             "🔧 Command Configuration": {
                 "Command(s)": cmd_summary,
-                "Mode": "Multiple" if self.cmdcheck_multiple else "Single",
                 "Timeout": f"{self.cmdcheck_timeout}s",
                 "Expected Exit Code": str(self.cmdcheck_expect_exit_code),
                 "Capture Output": "Yes" if self.cmdcheck_capture_output else "No",

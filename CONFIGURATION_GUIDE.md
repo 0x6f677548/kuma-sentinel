@@ -94,13 +94,14 @@ heartbeat:
   uptime_kuma:
     token: your-heartbeat-token
 cmdcheck:
-  command: "systemctl is-active nginx"
+  commands:
+    - command: "systemctl is-active nginx"
   timeout: 10
   uptime_kuma:
     token: your-cmdcheck-token
 ```
 
-**CLI:**
+**CLI (Single Command Only):**
 ```bash
 kuma-sentinel cmdcheck \
   --command "systemctl is-active nginx" \
@@ -111,7 +112,7 @@ kuma-sentinel cmdcheck \
 
 #### Multiple Commands - All Must Pass
 
-**YAML Configuration:**
+**YAML Configuration (Multiple Commands):**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
@@ -137,12 +138,15 @@ cmdcheck:
 
 **Result**: DOWN if ANY command fails, UP only if ALL succeed
 
+**CLI Limitation**: CLI only supports single commands. For multiple commands, use YAML configuration as shown above.
+
 #### Pattern Matching - Detect Conditions in Output
 
 **YAML Configuration:**
 ```yaml
 cmdcheck:
-  command: "tail -n 100 /var/log/app.log"
+  commands:
+    - command: "tail -n 100 /var/log/app.log"
   failure_pattern: "ERROR|CRITICAL|PANIC"  # Detected → DOWN
   success_pattern: "^healthy"              # Not detected (with failure) → DOWN
   timeout: 10
@@ -177,41 +181,40 @@ cmdcheck:
 
 - ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
 - ✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
-- ✅ **Multiple Commands** — Run multiple independent checks, all must pass for UP
+- ✅ **Multiple Commands** — Run multiple independent checks (via YAML), all must pass for UP
 - ✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
 - ✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
 - ✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
-- ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in multiple mode
+- ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in list
 - ✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
 
 ### Configuration Reference
 
-#### Global Settings
+#### Always-List Structure
+
+Commands are **always stored as a list**, even for a single command. This provides consistency and enables per-command configuration:
 
 ```yaml
 cmdcheck:
-  # Required: Either 'command' (single) or 'commands' (multiple)
-  command: "shell command to execute"        # Single command mode
-  # OR
-  multiple: true                              # Enable multiple command mode
-  commands:                                   # List of command objects (when multiple: true)
-    - command: "cmd1"
-      name: "optional name for reporting"
-      timeout: 10                             # Optional: per-command override
-      expect_exit_code: 0                     # Optional: per-command override
-      success_pattern: "pattern"              # Optional: per-command override
-      failure_pattern: "pattern"              # Optional: per-command override
-      capture_output: true                    # Optional: per-command override
+  # Commands list (required) - always a list
+  commands:
+    - command: "shell command to execute"    # Required: the actual shell command
+      name: "optional_name"                  # Optional: name for reporting (auto-generated if omitted)
+      timeout: 30                            # Optional: per-command timeout (inherits from defaults if omitted)
+      expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
+      success_pattern: null                  # Optional: per-command success pattern
+      failure_pattern: null                  # Optional: per-command failure pattern
+      capture_output: true                   # Optional: per-command output capture (inherits from defaults if omitted)
   
-  # Command-specific settings (single command mode)
-  timeout: 30                                 # Execution timeout in seconds (1-300, default 30)
-  expect_exit_code: 0                         # Expected success exit code (0-255, default 0)
-  capture_output: true                        # Capture stdout/stderr (default true, last 500 chars)
-  success_pattern: null                       # Regex pattern for success (optional)
-  failure_pattern: null                       # Regex pattern for failure (optional, takes precedence)
+  # Default values (applied to all commands unless overridden)
+  timeout: 30                                # Default timeout in seconds (1-300, default 30)
+  expect_exit_code: 0                        # Default expected exit code (0-255, default 0)
+  capture_output: true                       # Default output capture (default true, last 500 chars)
+  success_pattern: null                      # Default success pattern (optional)
+  failure_pattern: null                      # Default failure pattern (optional, takes precedence)
   
   uptime_kuma:
-    token: "your-cmdcheck-token"              # Required: push token for this command
+    token: "your-cmdcheck-token"             # Required: push token for this command
 ```
 
 #### Pattern Matching Logic
@@ -225,31 +228,42 @@ cmdcheck:
 
 **Examples:**
 ```yaml
-# Example 1: Service status check (exit code only)
+# Example 1: Single command (simplest form)
 cmdcheck:
-  command: "systemctl is-active myapp"
+  commands:
+    - command: "systemctl is-active myapp"
   expect_exit_code: 0
   timeout: 5
 
-# Example 2: Log error detection (failure pattern)
+# Example 2: Named single command
 cmdcheck:
-  command: "tail -n 500 /var/log/app.log"
+  commands:
+    - command: "test -f /var/run/app.pid"
+      name: "app_pid_file"
+  timeout: 5
+
+# Example 3: Log error detection (failure pattern)
+cmdcheck:
+  commands:
+    - command: "tail -n 500 /var/log/app.log"
   failure_pattern: "ERROR|CRITICAL|PANIC"
   timeout: 10
 
-# Example 3: Health endpoint with status line (success pattern)
+# Example 4: Health endpoint with status line (success pattern)
 cmdcheck:
-  command: "curl -s http://localhost:8080/health"
+  commands:
+    - command: "curl -s http://localhost:8080/health"
   success_pattern: '"status":\s*"healthy"'
   timeout: 5
 
-# Example 4: Disk space check (custom exit code)
+# Example 5: Disk space check (custom exit code)
 cmdcheck:
-  command: "test $(df /var | tail -1 | awk '{print $4}') -gt 1000000"
+  commands:
+    - command: "test $(df /var | tail -1 | awk '{print $4}') -gt 1000000"
   expect_exit_code: 0
   timeout: 5
 
-# Example 5: Multiple independent checks
+# Example 6: Multiple independent checks (all must pass)
 cmdcheck:
   commands:
     - command: "systemctl is-active nginx"

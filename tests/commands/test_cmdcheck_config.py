@@ -16,9 +16,7 @@ class TestConfigBasicDefaults:
 
     def test_defaults(self, config):
         """Test default values are set correctly."""
-        assert config.cmdcheck_command is None
         assert config.cmdcheck_commands == []
-        assert config.cmdcheck_multiple is False
         assert config.cmdcheck_timeout == 30
         assert config.cmdcheck_expect_exit_code == 0
         assert config.cmdcheck_capture_output is True
@@ -30,7 +28,7 @@ class TestYAMLLoading:
     """Test YAML configuration loading."""
 
     def test_load_single_command_from_yaml(self, config, tmp_path):
-        """Test loading single command from YAML."""
+        """Test loading single command from YAML (always as a list)."""
         yaml_file = tmp_path / "config.yaml"
         yaml_file.write_text("""
 logging:
@@ -41,7 +39,8 @@ heartbeat:
   uptime_kuma:
     token: heartbeat-token
 cmdcheck:
-  command: "test -f /tmp/file"
+  commands:
+    - command: "test -f /tmp/file"
   timeout: 60
   expect_exit_code: 0
   capture_output: true
@@ -51,7 +50,8 @@ cmdcheck:
 
         config.load_from_yaml(str(yaml_file))
 
-        assert config.cmdcheck_command == "test -f /tmp/file"
+        assert len(config.cmdcheck_commands) == 1
+        assert config.cmdcheck_commands[0]["command"] == "test -f /tmp/file"
         assert config.cmdcheck_timeout == 60
         assert config.cmdcheck_expect_exit_code == 0
         assert config.cmdcheck_capture_output is True
@@ -67,7 +67,6 @@ heartbeat:
   uptime_kuma:
     token: heartbeat-token
 cmdcheck:
-  multiple: true
   commands:
     - command: "systemctl is-active service1"
       name: service1
@@ -81,11 +80,13 @@ cmdcheck:
 
         config.load_from_yaml(str(yaml_file))
 
-        assert config.cmdcheck_multiple is True
         assert len(config.cmdcheck_commands) == 2
         assert config.cmdcheck_commands[0]["command"] == "systemctl is-active service1"
         assert config.cmdcheck_commands[0]["name"] == "service1"
         assert config.cmdcheck_commands[0]["timeout"] == 10
+        assert config.cmdcheck_commands[1]["command"] == "systemctl is-active service2"
+        assert config.cmdcheck_commands[1]["name"] == "service2"
+        assert config.cmdcheck_commands[1]["timeout"] == 15
 
     def test_load_patterns_from_yaml(self, config, tmp_path):
         """Test loading regex patterns from YAML."""
@@ -97,7 +98,8 @@ heartbeat:
   uptime_kuma:
     token: heartbeat-token
 cmdcheck:
-  command: "tail -n 100 /var/log/app.log"
+  commands:
+    - command: "tail -n 100 /var/log/app.log"
   success_pattern: "^healthy"
   failure_pattern: "ERROR|CRITICAL"
   uptime_kuma:
@@ -127,7 +129,7 @@ class TestCLIArgumentLoading:
     """Test CLI argument loading."""
 
     def test_load_single_command_from_args(self, config):
-        """Test loading single command from CLI args."""
+        """Test loading single command from CLI args (wrapped as list)."""
         args = {
             "command": "test -f /tmp/file",
             "timeout": 60,
@@ -136,25 +138,28 @@ class TestCLIArgumentLoading:
 
         config.load_from_args(args)
 
-        assert config.cmdcheck_command == "test -f /tmp/file"
+        # Single command is wrapped in list
+        assert len(config.cmdcheck_commands) == 1
+        assert config.cmdcheck_commands[0]["command"] == "test -f /tmp/file"
         assert config.cmdcheck_timeout == 60
         # Token is not loaded from args (it comes from positional args or env vars)
         assert config.command_token is None
 
     def test_load_multiple_commands_from_args(self, config):
-        """Test loading multiple commands from CLI args (tuple conversion)."""
-        # Simulate what Click provides for multiple=True
+        """Test that CLI args only support single command (not multiple)."""
+        # Note: CLI only supports single --command argument
+        # For multiple commands, use YAML configuration
+        # This test documents that "commands" key from args is not used in CLI
         args = {
-            "commands": ("echo test", "grep test"),
+            "command": "single command",
             "timeout": 30,
         }
 
         config.load_from_args(args)
 
-        # Should convert tuple to list of dicts
-        assert len(config.cmdcheck_commands) == 2
-        assert config.cmdcheck_commands[0]["command"] == "echo test"
-        assert config.cmdcheck_commands[1]["command"] == "grep test"
+        # Single command is wrapped in list
+        assert len(config.cmdcheck_commands) == 1
+        assert config.cmdcheck_commands[0]["command"] == "single command"
 
     def test_empty_args_dont_override_defaults(self, config):
         """Test empty args don't override YAML/env values."""
@@ -179,6 +184,8 @@ class TestCLIArgumentLoading:
 
         config.load_from_args(args)
 
+        assert len(config.cmdcheck_commands) == 1
+        assert config.cmdcheck_commands[0]["command"] == "test"
         assert config.cmdcheck_success_pattern == "OK"
         assert config.cmdcheck_failure_pattern == "FAIL"
 
@@ -186,34 +193,32 @@ class TestCLIArgumentLoading:
 class TestValidation:
     """Test configuration validation."""
 
-    def test_validate_requires_command(self, config):
-        """Test validation requires either command or commands."""
+    def test_validate_requires_commands(self, config):
+        """Test validation requires at least one command."""
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = None
         config.cmdcheck_commands = []
 
-        with pytest.raises(ValueError, match="Must specify either"):
+        with pytest.raises(ValueError, match="Must specify at least one command"):
             config.validate()
 
-    def test_validate_cannot_have_both_command_and_commands(self, config):
-        """Test cannot have both single and multiple commands."""
+    def test_validate_single_command(self, config):
+        """Test validation passes with single command in list."""
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test"
         config.cmdcheck_commands = [{"command": "test"}]
 
-        with pytest.raises(ValueError, match="Cannot specify both"):
-            config.validate()
+        # Should not raise
+        config.validate()
 
     def test_validate_timeout_range(self, config):
         """Test timeout must be 1-300 seconds."""
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.cmdcheck_timeout = 0
 
         with pytest.raises(ValueError, match="Timeout must be"):
@@ -229,7 +234,7 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.cmdcheck_expect_exit_code = 256
 
         with pytest.raises(ValueError, match="Exit code must be"):
@@ -240,7 +245,7 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.cmdcheck_success_pattern = "[invalid("
 
         with pytest.raises(ValueError, match="success_pattern.*regex"):
@@ -251,18 +256,27 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.cmdcheck_failure_pattern = "[invalid("
 
         with pytest.raises(ValueError, match="failure_pattern.*regex"):
             config.validate()
 
-    def test_validate_multiple_commands_fields(self, config):
-        """Test validation of individual commands."""
+    def test_validate_per_command_missing_command_field(self, config):
+        """Test per-command validation requires command field."""
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_multiple = True
+        config.cmdcheck_commands = [{"name": "test"}]  # Missing 'command' field
+
+        with pytest.raises(ValueError, match="missing 'command'"):
+            config.validate()
+
+    def test_validate_per_command_empty_command(self, config):
+        """Test per-command validation rejects empty command."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "token"
+        config.command_token = "token"
         config.cmdcheck_commands = [{"command": ""}]  # Empty command
 
         with pytest.raises(ValueError, match="empty command"):
@@ -273,7 +287,6 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_multiple = True
         config.cmdcheck_commands = [{"command": "test", "timeout": 400}]
 
         with pytest.raises(ValueError, match="timeout must be"):
@@ -284,7 +297,6 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_multiple = True
         config.cmdcheck_commands = [{"command": "test", "expect_exit_code": 256}]
 
         with pytest.raises(ValueError, match="exit code must be"):
@@ -295,7 +307,6 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_multiple = True
         config.cmdcheck_commands = [{"command": "test", "success_pattern": "[invalid("}]
 
         with pytest.raises(ValueError, match="invalid success_pattern"):
@@ -306,7 +317,7 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_command = "test -f /tmp/file"
+        config.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
 
         # Should not raise
         config.validate()
@@ -316,7 +327,6 @@ class TestValidation:
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_token = "token"
         config.command_token = "token"
-        config.cmdcheck_multiple = True
         config.cmdcheck_commands = [
             {"command": "true", "name": "cmd1"},
             {"command": "true", "name": "cmd2"},
@@ -331,18 +341,17 @@ class TestGetSummary:
 
     def test_summary_single_command(self, config):
         """Test summary for single command configuration."""
-        config.cmdcheck_command = "test -f /tmp/file"
+        config.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
         config.command_token = "secret-token"
 
         summary = config.get_summary(mask_tokens=True)
 
         assert "🔧 Command Configuration" in summary
-        assert summary["🔧 Command Configuration"]["Mode"] == "Single"
+        assert "1 command" in str(summary)
         assert "test -f /tmp/file" in str(summary)
 
     def test_summary_multiple_commands(self, config):
         """Test summary for multiple commands configuration."""
-        config.cmdcheck_multiple = True
         config.cmdcheck_commands = [
             {"command": "true"},
             {"command": "true"},
@@ -353,12 +362,11 @@ class TestGetSummary:
         summary = config.get_summary(mask_tokens=True)
 
         assert "🔧 Command Configuration" in summary
-        assert summary["🔧 Command Configuration"]["Mode"] == "Multiple"
         assert "3 commands" in str(summary)
 
     def test_summary_masks_token(self, config):
         """Test token masking in summary."""
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.command_token = "secret-token"
 
         summary = config.get_summary(mask_tokens=True)
@@ -368,7 +376,7 @@ class TestGetSummary:
 
     def test_summary_unmask_token(self, config):
         """Test unmasked token in summary."""
-        config.cmdcheck_command = "test"
+        config.cmdcheck_commands = [{"command": "test"}]
         config.command_token = "secret-token"
 
         summary = config.get_summary(mask_tokens=False)
@@ -377,7 +385,7 @@ class TestGetSummary:
 
     def test_summary_with_patterns(self, config):
         """Test summary includes patterns."""
-        config.cmdcheck_command = "tail /var/log/app.log"
+        config.cmdcheck_commands = [{"command": "tail /var/log/app.log"}]
         config.cmdcheck_success_pattern = "^healthy"
         config.cmdcheck_failure_pattern = "ERROR|CRITICAL"
 
@@ -389,7 +397,7 @@ class TestGetSummary:
     def test_summary_truncates_long_command(self, config):
         """Test long commands are truncated in summary."""
         long_cmd = "x" * 100
-        config.cmdcheck_command = long_cmd
+        config.cmdcheck_commands = [{"command": long_cmd}]
 
         summary = config.get_summary()
 
@@ -399,37 +407,34 @@ class TestGetSummary:
         assert "..." in command_display
 
 
-class TestCommandsConverter:
-    """Test the commands converter function."""
+class TestCommandsNormalizer:
+    """Test the commands normalizer function."""
 
-    def test_converts_list_of_dicts(self, config):
-        """Test converting list of dicts."""
+    def test_normalizes_single_string(self, config):
+        """Test normalizing single command string."""
+        result = config._normalize_commands("test command")
+
+        assert len(result) == 1
+        assert result[0]["command"] == "test command"
+
+    def test_normalizes_list_of_dicts(self, config):
+        """Test normalizing list of dicts."""
         input_list = [
             {"command": "test1", "timeout": 10},
             {"command": "test2", "timeout": 20},
         ]
 
-        result = config._commands_converter(input_list)
+        result = config._normalize_commands(input_list)
 
         assert len(result) == 2
         assert result[0]["command"] == "test1"
         assert result[0]["timeout"] == 10
 
-    def test_converts_list_of_tuples(self, config):
-        """Test converting list of tuples."""
-        input_list = [("test1", {"timeout": 10}), ("test2", {"timeout": 20})]
+    def test_normalizes_list_of_strings(self, config):
+        """Test normalizing list of strings."""
+        input_list = ["test1", "test2", "test3"]
 
-        result = config._commands_converter(input_list)
-
-        assert len(result) == 2
-        assert result[0]["command"] == "test1"
-
-    def test_converts_list_of_strings(self, config):
-        """Test converting list of command tuples to dicts."""
-        # Converter expects dicts or tuples like Click would provide
-        input_list = [("test1",), ("test2",), ("test3",)]
-
-        result = config._commands_converter(input_list)
+        result = config._normalize_commands(input_list)
 
         assert len(result) == 3
         assert all(isinstance(cmd, dict) for cmd in result)
@@ -437,14 +442,23 @@ class TestCommandsConverter:
         assert result[1]["command"] == "test2"
         assert result[2]["command"] == "test3"
 
+    def test_normalizes_tuple_input(self, config):
+        """Test normalizing tuple input (from Click)."""
+        input_tuple = ("test1", "test2", "test3")
+
+        result = config._normalize_commands(input_tuple)
+
+        assert len(result) == 3
+        assert result[0]["command"] == "test1"
+
     def test_handles_none_input(self, config):
-        """Test converter handles None gracefully."""
-        result = config._commands_converter(None)
+        """Test normalizer handles None gracefully."""
+        result = config._normalize_commands(None)
 
         assert result == []
 
     def test_handles_empty_list(self, config):
-        """Test converter handles empty list."""
-        result = config._commands_converter([])
+        """Test normalizer handles empty list."""
+        result = config._normalize_commands([])
 
         assert result == []

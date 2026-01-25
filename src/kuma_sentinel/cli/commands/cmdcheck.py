@@ -20,19 +20,23 @@ class CmdCheckCommand(CommandExecutor):
     """Command check monitoring using unified executor."""
 
     def get_builtin_command(self, base_command: click.Command) -> click.Command:
-        """Build cmdcheck command with arguments and options."""
+        """Build cmdcheck command with arguments and options.
+        
+        Note: CLI supports single command only. For multiple commands,
+        use YAML configuration with cmdcheck.commands list.
+        """
         # Add common arguments (uptime_kuma_url, heartbeat_token, token)
         base_command = self._add_common_arguments(base_command)
 
         # Add common options (--config, --log-file)
         base_command = self._add_common_options(base_command)
 
-        # Single command option
+        # Single command option (CLI only supports single command)
         base_command = click.option(
             "--command",
             "command",
             multiple=False,
-            help="Shell command to execute",
+            help="Shell command to execute (single command only; use --config for multiple)",
         )(base_command)
 
         # Timeout option
@@ -74,7 +78,7 @@ class CmdCheckCommand(CommandExecutor):
         """Get fields to display in config summary logging."""
         return {
             "🔧 Command Configuration": {
-                "Mode": "multiple" if self.config.cmdcheck_multiple else "single",
+                "Total Commands": str(len(self.config.cmdcheck_commands)),
                 "Timeout": "cmdcheck_timeout",
                 "Expected Exit Code": "cmdcheck_expect_exit_code",
                 "Capture Output": "cmdcheck_capture_output",

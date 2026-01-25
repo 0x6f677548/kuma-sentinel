@@ -125,15 +125,15 @@ class CommandExecutor(Command):
             checker = self._checker_class(logger, cfg)
             result = checker.execute_with_heartbeat()
 
-            # Calculate check duration
+            # Calculate check duration in milliseconds
             check_end = time.time()
-            check_duration = int(check_end - check_start)
-            check_minutes = check_duration // 60
+            check_duration_ms = int((check_end - check_start) * 1000)
+            check_minutes = check_duration_ms // 60000
 
             # Send alert based on result
             # (Heartbeat messages already sent by checker's execute_with_heartbeat())
             self._send_result_alert(
-                logger, cfg, self._command_name, result, check_minutes
+                logger, cfg, self._command_name, result, check_duration_ms
             )
 
             logger.info(f"✅ {self._command_name} check complete ({check_minutes}m)")
@@ -141,7 +141,10 @@ class CommandExecutor(Command):
 
         except Exception as e:
             logger.error(f"❌ Unexpected error: {str(e)}")
-            self._send_error_alert(logger, cfg, self._command_name, str(e))
+            # Calculate partial duration from error time in milliseconds
+            error_end = time.time()
+            error_duration_ms = int((error_end - check_start) * 1000)
+            self._send_error_alert(logger, cfg, self._command_name, str(e), error_duration_ms)
             sys.exit(1)
 
     def _load_and_validate_config(
@@ -231,10 +234,10 @@ class CommandExecutor(Command):
         cfg: ConfigBase,
         command_name: str,
         result: Any,
-        duration_minutes: int,
+        duration_ms: int,
     ) -> None:
         """Send result alert. Delegates to subclass for command-specific alert formatting."""
-        self.send_result_alert(logger, cfg, command_name, result, duration_minutes)
+        self.send_result_alert(logger, cfg, command_name, result, duration_ms)
 
     def _send_error_alert(
         self,
@@ -242,9 +245,10 @@ class CommandExecutor(Command):
         cfg: ConfigBase,
         command_name: str,
         error_message: str,
+        duration_ms: int = 0,
     ) -> None:
         """Send error alert. Delegates to subclass for command-specific error handling."""
-        self.send_error_alert(logger, cfg, command_name, error_message)
+        self.send_error_alert(logger, cfg, command_name, error_message, duration_ms)
 
     # === Abstract Methods (Subclasses Must Implement) ===
 
@@ -284,11 +288,12 @@ class CommandExecutor(Command):
         cfg: ConfigBase,
         command_name: str,
         result: Any,
-        duration_minutes: int,
+        duration_ms: int,
     ) -> None:
         """Send result alert. Override in subclass for custom alert logic."""
         # Default: send generic alert based on result status and message
         if cfg.command_token:
+            duration_minutes = duration_ms // 60000
             send_push(
                 logger,
                 cfg.uptime_kuma_url,
@@ -297,6 +302,7 @@ class CommandExecutor(Command):
                 command=command_name,
                 status=result.status,
                 timeout=PUSH_TIMEOUT_ALERT,
+                ping_ms=duration_ms,
             )
 
     def send_error_alert(
@@ -305,6 +311,7 @@ class CommandExecutor(Command):
         cfg: ConfigBase,
         command_name: str,
         error_message: str,
+        duration_ms: int = 0,
     ) -> None:
         """Send error alert. Override in subclass for custom error handling."""
         # Default: send error alert to command-specific token
@@ -317,4 +324,5 @@ class CommandExecutor(Command):
                 command=command_name,
                 status="down",
                 timeout=PUSH_TIMEOUT_ALERT,
+                ping_ms=duration_ms if duration_ms > 0 else None,
             )

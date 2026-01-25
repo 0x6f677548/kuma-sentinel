@@ -24,6 +24,7 @@ def send_push(
     command: str,
     status: str = "up",
     timeout: int = PUSH_TIMEOUT_HEARTBEAT,
+    ping_ms: Optional[int] = None,
 ) -> bool:
     """Send a generic push notification to Uptime Kuma.
 
@@ -35,6 +36,7 @@ def send_push(
         command: Command/check name (e.g., "portscan", "kopiasnapshotstatus")
         status: Status to report (default: "up")
         timeout: Request timeout in seconds
+        ping_ms: Response time in milliseconds (optional, for command-specific alerts)
 
     Returns:
         True if successful, False otherwise
@@ -53,6 +55,10 @@ def send_push(
     try:
         encoded_msg = url_encode(message)
         push_url = f"{uptime_kuma_url}/{push_token}?status={status}&msg={encoded_msg}"
+        
+        # Append ping parameter if provided (for command-specific result alerts)
+        if ping_ms is not None:
+            push_url += f"&ping={ping_ms}"
 
         with urllib.request.urlopen(push_url, timeout=timeout) as response:
             data = response.read().decode()

@@ -463,12 +463,14 @@ class TestCommandsNormalizer:
 
         assert result == []
 
+
 class TestURLValidation:
     """Test Uptime Kuma URL validation."""
 
     def test_valid_http_url(self):
         """Test valid HTTP URL."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         ConfigBase.validate_uptime_kuma_url("http://localhost:3001/api/push")
         ConfigBase.validate_uptime_kuma_url("http://uptimekuma.example.com/api/push")
         ConfigBase.validate_uptime_kuma_url("http://192.168.1.1:3001/api/push")
@@ -476,6 +478,7 @@ class TestURLValidation:
     def test_valid_https_url(self):
         """Test valid HTTPS URL."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         ConfigBase.validate_uptime_kuma_url("https://uptimekuma.example.com/api/push")
         ConfigBase.validate_uptime_kuma_url("https://monitoring.acme.com")
         ConfigBase.validate_uptime_kuma_url("https://kuma:3001/api/push")
@@ -483,6 +486,7 @@ class TestURLValidation:
     def test_empty_url(self):
         """Test empty URL raises error."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("")
         assert "cannot be empty" in str(exc_info.value)
@@ -490,6 +494,7 @@ class TestURLValidation:
     def test_none_url(self):
         """Test None URL raises error."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url(None)
         assert "cannot be empty" in str(exc_info.value)
@@ -497,6 +502,7 @@ class TestURLValidation:
     def test_invalid_scheme(self):
         """Test URL with invalid scheme."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("ftp://uptimekuma.com/api/push")
         assert "scheme must be 'http' or 'https'" in str(exc_info.value)
@@ -504,6 +510,7 @@ class TestURLValidation:
     def test_no_scheme(self):
         """Test URL without scheme."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("uptimekuma.com/api/push")
         assert "scheme must be 'http' or 'https'" in str(exc_info.value)
@@ -511,6 +518,7 @@ class TestURLValidation:
     def test_missing_hostname(self):
         """Test URL without hostname."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("http:///api/push")
         assert "hostname" in str(exc_info.value).lower()
@@ -518,6 +526,7 @@ class TestURLValidation:
     def test_url_with_spaces(self):
         """Test URL with spaces."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("http://my site.com/api/push")
         assert "spaces" in str(exc_info.value)
@@ -525,6 +534,7 @@ class TestURLValidation:
     def test_url_with_trailing_slash(self):
         """Test URL with trailing slash."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         with pytest.raises(ValueError) as exc_info:
             ConfigBase.validate_uptime_kuma_url("http://uptimekuma.com/")
         assert "trailing slash" in str(exc_info.value)
@@ -532,18 +542,21 @@ class TestURLValidation:
     def test_url_with_query_params(self):
         """Test URL with query parameters."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         # Should pass - valid URL
         ConfigBase.validate_uptime_kuma_url("http://uptimekuma.com/api/push?token=abc")
 
     def test_url_with_port(self):
         """Test URL with explicit port."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         ConfigBase.validate_uptime_kuma_url("http://localhost:3001/api/push")
         ConfigBase.validate_uptime_kuma_url("https://monitoring.io:8443/health")
 
     def test_url_with_auth(self):
         """Test URL with authentication."""
         from kuma_sentinel.core.config.base import ConfigBase
+
         ConfigBase.validate_uptime_kuma_url("http://user:pass@uptimekuma.com/api/push")
 
     def test_cmdcheck_config_with_valid_url(self):

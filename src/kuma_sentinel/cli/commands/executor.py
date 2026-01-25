@@ -178,6 +178,7 @@ class CommandExecutor(Command):
                 # Check file permissions unless user explicitly ignores them
                 ignore_perms = args.get("ignore_file_permissions", False)
                 from kuma_sentinel.core.logger import get_logger
+
                 logger = get_logger()
                 try:
                     self.config.__class__.validate_config_file_permissions(

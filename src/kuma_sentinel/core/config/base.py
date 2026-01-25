@@ -3,6 +3,7 @@
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, get_type_hints
 
 import yaml
@@ -40,8 +41,15 @@ class ConfigBase(ABC):
     Subclasses should implement command-specific attributes and loading logic.
     """
 
-    def __init__(self):
-        """Initialize configuration with defaults."""
+    def __init__(self, logger: Optional[Logger] = None):
+        """Initialize configuration with defaults.
+
+        Args:
+            logger: Optional logger for configuration operations.
+                   If not provided, will use the default logger.
+        """
+        from kuma_sentinel.core.logger import get_logger
+
         # Shared attributes
         self.log_file = "/var/log/kuma-sentinel.log"
         self.log_level = "INFO"
@@ -51,6 +59,7 @@ class ConfigBase(ABC):
         self.heartbeat_token: Optional[str] = None
         self.command_token: Optional[str] = None
         self.ignore_file_permissions = False  # Skip file permission checks if True
+        self.logger = logger or get_logger()
 
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for configuration.
@@ -105,17 +114,26 @@ class ConfigBase(ABC):
             RuntimeError: If config file parsing fails
         """
         try:
+            if self.logger:
+                self.logger.debug(f"Loading YAML configuration from: {config_file}")
+
             with open(config_file) as f:
                 data = yaml.safe_load(f) or {}
+
+            if self.logger:
+                self.logger.debug("Successfully parsed YAML configuration file")
+
             self._apply_field_mappings_from_yaml(data)
         except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"Configuration file not found: {config_file}"
-            ) from e
+            error_msg = f"Configuration file not found: {config_file}"
+            if self.logger:
+                self.logger.error(f"❌ {error_msg}")
+            raise FileNotFoundError(error_msg) from e
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to parse config file {config_file}: {str(e)}"
-            ) from e
+            error_msg = f"Failed to parse config file {config_file}: {str(e)}"
+            if self.logger:
+                self.logger.error(f"❌ {error_msg}")
+            raise RuntimeError(error_msg) from e
 
     def load_from_args(self, args) -> None:
         """Load configuration from command-line arguments."""
@@ -131,34 +149,90 @@ class ConfigBase(ABC):
     def validate(self) -> None:
         """Validate shared configuration common to all commands.
 
+        Logs validation failures and missing values for debugging.
+
         Raises:
             ValueError: If shared configuration is invalid
         """
         errors = []
 
-        if not self.uptime_kuma_url:
-            errors.append("Uptime Kuma URL not provided")
-        else:
-            # Validate URL format
-            try:
-                self.validate_uptime_kuma_url(self.uptime_kuma_url)
-            except ValueError as e:
-                errors.append(f"Invalid Uptime Kuma URL: {str(e)}")
+        # Validate URL
+        url_errors = self._validate_and_log_url()
+        errors.extend(url_errors)
 
-        if not self.heartbeat_token:
-            errors.append("Heartbeat push token not provided")
-
-        if not self.command_token:
-            errors.append("Command push token not provided")
+        # Validate tokens
+        token_errors = self._validate_and_log_tokens()
+        errors.extend(token_errors)
 
         if errors:
-            raise ValueError(
-                "Configuration validation failed:\n  " + "\n  ".join(errors)
-            )
+            error_message = "Configuration validation failed:\n  " + "\n  ".join(errors)
+            if self.logger:
+                self.logger.error(
+                    f"❌ Configuration validation failed with {len(errors)} error(s)"
+                )
+                for error in errors:
+                    self.logger.error(f"   - {error}")
+            raise ValueError(error_message)
+
+    def _validate_and_log_url(self) -> List[str]:
+        """Validate Uptime Kuma URL and log results.
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        if not self.uptime_kuma_url:
+            error_msg = "Uptime Kuma URL not provided"
+            if self.logger:
+                self.logger.warning(f"⚠️  {error_msg}")
+            return [error_msg]
+
+        try:
+            self.validate_uptime_kuma_url(self.uptime_kuma_url)
+            if self.logger:
+                self.logger.debug("✅ Uptime Kuma URL validation passed")
+            return []
+        except ValueError as e:
+            error_msg = f"Invalid Uptime Kuma URL: {str(e)}"
+            if self.logger:
+                self.logger.error(f"❌ {error_msg}")
+            return [error_msg]
+
+    def _validate_and_log_tokens(self) -> List[str]:
+        """Validate heartbeat and command tokens and log results.
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+
+        if not self.heartbeat_token:
+            error_msg = "Heartbeat push token not provided"
+            errors.append(error_msg)
+            if self.logger:
+                self.logger.warning(f"⚠️  {error_msg}")
+        else:
+            if self.logger:
+                self.logger.debug("✅ Heartbeat push token configured")
+
+        if not self.command_token:
+            error_msg = "Command push token not provided"
+            errors.append(error_msg)
+            if self.logger:
+                self.logger.warning(f"⚠️  {error_msg}")
+        else:
+            if self.logger:
+                self.logger.debug("✅ Command push token configured")
+
+        return errors
 
     def _apply_field_mappings_from_env(self) -> None:
-        """Apply field mappings from environment variables."""
+        """Apply field mappings from environment variables.
+
+        Logs when environment variables are detected and applied.
+        """
         mappings = self._get_field_mappings()
+        env_vars_loaded = []
+
         for field_name, mapping in mappings.items():
             if not mapping.env_var:
                 continue
@@ -167,6 +241,12 @@ class ConfigBase(ABC):
             if env_value:
                 converted = self._convert_value(env_value, mapping)
                 setattr(self, field_name, converted)
+                env_vars_loaded.append(mapping.env_var)
+
+        if env_vars_loaded and self.logger:
+            self.logger.debug(
+                f"Loaded {len(env_vars_loaded)} configuration field(s) from environment variables"
+            )
 
     def _apply_field_mappings_from_yaml(self, data: dict) -> None:
         """Apply field mappings from YAML data dictionary."""
@@ -349,7 +429,9 @@ class ConfigBase(ABC):
 
             # Check netloc (domain/host)
             if not parsed.netloc:
-                raise ValueError("URL must include a hostname (e.g., http://uptimekuma:3001)")
+                raise ValueError(
+                    "URL must include a hostname (e.g., http://uptimekuma:3001)"
+                )
 
             # Check for common issues
             if " " in url:

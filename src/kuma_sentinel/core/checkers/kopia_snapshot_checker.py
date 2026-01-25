@@ -37,7 +37,9 @@ def _validate_snapshot_path(path: str) -> None:
     # User: alphanumerics, hyphens, underscores, dots
     # Host: alphanumerics, hyphens, dots (domain names)
     # Path: alphanumerics, hyphens, underscores, dots, forward slashes
-    ssh_path = r"^[a-zA-Z0-9\-_.]+@[a-zA-Z0-9\-_.]+:[a-zA-Z0-9\-_.~/][a-zA-Z0-9\-_.~/]*$"
+    ssh_path = (
+        r"^[a-zA-Z0-9\-_.]+@[a-zA-Z0-9\-_.]+:[a-zA-Z0-9\-_.~/][a-zA-Z0-9\-_.~/]*$"
+    )
 
     # Check against both patterns
     if not (re.match(local_path, path) or re.match(ssh_path, path)):

@@ -421,6 +421,7 @@ def test_portscan_config_yaml_invalid_format():
     finally:
         os.unlink(config_file)
 
+
 class TestPortRangeValidation:
     """Test port range validation in PortscanConfig."""
 
@@ -489,9 +490,10 @@ class TestPortRangeValidation:
         """Test range where start > end."""
         with pytest.raises(ValueError) as exc_info:
             PortscanConfig.validate_port_range("443-80")
-        assert "start port" in str(exc_info.value).lower() and "end port" in str(
-            exc_info.value
-        ).lower()
+        assert (
+            "start port" in str(exc_info.value).lower()
+            and "end port" in str(exc_info.value).lower()
+        )
 
     def test_invalid_format_letters(self):
         """Test invalid format with letters."""

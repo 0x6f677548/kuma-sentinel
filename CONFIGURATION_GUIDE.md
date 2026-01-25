@@ -883,6 +883,7 @@ KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 - ✅ **Per-path thresholds** — Each snapshot can have different age requirements
 - ✅ **Global fallback** — Paths without explicit threshold use global default
 - ✅ **SSH support** — Handles remote paths like `user@host:/path`
+- ✅ **Path validation** — Prevents path traversal and command injection attacks
 - ✅ **CLI override** — CLI `--snapshot` flags replace YAML config entirely
 - ✅ **Type-safe** — Structured YAML format prevents configuration errors
 - ✅ **Multi-source config** — Load from YAML files, environment variables, or CLI arguments
@@ -946,6 +947,27 @@ kuma-sentinel kopiasnapshotstatus \
   --config /etc/kuma-sentinel/config.yaml \
   --max-age-hours 24
 ```
+
+### Path Validation & Security
+
+Snapshot paths are validated to prevent path traversal and command injection attacks.
+
+**Allowed path formats:**
+- ✅ Local paths: `/mnt/data`, `./backup`, `~/snapshots`
+- ✅ SSH paths: `user@host:/path`, `root@server.com:/mnt/backups`
+- ✅ Valid characters: alphanumerics, hyphens, underscores, dots, forward slashes, tildes
+
+**Blocked patterns:**
+- ❌ Path traversal: `../../../etc/passwd`
+- ❌ Command injection: `; rm -rf /`, `| cat`, `&& echo`, `` `whoami` ``, `$(whoami)`
+- ❌ Dangerous characters: `!`, `*`, `?`, `$`, `` ` ``, `;`, `|`, `&`, `(`, `)`, `<`, `>`
+
+If an invalid path is detected, the snapshot check fails with a security error:
+```
+❌ Invalid snapshot path configuration: Invalid snapshot path format: /data; rm -rf /
+```
+
+This validation is performed both at configuration load time and during execution.
 
 ## Examples
 

@@ -104,6 +104,23 @@ class KopiaSnapshotConfig(ConfigBase):
         # Validate shared config first (raises if invalid)
         super().validate()
 
+        # Validate snapshot paths if any are configured
+        # (paths are optional at config time, but will be validated at execution time)
+        if self.kopiasnapshotstatus_snapshots:
+            from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
+                _validate_snapshot_path,
+            )
+
+            for snapshot in self.kopiasnapshotstatus_snapshots:
+                path = snapshot.get("path")
+                if path:
+                    try:
+                        _validate_snapshot_path(path)
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Invalid snapshot path in configuration: {str(e)}"
+                        ) from e
+
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get kopia snapshot configuration summary for logging."""
         # Build snapshot summary

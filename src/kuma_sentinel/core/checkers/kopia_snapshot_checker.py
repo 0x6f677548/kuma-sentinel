@@ -1,6 +1,7 @@
 """Kopia snapshot status checker for sentinel."""
 
 import json
+import re
 import subprocess
 import time
 from datetime import datetime
@@ -9,6 +10,60 @@ from typing import Optional, Tuple
 
 from kuma_sentinel.core.checkers.base import Checker
 from kuma_sentinel.core.models import CheckResult
+
+
+def _validate_snapshot_path(path: str) -> None:
+    """Validate snapshot path format to prevent path traversal attacks.
+
+    Allows:
+    - Local paths: /mnt/data, /backups, ./relative/path
+    - SSH paths: user@host:/path, root@server.com:/data
+    - Path components: alphanumerics, hyphens, underscores, dots, forward slashes
+
+    Args:
+        path: Path string to validate
+
+    Raises:
+        ValueError: If path contains invalid characters or suspicious patterns
+    """
+    if not path:
+        raise ValueError("Snapshot path cannot be empty")
+
+    # Pattern for local paths: /path or ./path or ~/path or relative/path
+    # Components: alphanumerics, hyphens, underscores, dots, forward slashes, tildes
+    local_path = r"^[a-zA-Z0-9\-_.~/][a-zA-Z0-9\-_.~/]*$"
+
+    # Pattern for SSH paths: user@host:/path
+    # User: alphanumerics, hyphens, underscores, dots
+    # Host: alphanumerics, hyphens, dots (domain names)
+    # Path: alphanumerics, hyphens, underscores, dots, forward slashes
+    ssh_path = r"^[a-zA-Z0-9\-_.]+@[a-zA-Z0-9\-_.]+:[a-zA-Z0-9\-_.~/][a-zA-Z0-9\-_.~/]*$"
+
+    # Check against both patterns
+    if not (re.match(local_path, path) or re.match(ssh_path, path)):
+        raise ValueError(
+            f"Invalid snapshot path format: {path}. "
+            f"Path must be a local path (e.g., /mnt/data) or "
+            f"SSH path (e.g., user@host:/path). "
+            f"Only alphanumerics, hyphens, underscores, dots, slashes, and tildes allowed."
+        )
+
+    # Additional check: prevent path traversal attempts
+    if ".." in path:
+        raise ValueError(
+            f"Invalid snapshot path: {path}. "
+            f"Path traversal sequences (..) are not allowed."
+        )
+
+    # Prevent shell metacharacters
+    dangerous_chars = ["$", "`", ";", "|", "&", "(", ")", "<", ">", "!", "*", "?"]
+    for char in dangerous_chars:
+        if char in path:
+            raise ValueError(
+                f"Invalid snapshot path: {path}. "
+                f"Path contains dangerous character '{char}'. "
+                f"Shell metacharacters are not allowed."
+            )
 
 
 def _run_kopia_command(
@@ -215,6 +270,16 @@ class KopiaSnapshotChecker(Checker):
                     self.logger.warning(
                         "⚠️  Snapshot config missing 'path' field, skipping"
                     )
+                    continue
+
+                # Validate path format to prevent path traversal attacks
+                try:
+                    _validate_snapshot_path(path)
+                except ValueError as e:
+                    self.logger.error(
+                        f"❌ Invalid snapshot path configuration: {str(e)}"
+                    )
+                    failed_paths.append(path)
                     continue
 
                 # Get per-path max_age_hours or use default

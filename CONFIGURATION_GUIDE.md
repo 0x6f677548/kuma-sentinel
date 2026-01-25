@@ -179,7 +179,7 @@ cmdcheck:
 
 ### Key Features
 
-- ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries with full shell features (pipes, redirects, logic operators)
+- ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries
 - ✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
 - ✅ **Multiple Commands** — Run multiple independent checks (via YAML), all must pass for UP
 - ✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
@@ -187,6 +187,134 @@ cmdcheck:
 - ✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
 - ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in list
 - ✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
+- ✅ **Security** — Commands executed without shell interpretation to prevent injection attacks
+
+### Command Execution Limitations
+
+Commands are executed **without shell interpretation** (`shell=False`) to prevent command injection attacks and improve security. This means **shell metacharacters are NOT evaluated**.
+
+#### ❌ NOT Supported (Shell Features)
+
+These patterns will **NOT work**:
+
+```bash
+# Pipes
+"systemctl status nginx | grep active"
+
+# Command substitution
+"echo $(whoami)" or "echo `whoami`"
+
+# Logical operators
+"test -f /etc/file && echo yes"
+"cmd1 || cmd2"
+
+# Redirections
+"ls > /tmp/output.log"
+"cat < /etc/passwd"
+
+# Bash-specific operators
+"for i in {1..5}; do echo $i; done"
+
+# Variable expansion
+"echo $HOME"
+"echo ${USER}_profile"
+
+# Background processes
+"long-running-cmd &"
+```
+
+**Why?** These features require shell interpretation. To prevent command injection vulnerabilities, commands run directly without a shell.
+
+#### ✅ Supported
+
+Simple commands with arguments work perfectly:
+
+```bash
+"systemctl is-active nginx"              # ✅ Works
+"curl -s https://api.example.com/health" # ✅ Works
+"grep ERROR /var/log/app.log"            # ✅ Works
+"test -f /var/run/app.pid"               # ✅ Works
+"/usr/local/bin/check-health.sh"         # ✅ Works
+```
+
+Quoted arguments are handled correctly:
+
+```bash
+"grep 'error pattern' /var/log/syslog"   # ✅ Works
+'echo "hello world"'                      # ✅ Works
+```
+
+#### Handling Complex Commands
+
+If you need commands that require shell features, wrap them in a shell script:
+
+**Before (doesn't work):**
+```yaml
+cmdcheck:
+  commands:
+    - command: "systemctl status nginx | grep active"
+```
+
+**After (works):**
+
+1. Create `/usr/local/bin/check-nginx.sh`:
+```bash
+#!/bin/bash
+systemctl status nginx | grep active
+```
+
+2. Make it executable:
+```bash
+chmod 755 /usr/local/bin/check-nginx.sh
+```
+
+3. Update config:
+```yaml
+cmdcheck:
+  commands:
+    - command: "/usr/local/bin/check-nginx.sh"
+      name: "nginx_check"
+```
+
+**Complex Example with Multiple Conditions:**
+
+Script `/usr/local/bin/check-system-health.sh`:
+```bash
+#!/bin/bash
+
+# Complex logic with pipes, conditions, etc.
+if systemctl is-active nginx >/dev/null 2>&1; then
+    NGINX_OK=1
+else
+    NGINX_OK=0
+fi
+
+if test -f /var/run/app.pid; then
+    APP_OK=1
+else
+    APP_OK=0
+fi
+
+if [ $NGINX_OK -eq 1 ] && [ $APP_OK -eq 1 ]; then
+    echo "All systems healthy"
+    exit 0
+else
+    echo "System check failed: nginx=$NGINX_OK app=$APP_OK"
+    exit 1
+fi
+```
+
+Config:
+```yaml
+cmdcheck:
+  commands:
+    - command: "/usr/local/bin/check-system-health.sh"
+      name: "system_health"
+      timeout: 10
+      expect_exit_code: 0
+      success_pattern: "All systems healthy"
+      failure_pattern: "failed"
+```
 
 ### Configuration Reference
 
@@ -256,14 +384,7 @@ cmdcheck:
   success_pattern: '"status":\s*"healthy"'
   timeout: 5
 
-# Example 5: Disk space check (custom exit code)
-cmdcheck:
-  commands:
-    - command: "test $(df /var | tail -1 | awk '{print $4}') -gt 1000000"
-  expect_exit_code: 0
-  timeout: 5
-
-# Example 6: Multiple independent checks (all must pass)
+# Example 5: Multiple independent checks (all must pass)
 cmdcheck:
   commands:
     - command: "systemctl is-active nginx"
@@ -302,27 +423,47 @@ cmdcheck:
 Monitor application health endpoints:
 ```yaml
 cmdcheck:
-  command: "curl -s http://localhost:8080/api/health | grep -q 'healthy'"
-  success_pattern: "healthy"
-  timeout: 5
+  commands:
+    - command: "curl -s http://localhost:8080/api/health"
+      name: "app_health"
+      success_pattern: '"status":\s*"healthy"'
+      timeout: 5
 ```
 
 #### 3. File Existence Checks
 
-Alert if critical files are missing:
+Alert if critical files are missing (multiple independent checks):
 ```yaml
 cmdcheck:
-  command: "test -f /var/run/app.pid && test -f /var/spool/lock"
-  timeout: 5
+  commands:
+    - command: "test -f /var/run/app.pid"
+      name: "app_pid_file"
+      timeout: 5
+    - command: "test -f /var/spool/lock"
+      name: "lock_file"
+      timeout: 5
+    - command: "test -f /etc/app/config.yaml"
+      name: "config_file"
+      timeout: 5
 ```
+
+**Result**: DOWN if ANY file is missing, UP only if ALL files exist
 
 #### 4. Disk Space Monitoring
 
-Ensure sufficient disk space:
+Create a monitoring script:
+```bash
+# Script: /usr/local/bin/check-disk-space.sh
+#!/bin/bash
+AVAILABLE=$(df / | tail -1 | awk '{print $4}')
+test "$AVAILABLE" -gt 5000000
+```
+
 ```yaml
 cmdcheck:
-  command: "test $(df / | tail -1 | awk '{print $4}') -gt 5000000"
-  timeout: 10
+  commands:
+    - command: "/usr/local/bin/check-disk-space.sh"
+      timeout: 10
 ```
 
 #### 5. Log Pattern Detection
@@ -330,10 +471,12 @@ cmdcheck:
 Alert on error patterns in logs:
 ```yaml
 cmdcheck:
-  command: "journalctl -u myapp -n 1000 --no-pager"
-  failure_pattern: "ERROR|CRITICAL|FATAL"
-  success_pattern: "Running normally"
-  timeout: 10
+  commands:
+    - command: "journalctl -u myapp -n 1000 --no-pager"
+      name: "app_logs"
+      failure_pattern: "ERROR|CRITICAL|FATAL"
+      success_pattern: "Running normally"
+      timeout: 10
 ```
 
 #### 6. Database Connectivity
@@ -341,9 +484,11 @@ cmdcheck:
 Verify database health:
 ```yaml
 cmdcheck:
-  command: "psql -h db.example.com -U monitoring -d health_check -c 'SELECT 1' -q"
-  expect_exit_code: 0
-  timeout: 10
+  commands:
+    - command: "psql -h db.example.com -U monitoring -d health_check -c SELECT 1"
+      name: "db_health"
+      expect_exit_code: 0
+      timeout: 10
 ```
 
 #### 7. Custom Script Execution
@@ -351,25 +496,46 @@ cmdcheck:
 Run custom monitoring scripts:
 ```yaml
 cmdcheck:
-  command: "/usr/local/bin/custom-health-check.sh"
-  success_pattern: "^HEALTHY"
-  timeout: 30
+  commands:
+    - command: "/usr/local/bin/custom-health-check.sh"
+      name: "custom_check"
+      success_pattern: "^HEALTHY"
+      timeout: 30
 ```
 
 ### Security Considerations
 
-⚠️ **CRITICAL SECURITY MODEL**: Kuma Sentinel assumes **configuration is admin-controlled**. Commands are defined in config files or CLI arguments, NOT from untrusted user input.
+⚠️ **SECURITY FIRST**: Kuma Sentinel is designed with security as a primary concern.
 
+#### Command Execution Security
+
+Commands are executed **without shell interpretation** (`shell=False`) to prevent command injection vulnerabilities. This means:
+
+- ✅ Shell metacharacters cannot be injected through input
+- ✅ Safe against semicolon-separated command chaining
+- ✅ Safe against pipe injection attacks
+- ✅ Safe against command substitution attacks
+
+#### Configuration Security
+
+Kuma Sentinel assumes **configuration is admin-controlled** (YAML files, CLI arguments, environment variables are set by administrators only).
+
+If you need complex shell logic:
+1. Create a dedicated shell script (stored securely with 755 permissions)
+2. Call the script from your configuration
+3. Keep the script under version control with your infrastructure code
+
+This separates data (configuration) from logic (scripts) and enables proper code review and auditing.
 
 #### Attack Vectors & Mitigations
 
 | Vector | Risk | Mitigation |
 |--------|------|-----------|
-| Shell Metacharacters (`;`, `&&`, `\|`) | Command chaining if input is uncontrolled | Config-only commands; admin responsibility |
-| PATH Manipulation | Malicious `ls` via hijacked PATH | Dedicated service user; use absolute paths in commands |
+| Config File Tampering | Malicious commands in config | File permissions (600), access control |
+| PATH Manipulation | Malicious binary substitution | Use absolute paths; dedicated service user |
 | Privilege Escalation | Commands running as root | Run as dedicated low-privilege user |
-| Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits in container |
-| Output Leakage | Sensitive data in command output | Output truncated to 500 chars; document data sensitivity |
+| Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits |
+| Output Leakage | Sensitive data in command output | Output truncated to 500 chars; sanitize scripts |
 
 #### Deployment Best Practices
 
@@ -461,12 +627,31 @@ cmdcheck:
 
 #### Monitor Backup Completion
 
+Create a monitoring script to check for recent backups:
+```bash
+# Script: /usr/local/bin/check-backup-completion.sh
+#!/bin/bash
+# Check if backups from last 24 hours exist
+find /var/backups -name 'backup-*.tar' -mtime -1 | grep -q .
+```
+
 ```yaml
 cmdcheck:
-  command: "find /var/backups -name 'backup-*.tar' -mtime -1 | wc -l | grep -q '^[1-9]$'"
-  success_pattern: "^[1-9]"
-  failure_pattern: "^0"
-  timeout: 30
+  commands:
+    - command: "/usr/local/bin/check-backup-completion.sh"
+      name: "backup_check"
+      success_pattern: ""  # Any output = success (files found)
+      timeout: 30
+```
+
+**Alternative:** Use multiple test commands:
+```yaml
+cmdcheck:
+  commands:
+    - command: "find /var/backups -name 'backup-*.tar' -mtime -1"
+      name: "recent_backups"
+      timeout: 30
+      failure_pattern: "^$"  # Empty output = failure (no backups found)
 ```
 
 #### Check Application via Custom Script
@@ -481,10 +666,36 @@ cmdcheck:
 
 #### Database Replica Lag Check
 
+Create a monitoring script for replication lag:
+```bash
+# Script: /usr/local/bin/check-replica-lag.sh
+#!/bin/bash
+# Check PostgreSQL replication lag
+LAG=$(psql -h replica.db -U monitoring -d postgres \
+  -c "SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))" \
+  -t 2>/dev/null | tr -d ' ')
+
+# Check if lag is less than 60 seconds
+[ -n "$LAG" ] && [ "${LAG%.*}" -lt 60 ]
+```
+
 ```yaml
 cmdcheck:
-  command: "psql -h replica.db -U monitoring -c \"SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))\" | grep -E '^\\s+[0-9]{1,3}(\\.[0-9]+)?\\s*$'"
-  timeout: 15
+  commands:
+    - command: "/usr/local/bin/check-replica-lag.sh"
+      name: "replica_lag"
+      expect_exit_code: 0
+      timeout: 15
+```
+
+**Alternative:** Use direct command with pattern matching:
+```yaml
+cmdcheck:
+  commands:
+    - command: "psql -h replica.db -U monitoring -d postgres -c SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))"
+      name: "replica_lag"
+      failure_pattern: "^\\s*[6-9][0-9]+|^\\s*[1-9][0-9]{2,}"  # Matches >= 60 seconds
+      timeout: 15
 ```
 
 ### Result Message Format

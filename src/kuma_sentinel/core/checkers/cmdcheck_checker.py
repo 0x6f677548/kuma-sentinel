@@ -1,6 +1,7 @@
 """Command check monitoring implementation."""
 
 import re
+import shlex
 import subprocess
 import time
 from logging import Logger
@@ -100,10 +101,29 @@ class CmdCheckChecker(Checker):
             self.logger.debug(f"Running command {idx + 1}/{len(commands)}: {name}")
 
             try:
+                # Parse command string into argument list for safe execution
+                # shell=False prevents shell metacharacter interpretation (security)
+                try:
+                    args = shlex.split(command)
+                except ValueError as e:
+                    # shlex.split() raises ValueError for unclosed quotes
+                    duration = time.time() - cmd_start
+                    results.append(
+                        {
+                            "name": name,
+                            "command": command,
+                            "status": "down",
+                            "exit_code": None,
+                            "output": f"Invalid command syntax: {str(e)}",
+                            "duration_seconds": duration,
+                        }
+                    )
+                    failures.append(f"{name}[{command}] (Invalid command syntax)")
+                    continue
+
                 result = subprocess.run(
-                    command,
-                    shell=True,
-                    executable="/bin/bash",
+                    args,
+                    shell=False,
                     capture_output=capture_output,
                     text=True,
                     timeout=timeout,

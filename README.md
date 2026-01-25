@@ -54,6 +54,7 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
   3. Environment variables
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
+- **Security First**: Commands executed without shell interpretation to prevent injection attacks
 - **Extensible Architecture**: Built to support additional monitoring checks
 
 ## Diagram
@@ -330,27 +331,29 @@ kuma-sentinel cmdcheck \
 
 **Additional examples**:
 ```bash
-# Check disk space
+# Check service status
 kuma-sentinel cmdcheck \
-  --command "test $(df / | tail -1 | awk '{print $4}') -gt 1000000"
+  --command "systemctl is-active nginx"
 
-# Check service with custom health endpoint
+# Check health endpoint
 kuma-sentinel cmdcheck \
   --command "curl -sf http://localhost:8080/health"
 
-# Check log file for errors (last hour)
+# Check log file for errors (using failure pattern)
 kuma-sentinel cmdcheck \
-  --command "grep -q 'ERROR\|CRITICAL' <(journalctl -u myapp --since '1 hour ago')" \
-  --failure-pattern "^$"  # Fail if no errors found is NOT what we want... actually empty means success
+  --command "tail -n 100 /var/log/app.log" \
+  --failure-pattern "ERROR|CRITICAL"
 
 # Database connectivity check
 kuma-sentinel cmdcheck \
-  --command "psql -h db.example.com -U monitoring -d health_check -c 'SELECT 1'"
+  --command "psql -h db.example.com -U monitoring -d health_check -c SELECT 1"
 
 # Custom script execution
 kuma-sentinel cmdcheck \
   --command "/usr/local/bin/custom-health-check.sh"
 ```
+
+**Note**: Commands are executed without shell interpretation for security. Simple commands work great. For complex logic (pipes, operators), wrap your commands in shell scripts. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#command-execution-limitations) for details.
 
 **Result**:
 - ✅ If all checks pass (exit 0) → Uptime Kuma shows UP
@@ -590,6 +593,88 @@ zfspoolstatus:
 ```
 
 See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
+
+## Security
+
+### Command Execution Security
+
+Kuma Sentinel is designed with **security as a core principle**:
+
+- ✅ **No Shell Injection**: Commands are executed without shell interpretation. Shell metacharacters are treated as literal arguments, preventing injection attacks.
+- ✅ **Safe from Chaining**: Semicolons, pipes, operators (`&&`, `||`, etc.) cannot be used to chain commands or inject new ones.
+- ✅ **Safe Configuration**: Configuration files (YAML) are the only input mechanism for commands - never accept commands from untrusted sources.
+
+**Example - What's Protected:**
+
+```yaml
+# ✅ Shell metacharacters are safely rejected (treated as literal arguments)
+commands:
+  - command: "systemctl is-active nginx; rm -rf /"  # Semicolon is literal, not a separator
+```
+
+With shell=False, the semicolon is passed as a literal argument to systemctl, which rejects it as invalid.
+
+**⚠️ What's NOT Protected:**
+
+If an attacker gains write access to the config file, they can replace the entire command:
+```yaml
+# ❌ This IS a threat if config file is compromised
+commands:
+  - command: "rm -rf /"  # Attacker can replace command directly
+```
+
+**Real Protection**: Secure your configuration files with proper file permissions (see "Configuration File Permissions" below).
+
+### Running as Non-Root
+
+⚠️ **Always run Kuma Sentinel as a dedicated, low-privilege user**:
+
+```bash
+useradd -r -s /bin/false kuma-sentinel
+chown kuma-sentinel:kuma-sentinel /etc/kuma-sentinel/config.yaml
+chmod 600 /etc/kuma-sentinel/config.yaml
+```
+
+If specific commands require elevated privileges, use sudo with **minimal, read-only access**:
+
+```bash
+# In sudoers (restrict to specific commands)
+kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl is-active
+kuma-sentinel ALL=(root) NOPASSWD: /usr/sbin/zpool status
+```
+
+### Configuration File Permissions
+
+Always restrict access to configuration files:
+
+```bash
+chmod 600 /etc/kuma-sentinel/config.yaml
+chown kuma-sentinel:kuma-sentinel /etc/kuma-sentinel/config.yaml
+```
+
+Configuration files may contain authentication tokens - they should only be readable by the service user.
+
+### Handling Sensitive Data
+
+Command output is truncated to **500 characters** before being sent to Uptime Kuma. However:
+
+- ⚠️ **Avoid outputting secrets** (passwords, API keys, tokens) in command output
+- ⚠️ **Sanitize scripts** to prevent leaking sensitive information
+- ⚠️ **Use pattern matching** instead of output capture when possible
+
+Example - Log errors without leaking stack traces:
+
+```bash
+# ❌ BAD: May leak implementation details
+curl http://api.internal:8080/health
+
+# ✅ GOOD: Pattern match on success marker only
+curl -s http://api.internal:8080/health | grep -q '"status":"ok"'
+```
+
+### Further Reading
+
+For comprehensive security guidance, see [CONFIGURATION_GUIDE.md - Security Considerations](CONFIGURATION_GUIDE.md#security-considerations)
 
 ### Authentication Tokens (Environment Variables Only)
 

@@ -334,7 +334,7 @@ def test_portscan_config_validation_success(monkeypatch, tmp_path):
     """Test validation succeeds with all required fields."""
     monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "heartbeat_token_123")
     monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "command_token_456")
-    
+
     # Create YAML config with IP ranges since env vars only support tokens
     config_file = tmp_path / "config.yaml"
     yaml_content = {

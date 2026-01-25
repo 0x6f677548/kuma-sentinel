@@ -29,7 +29,11 @@ heartbeat:
 # === COMMAND CHECK CONFIGURATION ===
 # Execute arbitrary shell commands and monitor the results
 # Commands are always stored as a list, even for single commands.
-# Each command can override defaults for timeout, exit code expectations, and patterns.
+# 
+# IMPORTANT SECURITY NOTE:
+# Commands are executed WITHOUT shell interpretation (shell=False) to prevent
+# command injection attacks. This means shell metacharacters are NOT evaluated.
+# See CONFIGURATION_GUIDE.md for supported command syntax and migration guide.
 
 cmdcheck:
   uptime_kuma:
@@ -38,26 +42,45 @@ cmdcheck:
   
   # Commands list (required) - always a list, even for single command
   commands:
-    # Single command example:
+    # ✅ SUPPORTED: Simple command with arguments
     - command: "systemctl is-active nginx"
       name: "nginx_status"
       timeout: 10
       expect_exit_code: 0
       capture_output: true
-      success_pattern: null
-      failure_pattern: null
     
-    # Multiple commands example (uncomment to use):
-    # - command: "systemctl is-active postgresql"
-    #   name: "database_status"
-    #   timeout: 15
-    #   expect_exit_code: 0
-    # - command: "test -f /var/run/app.pid"
-    #   name: "app_running"
-    #   timeout: 5
+    # ✅ SUPPORTED: Command with quoted arguments
+    - command: "grep -i error /var/log/nginx/error.log"
+      name: "nginx_errors"
+      timeout: 10
+    
+    # ✅ SUPPORTED: File existence test
+    - command: "test -f /var/run/app.pid"
+      name: "app_pid_file"
+      timeout: 5
+      expect_exit_code: 0
+    
+    # ✅ SUPPORTED: Pattern matching on output
+    # - command: "systemctl status nginx"
+    #   name: "nginx_detailed"
+    #   failure_pattern: "failed|error"
+    #   success_pattern: "active.*running"
+    #   timeout: 10
+    
+    # ❌ NOT SUPPORTED: Shell pipes, operators, substitution
+    # ❌ DON'T USE: "systemctl is-active nginx | grep active"
+    # ❌ DON'T USE: "systemctl is-active nginx && echo 'OK'"
+    # ❌ DON'T USE: "echo $(whoami)"
+    # See CONFIGURATION_GUIDE.md for how to handle complex commands
   
-  # Default timeout for all commands (used if not specified per-command)
+  # Default timeout for all commands in seconds (used if not specified per-command)
   timeout: 30
+  
+  # Default expected exit code (used if not specified per-command)
+  expect_exit_code: 0
+  
+  # Default output capture (last 500 chars sent to Uptime Kuma)
+  capture_output: true
   
   # Default expected exit code for success (used if not specified per-command)
   expect_exit_code: 0

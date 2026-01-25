@@ -55,7 +55,7 @@ def send_push(
     try:
         encoded_msg = url_encode(message)
         push_url = f"{uptime_kuma_url}/{push_token}?status={status}&msg={encoded_msg}"
-        
+
         # Append ping parameter if provided (for command-specific result alerts)
         if ping_ms is not None:
             push_url += f"&ping={ping_ms}"

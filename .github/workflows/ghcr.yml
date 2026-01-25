@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 # set the run-name 
-run-name: ${{ github.ref_name }} -> build_and_pub_to_ghcr ( ${{ github.run_attempt }} )
+run-name: ${{ github.ref_name }} -> ghcr ( ${{ github.run_attempt }} )
 
 # Defines two custom environment variables for the workflow. 
 # These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
@@ -18,8 +18,8 @@ env:
             
 jobs:
     
-  build_and_pub_to_ghcr:
-    name: build_and_pub_to_ghcr
+  ghcr:
+    name: ghcr
     runs-on: ubuntu-latest
     permissions:
       contents: write

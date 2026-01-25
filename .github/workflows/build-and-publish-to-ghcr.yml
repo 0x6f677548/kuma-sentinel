@@ -1,6 +1,6 @@
 # yamllint disable rule:line-length
 ---
-name: build_and_pub_to_ghcr
+name: ghcr
 
 on:
   release:

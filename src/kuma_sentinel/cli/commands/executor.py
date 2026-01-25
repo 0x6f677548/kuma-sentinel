@@ -10,7 +10,7 @@ import click
 
 from kuma_sentinel.cli.commands.base import Command
 from kuma_sentinel.core.config.base import ConfigBase
-from kuma_sentinel.core.logger import setup_logging
+from kuma_sentinel.core.logger import setup_default_logging, setup_logging
 from kuma_sentinel.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
 
 
@@ -30,6 +30,10 @@ class CommandExecutor(Command):
     _help_text: str = ""
     _checker_class: Any = None
     _config_class: Any = None
+
+    def __init__(self):
+        """Initialize the command executor with default logging."""
+        setup_default_logging()
 
     def _add_common_arguments(self, base_command: click.Command) -> click.Command:
         """Add common positional arguments to a Click command.
@@ -185,25 +189,15 @@ class CommandExecutor(Command):
                         config_file, logger=logger, ignore_warning=ignore_perms
                     )
                 except RuntimeError as e:
-                    click.secho(str(e), fg="red", err=True)
+                    logger.error(str(e))
                     sys.exit(1)
 
                 try:
-                    click.secho(
-                        f"📂 Loading YAML config file: {config_file}",
-                        fg="cyan",
-                    )
+                    logger.info(f"📂 Loading YAML config file: {config_file}")
                     self.config.load_from_yaml(config_file)
-                    click.secho(
-                        "✅ Config file loaded successfully",
-                        fg="green",
-                    )
+                    logger.info("✅ Config file loaded successfully")
                 except Exception as e:
-                    click.secho(
-                        f"Error loading config file: {e}",
-                        fg="red",
-                        err=True,
-                    )
+                    logger.error(f"Error loading config file: {e}")
                     sys.exit(1)
 
         # Step 4: Load from command-line args (highest precedence)
@@ -220,12 +214,10 @@ class CommandExecutor(Command):
         try:
             self.config.validate()
         except ValueError as e:
-            click.secho(f"Configuration error: {e}", fg="red", err=True)
-            click.secho(
-                f"\nUse 'kuma-sentinel {command_name} --help' for usage information",
-                fg="yellow",
-                err=True,
-            )
+            from kuma_sentinel.core.logger import get_logger
+            logger = get_logger()
+            logger.error(f"Configuration error: {e}")
+            logger.info(f"Use 'kuma-sentinel {command_name} --help' for usage information")
             sys.exit(1)
 
         return self.config

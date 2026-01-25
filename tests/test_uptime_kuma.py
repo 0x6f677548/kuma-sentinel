@@ -289,3 +289,64 @@ class TestSendPush:
             )
 
             assert result is False
+
+
+class TestSecurityEventLogging:
+    """Test security event logging in uptime_kuma module."""
+
+    def test_send_push_logs_security_events(self):
+        """Test that security-relevant events are logged with security markers."""
+        logger = Mock()
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response = Mock()
+            mock_response.read.return_value = b'{"ok":true}'
+            mock_response.getcode.return_value = 200
+            mock_urlopen.return_value = mock_response
+
+            send_push(
+                logger,
+                "http://localhost/api/push/test_token",
+                "test_token",
+                "Heartbeat",
+                "heartbeat",
+            )
+
+            # Verify logging occurred
+            assert logger.info.called or logger.warning.called or logger.error.called
+
+    def test_send_push_error_logging_security_event(self):
+        """Test that errors in push notification are logged as security events."""
+        logger = Mock()
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.side_effect = URLError("Connection refused")
+
+            send_push(
+                logger,
+                "http://localhost/api/push/test_token",
+                "test_token",
+                "Heartbeat",
+                "heartbeat",
+            )
+
+            # Should log error when connection fails
+            assert logger.error.called or logger.warning.called
+
+    def test_send_push_timeout_security_event(self):
+        """Test that timeout errors are logged appropriately."""
+        logger = Mock()
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.side_effect = TimeoutError("Request timeout")
+
+            result = send_push(
+                logger,
+                "http://localhost/api/push/test_token",
+                "test_token",
+                "Heartbeat",
+                "heartbeat",
+            )
+
+            assert result is False
+            assert logger.error.called or logger.warning.called

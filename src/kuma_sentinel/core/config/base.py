@@ -381,9 +381,16 @@ class ConfigBase(ABC):
                 )
 
                 if ignore_warning:
-                    # Development/testing mode: just warn
                     if logger:
+                        from kuma_sentinel.core.logger import log_security_event
+
                         logger.warning(f"⚠️  {error_msg}")
+                        log_security_event(
+                            logger,
+                            "permission_bypass",
+                            f"Config file permissions check bypassed for {file_path} (mode {oct(mode)})",
+                            level="warning",
+                        )
                     return False
                 else:
                     # Production mode: fail hard

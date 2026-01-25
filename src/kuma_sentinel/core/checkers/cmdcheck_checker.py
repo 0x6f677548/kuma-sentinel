@@ -8,6 +8,7 @@ from logging import Logger
 from typing import Any, Dict, List, Optional, Tuple
 
 from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_sentinel.core.logger import log_security_event
 from kuma_sentinel.core.models import CheckResult
 from kuma_sentinel.core.utils.sanitizer import DataSanitizer
 
@@ -577,20 +578,22 @@ class CmdCheckChecker(Checker):
             # Some tools are inherently dangerous (empty string in dangerous_args)
             # These don't require specific arguments to trigger a warning
             if "" in dangerous_args:
-                self.logger.warning(
-                    f"⚠️  Command '{name}' {warning_msg}: "
-                    f"{tool_name} detected. "
-                    f"Ensure this is authorized and runs with read-only intent."
+                log_security_event(
+                    self.logger,
+                    "dangerous_command_warning",
+                    f"Command '{name}' contains dangerous tool '{tool_name}': {warning_msg}. "
+                    f"Ensure this is authorized and runs with read-only intent.",
                 )
                 break  # Only warn once per tool
 
             # Check if any dangerous argument is used with this tool
             for dangerous_arg in dangerous_args:
                 if dangerous_arg in command_lower:
-                    self.logger.warning(
-                        f"⚠️  Command '{name}' {warning_msg}: "
-                        f"{tool_name} {dangerous_arg} detected. "
-                        f"Ensure this is authorized and runs with read-only intent."
+                    log_security_event(
+                        self.logger,
+                        "dangerous_command_warning",
+                        f"Command '{name}' contains dangerous pattern '{tool_name} {dangerous_arg}': {warning_msg}. "
+                        f"Ensure this is authorized and runs with read-only intent.",
                     )
                     break  # Only warn once per tool
 

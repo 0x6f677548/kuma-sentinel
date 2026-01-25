@@ -420,3 +420,327 @@ def test_portscan_config_yaml_invalid_format():
         assert "Failed to parse config file" in str(exc_info.value)
     finally:
         os.unlink(config_file)
+
+class TestPortRangeValidation:
+    """Test port range validation in PortscanConfig."""
+
+    def test_single_valid_port(self):
+        """Test single valid port numbers."""
+        PortscanConfig.validate_port_range("80")
+        PortscanConfig.validate_port_range("443")
+        PortscanConfig.validate_port_range("22")
+        PortscanConfig.validate_port_range("1")
+        PortscanConfig.validate_port_range("65535")
+
+    def test_valid_port_range(self):
+        """Test valid port ranges."""
+        PortscanConfig.validate_port_range("1-1000")
+        PortscanConfig.validate_port_range("20-25")
+        PortscanConfig.validate_port_range("8000-9000")
+        PortscanConfig.validate_port_range("443-445")
+
+    def test_comma_separated_ports(self):
+        """Test comma-separated ports."""
+        PortscanConfig.validate_port_range("22,80,443")
+        PortscanConfig.validate_port_range("20,21,22,23,25")
+        PortscanConfig.validate_port_range("80,443,8080,8443")
+
+    def test_mixed_ports_and_ranges(self):
+        """Test mixed single ports and ranges."""
+        PortscanConfig.validate_port_range("20-25,80,443")
+        PortscanConfig.validate_port_range("22,80,443-445,3000-3005")
+        PortscanConfig.validate_port_range("1-1000,5000-6000,8000-9000")
+
+    def test_empty_port_spec(self):
+        """Test empty port specification."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("")
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_port_too_low(self):
+        """Test port number below 1."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("0")
+        assert "out of range" in str(exc_info.value) or "between 1 and 65535" in str(
+            exc_info.value
+        )
+
+    def test_port_too_high(self):
+        """Test port number above 65535."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("65536")
+        assert "out of range" in str(exc_info.value) or "between 1 and 65535" in str(
+            exc_info.value
+        )
+
+    def test_range_start_too_high(self):
+        """Test range where start port is too high."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("65536-65540")
+        assert "out of range" in str(exc_info.value)
+
+    def test_range_end_too_high(self):
+        """Test range where end port is too high."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("8000-65536")
+        assert "out of range" in str(exc_info.value)
+
+    def test_range_reversed(self):
+        """Test range where start > end."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("443-80")
+        assert "start port" in str(exc_info.value).lower() and "end port" in str(
+            exc_info.value
+        ).lower()
+
+    def test_invalid_format_letters(self):
+        """Test invalid format with letters."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("http")
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_invalid_format_special_chars(self):
+        """Test invalid format with special characters."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("80;443")
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_invalid_format_spaces(self):
+        """Test invalid format with spaces."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("80, 443")
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_invalid_format_extra_dashes(self):
+        """Test invalid format with extra dashes."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("80-90-100")
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_range_with_non_numeric(self):
+        """Test range with non-numeric values."""
+        with pytest.raises(ValueError) as exc_info:
+            PortscanConfig.validate_port_range("80-abc")
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_nmap_default_range(self):
+        """Test nmap default range."""
+        PortscanConfig.validate_port_range("1-1000")
+
+    def test_common_port_combinations(self):
+        """Test common port combinations."""
+        PortscanConfig.validate_port_range("22,80,443,3000,8000-9000")
+        PortscanConfig.validate_port_range("1-65535")
+
+    def test_portscan_config_with_valid_ports(self):
+        """Test PortscanConfig validation with valid ports."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "token1"
+        config.command_token = "token2"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+        config.portscan_nmap_ports = "1-1000"
+
+        # Should not raise
+        config.validate()
+
+    def test_portscan_config_with_invalid_ports(self):
+        """Test PortscanConfig validation with invalid ports."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "token1"
+        config.command_token = "token2"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+        config.portscan_nmap_ports = "65536"
+
+        with pytest.raises(ValueError) as exc_info:
+            config.validate()
+        assert "Invalid port specification" in str(exc_info.value)
+
+    def test_portscan_config_with_port_out_of_range(self):
+        """Test PortscanConfig with out-of-range port."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "token1"
+        config.command_token = "token2"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+        config.portscan_nmap_ports = "80-65540"
+
+        with pytest.raises(ValueError) as exc_info:
+            config.validate()
+        assert "Invalid port" in str(exc_info.value)
+
+    def test_portscan_config_with_complex_ports(self):
+        """Test PortscanConfig with complex port combinations."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "token1"
+        config.command_token = "token2"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+        config.portscan_nmap_ports = "20-25,80,443-445,3000,8000-9000"
+
+        # Should not raise
+        config.validate()
+
+
+class TestConfigPrecedence:
+    """Test configuration loading precedence: defaults -> env -> YAML -> args."""
+
+    def test_yaml_preserved_when_click_empty_tuple_provided(self):
+        """Test that YAML values are not overridden by Click's empty tuple from multiple=True.
+
+        This is a regression test for the bug where Click's multiple=True option
+        returns an empty tuple () when no arguments are provided, which was
+        overriding YAML configuration values.
+
+        Loading order should be:
+        1. Defaults (set in __init__)
+        2. Environment variables
+        3. YAML file (highest precedence from non-CLI sources)
+        4. CLI arguments (highest overall precedence, but empty tuples should not count)
+        """
+        # Create config and load from YAML
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_ip_ranges == ["192.168.100.110-199"]
+        assert config.portscan_exclude == []
+
+        # Simulate Click's behavior when multiple=True option not provided
+        # Click returns empty tuple () for unprovided multiple options
+        args_from_click = {
+            "config": "test.config.yaml",
+            "log_file": None,
+            "uptime_kuma_url": None,
+            "heartbeat_token": None,
+            "token": None,
+            "ip_ranges": (),  # Empty tuple from Click's multiple=True
+            "exclude": (),  # Empty tuple from Click's multiple=True
+            "ports": None,
+            "timing": None,
+        }
+
+        # Load from args - should NOT override YAML values with empty tuples
+        config.load_from_args(args_from_click)
+
+        # YAML values should be preserved
+        assert config.portscan_ip_ranges == [
+            "192.168.100.110-199"
+        ], "ip_ranges from YAML should not be overridden by empty tuple from CLI"
+        assert (
+            config.portscan_exclude == []
+        ), "exclude from YAML should not be overridden by empty tuple from CLI"
+
+    def test_yaml_overridden_when_click_provided_values(self):
+        """Test that CLI arguments DO override YAML when values are provided."""
+        # Create config and load from YAML
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_ip_ranges == ["192.168.100.110-199"]
+
+        # Simulate Click providing actual arguments (as tuples)
+        args_from_click = {
+            "config": "test.config.yaml",
+            "log_file": None,
+            "uptime_kuma_url": None,
+            "heartbeat_token": None,
+            "token": None,
+            "ip_ranges": ("10.0.0.0/8",),  # Provided tuple from CLI
+            "exclude": ("10.0.0.1",),  # Provided tuple from CLI
+            "ports": None,
+            "timing": None,
+        }
+
+        # Load from args - SHOULD override YAML values when provided
+        config.load_from_args(args_from_click)
+
+        # CLI values should override YAML
+        assert config.portscan_ip_ranges == [
+            "10.0.0.0/8"
+        ], "ip_ranges should be overridden by CLI arguments when provided"
+        assert config.portscan_exclude == [
+            "10.0.0.1"
+        ], "exclude should be overridden by CLI arguments when provided"
+
+    def test_timing_string_preserved_when_click_not_provided(self):
+        """Test that string values from YAML are preserved when Click provides None."""
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_nmap_timing == "T5"
+
+        # Simulate Click not providing timing argument
+        args_from_click = {
+            "timing": None,
+            "ports": None,
+            "ip_ranges": (),
+            "exclude": (),
+        }
+
+        config.load_from_args(args_from_click)
+
+        # YAML timing should be preserved
+        assert (
+            config.portscan_nmap_timing == "T5"
+        ), "timing from YAML should be preserved when CLI provides None"
+
+    def test_string_value_overridden_when_provided(self):
+        """Test that string CLI arguments override YAML values."""
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_nmap_timing == "T5"
+
+        # Simulate Click providing timing argument
+        args_from_click = {
+            "timing": "T0",
+            "ports": None,
+            "ip_ranges": (),
+            "exclude": (),
+        }
+
+        config.load_from_args(args_from_click)
+
+        # CLI timing should override YAML
+        assert (
+            config.portscan_nmap_timing == "T0"
+        ), "timing should be overridden by CLI arguments when provided"
+
+    def test_ports_string_preserved_when_click_not_provided(self):
+        """Test that comma-separated string ports from YAML are preserved."""
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_nmap_ports == "1-1000"
+
+        args_from_click = {
+            "ports": None,
+            "timing": None,
+            "ip_ranges": (),
+            "exclude": (),
+        }
+
+        config.load_from_args(args_from_click)
+
+        # YAML ports should be preserved
+        assert (
+            config.portscan_nmap_ports == "1-1000"
+        ), "ports from YAML should be preserved when CLI provides None"
+
+    def test_ports_string_overridden_when_provided(self):
+        """Test that CLI ports argument overrides YAML."""
+        config = PortscanConfig()
+        config.load_from_yaml("test.config.yaml")
+        assert config.portscan_nmap_ports == "1-1000"
+
+        args_from_click = {
+            "ports": "22,80,443",
+            "timing": None,
+            "ip_ranges": (),
+            "exclude": (),
+        }
+
+        config.load_from_args(args_from_click)
+
+        # CLI ports should override YAML
+        assert (
+            config.portscan_nmap_ports == "22,80,443"
+        ), "ports should be overridden by CLI arguments when provided"
+
+        config.validate()

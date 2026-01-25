@@ -138,6 +138,12 @@ class ConfigBase(ABC):
 
         if not self.uptime_kuma_url:
             errors.append("Uptime Kuma URL not provided")
+        else:
+            # Validate URL format
+            try:
+                self.validate_uptime_kuma_url(self.uptime_kuma_url)
+            except ValueError as e:
+                errors.append(f"Invalid Uptime Kuma URL: {str(e)}")
 
         if not self.heartbeat_token:
             errors.append("Heartbeat push token not provided")
@@ -316,6 +322,48 @@ class ConfigBase(ABC):
             if not ignore_warning:
                 raise RuntimeError(error_msg) from e
             return False
+
+    @staticmethod
+    def validate_uptime_kuma_url(url: str) -> None:
+        """Validate Uptime Kuma API URL format.
+
+        Args:
+            url: URL string to validate
+
+        Raises:
+            ValueError: If URL format is invalid
+        """
+        from urllib.parse import urlparse
+
+        if not url:
+            raise ValueError("Uptime Kuma URL cannot be empty")
+
+        try:
+            parsed = urlparse(url)
+
+            # Check scheme
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(
+                    f"URL scheme must be 'http' or 'https', got '{parsed.scheme}'"
+                )
+
+            # Check netloc (domain/host)
+            if not parsed.netloc:
+                raise ValueError("URL must include a hostname (e.g., http://uptimekuma:3001)")
+
+            # Check for common issues
+            if " " in url:
+                raise ValueError("URL contains spaces")
+
+            if url.endswith("/"):
+                raise ValueError("URL should not end with trailing slash")
+
+            return None
+
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Invalid URL format: {str(e)}") from e
 
     @abstractmethod
     def get_summary(self, mask_tokens: bool = True) -> dict:

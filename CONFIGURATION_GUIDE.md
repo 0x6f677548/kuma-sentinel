@@ -1540,6 +1540,179 @@ kuma-sentinel portscan
 
 ---
 
+## Input Validation
+
+Kuma Sentinel performs comprehensive validation on all configuration inputs to prevent invalid configurations and security issues. This section describes the validation rules for key configuration fields.
+
+### Uptime Kuma URL Validation
+
+The `uptime_kuma.url` field is validated to ensure it points to a valid, secure Uptime Kuma instance.
+
+**Validation Rules:**
+- **Scheme:** Must be `http` or `https` (no `ftp://`, `file://`, etc.)
+- **Hostname:** Must be present (e.g., `localhost`, `uptimekuma`, `192.168.1.1`)
+- **Format:** No spaces allowed
+- **Trailing Slashes:** Not allowed (e.g., `http://uptimekuma:3001/` is invalid, use `http://uptimekuma:3001` instead)
+
+**Valid Examples:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  url: https://monitoring.example.com:8080/api/push
+  url: http://192.168.1.1:3001/api/push
+  url: https://uptimekuma.example.com
+```
+
+**Invalid Examples and Errors:**
+```yaml
+uptime_kuma:
+  url: ftp://uptimekuma:3001/api/push
+  # Error: URL scheme must be 'http' or 'https'
+
+uptime_kuma:
+  url: http://
+  # Error: URL must include a hostname
+
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push/
+  # Error: URL must not have a trailing slash
+
+uptime_kuma:
+  url: http://uptime kuma:3001
+  # Error: URL contains invalid characters (spaces)
+```
+
+### Port Range Validation (portscan command)
+
+The `portscan.portscan_nmap_ports` field accepts multiple formats for specifying ports to scan.
+
+**Supported Formats:**
+
+1. **Single Port:**
+   ```yaml
+   portscan:
+     portscan_nmap_ports: "80"
+     portscan_nmap_ports: "443"
+     portscan_nmap_ports: "8080"
+   ```
+
+2. **Port Range:**
+   ```yaml
+   portscan:
+     portscan_nmap_ports: "1-1000"        # Ports 1 through 1000
+     portscan_nmap_ports: "20-25"         # Common SMTP range
+     portscan_nmap_ports: "8000-9000"     # Web services range
+   ```
+
+3. **Multiple Ports (Comma-separated):**
+   ```yaml
+   portscan:
+     portscan_nmap_ports: "22,80,443"     # SSH, HTTP, HTTPS
+     portscan_nmap_ports: "3306,5432"     # MySQL, PostgreSQL
+   ```
+
+4. **Mixed Format:**
+   ```yaml
+   portscan:
+     portscan_nmap_ports: "22,80,443-445,8000-8100"
+     # SSH (22), HTTP (80), HTTPS/SMB (443-445), Custom web (8000-8100)
+   ```
+
+5. **Common Presets:**
+   ```yaml
+   portscan:
+     portscan_nmap_ports: "1-65535"       # All ports (slow!)
+     portscan_nmap_ports: "1-1000"        # Common ports
+     portscan_nmap_ports: "20-25,53,80,110,143,443,465,993,995"  # Common services
+   ```
+
+**Validation Rules:**
+- **Port Range:** Each port must be between 1 and 65535
+- **Range Format:** Must be in format `start-end` where `start < end`
+- **No Spaces:** Port specifications cannot contain spaces
+- **Numeric Values:** All port numbers must be numeric (no letters or special characters)
+- **Range Direction:** Cannot have reversed ranges (e.g., `1000-100` is invalid)
+
+**Valid Examples:**
+```yaml
+portscan:
+  portscan_nmap_ports: "22"               # Single port
+  portscan_nmap_ports: "1-1000"           # Range
+  portscan_nmap_ports: "80,443"           # Multiple ports
+  portscan_nmap_ports: "22,80,443-445"    # Mixed
+```
+
+**Invalid Examples and Errors:**
+```yaml
+portscan:
+  portscan_nmap_ports: "0"
+  # Error: Port must be between 1 and 65535
+
+portscan:
+  portscan_nmap_ports: "65536"
+  # Error: Port must be between 1 and 65535
+
+portscan:
+  portscan_nmap_ports: "1000-100"
+  # Error: Port range start must be less than end (range inverted)
+
+portscan:
+  portscan_nmap_ports: "80 443"
+  # Error: Port specification contains spaces
+
+portscan:
+  portscan_nmap_ports: "80-"
+  # Error: Invalid port specification (incomplete range)
+
+portscan:
+  portscan_nmap_ports: "ssh,http,https"
+  # Error: Port specification must contain numeric values only
+```
+
+### Configuration Validation on Startup
+
+All configuration is validated when you start Kuma Sentinel. If validation fails, the application will:
+
+1. **Log a detailed error message** showing exactly what failed
+2. **Refuse to start** the monitoring service
+3. **Exit with an error code** (exit code 1)
+
+**Example error output:**
+```
+ERROR: Configuration validation failed
+  - Invalid Uptime Kuma URL: URL scheme must be 'http' or 'https'
+  - Invalid port specification in portscan: Port must be between 1 and 65535
+```
+
+### Handling Validation Errors
+
+**If you get a validation error:**
+
+1. **Read the error message** - It will tell you exactly what's wrong
+2. **Check the CONFIGURATION_GUIDE.md** - See valid examples for that field
+3. **Validate URL format** - Ensure scheme is http/https, hostname is present, no trailing slashes
+4. **Validate port ranges** - Ensure all ports are 1-65535 and ranges are in format start-end
+5. **Test with dry-run** - Use `--log-level DEBUG` to see configuration details
+
+**Example debug workflow:**
+```bash
+# Check if URL is valid
+# - Must start with http:// or https://
+# - Must have a hostname
+# - No trailing slashes
+
+# Check if ports are valid
+# - Single: 1-65535
+# - Range: start-end (start < end)
+# - Multiple: comma-separated, no spaces
+# - Examples: "22", "80-443", "22,80,443-445"
+
+# Use verbose logging to see what's being validated
+kuma-sentinel portscan --log-level DEBUG --config config.yaml
+```
+
+---
+
 ## Testing Your Configuration
 
 ### Validate YAML syntax

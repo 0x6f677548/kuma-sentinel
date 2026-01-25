@@ -82,6 +82,77 @@ class PortscanConfig(ConfigBase):
         )
         return mappings
 
+    @staticmethod
+    def _validate_port_part(part: str) -> None:
+        """Validate a single port or port range.
+
+        Args:
+            part: A port (e.g., "80") or range (e.g., "1-1000")
+
+        Raises:
+            ValueError: If the port or range is invalid
+        """
+        if "-" in part:
+            # It's a range
+            start_str, end_str = part.split("-")
+            start = int(start_str)
+            end = int(end_str)
+
+            if start < 1 or start > 65535:
+                raise ValueError(
+                    f"Invalid port in range '{part}': start port {start} out of range (1-65535)"
+                )
+            if end < 1 or end > 65535:
+                raise ValueError(
+                    f"Invalid port in range '{part}': end port {end} out of range (1-65535)"
+                )
+            if start > end:
+                raise ValueError(
+                    f"Invalid port range '{part}': start port ({start}) > end port ({end})"
+                )
+        else:
+            # Single port
+            port = int(part)
+            if port < 1 or port > 65535:
+                raise ValueError(
+                    f"Invalid port number: {port}. Must be between 1 and 65535"
+                )
+
+    @staticmethod
+    def validate_port_range(port_spec: str) -> None:
+        """Validate port range specification.
+
+        Allows:
+        - Single port: 80, 443
+        - Range: 1-1000, 8000-9000
+        - Comma-separated: 22,80,443 or 20-25,80,443-445
+
+        Args:
+            port_spec: Port specification string
+
+        Raises:
+            ValueError: If port specification is invalid
+        """
+        import re
+
+        if not port_spec:
+            raise ValueError("Port specification cannot be empty")
+
+        # Validate format
+        pattern = r"^(\d+(-\d+)?)(,\d+(-\d+)?)*$"
+        if not re.match(pattern, port_spec):
+            raise ValueError(
+                f"Invalid port specification: '{port_spec}'. "
+                f"Use format: 80 or 1-1000 or 22,80,443 or 20-25,80,443-445"
+            )
+
+        # Validate individual ports and ranges
+        parts = port_spec.split(",")
+        for part in parts:
+            PortscanConfig._validate_port_part(part)
+
+        return None
+
     def validate(self):
         """Validate portscan configuration."""
         # Validate shared config first (raises if invalid)
@@ -97,6 +168,12 @@ class PortscanConfig(ConfigBase):
             errors.append(
                 f"Invalid timing level '{self.portscan_nmap_timing}'. Must be T0-T5"
             )
+
+        # Validate port range
+        try:
+            self.validate_port_range(self.portscan_nmap_ports)
+        except ValueError as e:
+            errors.append(f"Invalid port specification: {str(e)}")
 
         if errors:
             raise ValueError(

@@ -47,11 +47,11 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
 - **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
-- **Flexible Configuration**: Support for YAML config files, environment variables, and CLI arguments with clear priority
+- **Flexible Configuration**: Support for YAML config files, environment variables for tokens only, and CLI arguments with clear priority
 - **Multi-Source Configuration**:
   1. Command-line arguments (highest priority)
   2. YAML config file
-  3. Environment variables
+  3. Token environment variables only (authentication tokens only)
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
 - **Security First**: Commands executed without shell interpretation to prevent injection attacks

@@ -898,7 +898,9 @@ class TestGetLatestSnapshotAgeParsing:
         logger.error.assert_called()
         # Verify specific error about timestamp parsing
         error_calls = [call[0][0] for call in logger.error.call_args_list]
-        assert any("Failed to parse snapshot timestamp" in str(call) for call in error_calls)
+        assert any(
+            "Failed to parse snapshot timestamp" in str(call) for call in error_calls
+        )
 
     @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_missing_endtime(self, mock_run):

@@ -1228,7 +1228,9 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+        with patch(
+            "kuma_sentinel.core.checkers.base.HeartbeatService"
+        ) as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1248,7 +1250,9 @@ class TestCheckerBaseClass:
                 returned_result = checker.execute_with_heartbeat()
 
                 # Verify heartbeat was called
-                assert mock_heartbeat.send_message.call_count >= 2  # Start and end messages
+                assert (
+                    mock_heartbeat.send_message.call_count >= 2
+                )  # Start and end messages
                 mock_heartbeat.start.assert_called_once()
                 mock_heartbeat.stop.assert_called_once()
                 assert returned_result == result
@@ -1286,7 +1290,9 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+        with patch(
+            "kuma_sentinel.core.checkers.base.HeartbeatService"
+        ) as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1316,7 +1322,9 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+        with patch(
+            "kuma_sentinel.core.checkers.base.HeartbeatService"
+        ) as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1346,7 +1354,9 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+        with patch(
+            "kuma_sentinel.core.checkers.base.HeartbeatService"
+        ) as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1362,7 +1372,7 @@ class TestCheckerBaseClass:
                 )
                 mock_execute.return_value = result
 
-                returned_result = checker.execute_with_heartbeat()
+                checker.execute_with_heartbeat()
 
                 # Verify heartbeat was called with DOWN emoji
                 assert mock_heartbeat.send_message.called

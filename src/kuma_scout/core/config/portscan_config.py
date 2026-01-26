@@ -69,7 +69,7 @@ class PortscanConfig(ConfigBase):
                     yaml_path="portscan.nmap.arguments",
                 ),
                 "command_token": FieldMapping(
-                    env_var="KUMA_SENTINEL_PORTSCAN_TOKEN",
+                    env_var="KUMA_SCOUT_PORTSCAN_TOKEN",
                     arg_key="portscan_token",
                     yaml_path="portscan.uptime_kuma.token",
                 ),

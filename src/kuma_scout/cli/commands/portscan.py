@@ -1,13 +1,13 @@
-"""Port scanning command for kuma sentinel."""
+"""Port scanning command for kuma scout."""
 
 from typing import Dict
 
 import click
 
-from kuma_sentinel.cli.commands import register_command
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.core.checkers.port_checker import PortChecker
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
+from kuma_scout.cli.commands import register_command
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.core.checkers.port_checker import PortChecker
+from kuma_scout.core.config.portscan_config import PortscanConfig
 
 
 @register_command(

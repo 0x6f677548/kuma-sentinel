@@ -1,4 +1,4 @@
-"""Shared data models for sentinel checks."""
+"""Shared data models for scout checks."""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict

@@ -1,16 +1,16 @@
-"""Abstract base class for sentinel checks."""
+"""Abstract base class for scout checks."""
 
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import Optional
 
-from kuma_sentinel.core.config.base import ConfigBase
-from kuma_sentinel.core.heartbeat import HeartbeatService
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.config.base import ConfigBase
+from kuma_scout.core.heartbeat import HeartbeatService
+from kuma_scout.core.models import CheckResult
 
 
 class Checker(ABC):
-    """Base class for all sentinel checks.
+    """Base class for all scout checks.
 
     Subclasses must implement the execute() method to perform the check
     and return a CheckResult. Heartbeat support is built-in and can be
@@ -130,13 +130,13 @@ class Checker(ABC):
 
             return result
         except TimeoutError as e:
-            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            from kuma_scout.core.utils.sanitizer import DataSanitizer
 
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(f"❌ {self.name} check timed out: {sanitized_error}")
             raise
         except Exception as e:
-            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            from kuma_scout.core.utils.sanitizer import DataSanitizer
 
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(

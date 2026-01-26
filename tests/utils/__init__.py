@@ -1,6 +1,6 @@
 """Tests for sensitive data sanitization."""
 
-from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.utils.sanitizer import DataSanitizer
 
 
 class TestDataSanitizer:
@@ -201,14 +201,14 @@ class TestCmdCheckSanitizationIntegration:
 
     def test_config_default_sanitization_enabled(self):
         """Test that sanitization is enabled by default in config."""
-        from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+        from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
 
         config = CmdCheckConfig()
         assert config.cmdcheck_sanitize_output is True
 
     def test_config_sanitization_can_be_disabled(self):
         """Test that sanitization can be disabled via config."""
-        from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+        from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
 
         config = CmdCheckConfig()
         config.cmdcheck_sanitize_output = False

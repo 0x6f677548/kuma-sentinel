@@ -3,7 +3,7 @@
 from unittest.mock import Mock, patch
 from urllib.error import URLError
 
-from kuma_sentinel.core.uptime_kuma import send_push, url_encode
+from kuma_scout.core.uptime_kuma import send_push, url_encode
 
 
 class TestUrlEncode:

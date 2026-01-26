@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from kuma_sentinel.core.checkers.base import Checker
-from kuma_sentinel.core.config.base import ConfigBase
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.checkers.base import Checker
+from kuma_scout.core.config.base import ConfigBase
+from kuma_scout.core.models import CheckResult
 
 
 class SimpleTestConfig(ConfigBase):
@@ -211,7 +211,7 @@ logging:
         # Set an environment variable
         import os
 
-        os.environ["KUMA_SENTINEL_HEARTBEAT_TOKEN"] = "test_env_token"
+        os.environ["KUMA_SCOUT_HEARTBEAT_TOKEN"] = "test_env_token"
         try:
             config.load_from_env()
 
@@ -220,7 +220,7 @@ logging:
             call_args = str(logger.debug.call_args_list)
             assert "environment variables" in call_args
         finally:
-            del os.environ["KUMA_SENTINEL_HEARTBEAT_TOKEN"]
+            del os.environ["KUMA_SCOUT_HEARTBEAT_TOKEN"]
 
 
 class TestCheckerHeartbeatLogging:

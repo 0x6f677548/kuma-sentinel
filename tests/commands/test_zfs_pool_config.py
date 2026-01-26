@@ -6,7 +6,7 @@ import tempfile
 import pytest
 import yaml
 
-from kuma_sentinel.core.config.zfs_pool_config import ZfsPoolStatusConfig
+from kuma_scout.core.config.zfs_pool_config import ZfsPoolStatusConfig
 
 
 def test_zfs_pool_config_factory():

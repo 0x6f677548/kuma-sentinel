@@ -5,7 +5,7 @@
 ### 1. Clone and Setup
 
 ```bash
-cd /code/projects/kuma-sentinel
+cd /code/projects/kuma-scout
 ```
 
 ### 2. Install in Development Mode
@@ -21,8 +21,8 @@ This installs:
 ### 3. Verify Installation
 
 ```bash
-kuma-sentinel --version
-kuma-sentinel portscan --help
+kuma-scout --version
+kuma-scout portscan --help
 ```
 
 ## Development Commands
@@ -34,7 +34,7 @@ kuma-sentinel portscan --help
 uv run pytest
 
 # Run with coverage report
-uv run pytest --cov=src/kuma_sentinel
+uv run pytest --cov=src/kuma_scout
 
 # Run specific test file
 uv run pytest tests/test_config.py
@@ -78,15 +78,15 @@ hatch run check         # Run ruff, black, and mypy checks
 uv build
 
 # This creates:
-# - dist/kuma_sentinel-0.1.0-py3-none-any.whl
-# - dist/kuma_sentinel-0.1.0.tar.gz
+# - dist/kuma_scout-0.1.0-py3-none-any.whl
+# - dist/kuma_scout-0.1.0.tar.gz
 ```
 
 ## Project Structure
 
 ```
-kuma-sentinel/
-├── src/kuma_sentinel/
+kuma-scout/
+├── src/kuma_scout/
 │   ├── cli/                    # CLI commands (portscan, kopiasnapshotstatus, etc.)
 │   ├── core/                   # Core monitoring logic
 │   │   ├── config/            # Configuration management (base + command configs)
@@ -113,15 +113,15 @@ kuma-sentinel/
 
 ### Directory Details
 
-**src/kuma_sentinel/cli/** - Click CLI commands
+**src/kuma_scout/cli/** - Click CLI commands
 - Each command implements the `Command` interface
 - Registers CLI options and calls `CommandExecutor`
 
-**src/kuma_sentinel/core/config/** - Configuration management
+**src/kuma_scout/core/config/** - Configuration management
 - `base.py` - `ConfigBase` abstract class and `FieldMapping` declarative system
 - Command-specific configs (e.g., `portscan_config.py`, `kopia_snapshot_config.py`)
 
-**src/kuma_sentinel/core/checkers/** - Monitoring implementations
+**src/kuma_scout/core/checkers/** - Monitoring implementations
 - `base.py` - `Checker` abstract base class
 - Specific checkers (e.g., `port_checker.py`, `kopia_snapshot_checker.py`, `cmdcheck_checker.py`)
 
@@ -144,16 +144,16 @@ The CLI entry point is defined in `pyproject.toml`:
 
 ```
 [project.scripts]
-kuma-sentinel = "kuma_sentinel.cli.app:cli"
+kuma-scout = "kuma_scout.cli.app:cli"
 ```
 
-This creates the `kuma-sentinel` command that calls the `cli()` function in `app.py`.
+This creates the `kuma-scout` command that calls the `cli()` function in `app.py`.
 
 ## Configuration Architecture
 
 ### FieldMapping Design
 
-Configuration values are managed through a declarative `FieldMapping` system in `src/kuma_sentinel/core/config/base.py`:
+Configuration values are managed through a declarative `FieldMapping` system in `src/kuma_scout/core/config/base.py`:
 
 ```python
 @dataclass
@@ -182,7 +182,7 @@ Configuration files use YAML with nested structures:
 
 ```yaml
 logging:
-  log_file: /var/log/kuma-sentinel.log
+  log_file: /var/log/kuma-scout.log
   log_level: INFO
 
 heartbeat:
@@ -221,7 +221,7 @@ kopiasnapshotstatus:
 
 **For detailed Kopia snapshot configuration examples and advanced usage, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)**
 
-This is loaded via the `FieldMapping` system in [src/kuma_sentinel/core/config/kopia_snapshot_config.py](src/kuma_sentinel/core/config/kopia_snapshot_config.py):
+This is loaded via the `FieldMapping` system in [src/kuma_scout/core/config/kopia_snapshot_config.py](src/kuma_scout/core/config/kopia_snapshot_config.py):
 
 ```python
 "kopiasnapshotstatus_snapshots": FieldMapping(
@@ -235,7 +235,7 @@ The checker iterates over snapshots and uses each snapshot's `max_age_hours` or 
 
 ### Adding a New Feature
 
-1. **Implement the feature** in the appropriate module under `src/kuma_sentinel/`
+1. **Implement the feature** in the appropriate module under `src/kuma_scout/`
 2. **Write tests** for the feature in `tests/`
 3. **Run tests** to ensure nothing breaks: `uv run pytest`
 4. **Format code**: `uv run black src/ tests/`
@@ -251,17 +251,17 @@ Edit [pyproject.toml](pyproject.toml) and update the version field in the `[proj
 version = "0.2.0"  # Update this
 ```
 
-You can also update [src/kuma_sentinel/__about__.py](src/kuma_sentinel/__about__.py) for reference in the package.
+You can also update [src/kuma_scout/__about__.py](src/kuma_scout/__about__.py) for reference in the package.
 
 ## Adding a New Command and Checker
 
 ### Architecture Overview
 
-Kuma Sentinel uses a **Command-Driven Registration Pattern** for maximum simplicity and extensibility:
+Kuma Scout uses a **Command-Driven Registration Pattern** for maximum simplicity and extensibility:
 
 1. **Single decorator on the Command class** - Registers the command, checker, and config all at once
-2. **Configuration Class** - Settings management (in `src/kuma_sentinel/core/config/`)
-3. **Checker Class** - Monitoring logic (in `src/kuma_sentinel/core/checkers/`)
+2. **Configuration Class** - Settings management (in `src/kuma_scout/core/config/`)
+3. **Checker Class** - Monitoring logic (in `src/kuma_scout/core/checkers/`)
 4. **Tests** - Unit tests for all components
 
 **Key benefits:**
@@ -273,7 +273,7 @@ Kuma Sentinel uses a **Command-Driven Registration Pattern** for maximum simplic
 
 #### 1. Create the Configuration Class
 
-Create `src/kuma_sentinel/core/config/mycheck_config.py`:
+Create `src/kuma_scout/core/config/mycheck_config.py`:
 
 ```python
 """MyCheck command configuration."""
@@ -309,7 +309,7 @@ class MyCheckConfig(ConfigBase):
                 converter=int,
             ),
             "command_token": FieldMapping(
-                env_var="KUMA_SENTINEL_MYCHECK_TOKEN",
+                env_var="KUMA_SCOUT_MYCHECK_TOKEN",
                 arg_key="mycheck_token",
                 yaml_path="mycheck.uptime_kuma.token",
             ),
@@ -345,15 +345,15 @@ class MyCheckConfig(ConfigBase):
 
 #### 2. Create the Checker Class
 
-Create `src/kuma_sentinel/core/checkers/mycheck_checker.py`:
+Create `src/kuma_scout/core/checkers/mycheck_checker.py`:
 
 ```python
 """MyCheck monitoring implementation."""
 
 from logging import Logger
 
-from kuma_sentinel.core.config.mycheck_config import MyCheckConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.config.mycheck_config import MyCheckConfig
+from kuma_scout.core.models import CheckResult
 
 from .base import Checker
 
@@ -407,15 +407,15 @@ class MyCheckChecker(Checker):
 
 #### 3. Create the Command Class
 
-Create `src/kuma_sentinel/cli/commands/mycheck.py`:
+Create `src/kuma_scout/cli/commands/mycheck.py`:
 
 ```python
 """MyCheck monitoring command."""
 
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.cli.commands import register_command
-from kuma_sentinel.core.checkers.mycheck_checker import MyCheckChecker
-from kuma_sentinel.core.config.mycheck_config import MyCheckConfig
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.cli.commands import register_command
+from kuma_scout.core.checkers.mycheck_checker import MyCheckChecker
+from kuma_scout.core.config.mycheck_config import MyCheckConfig
 
 
 @register_command(
@@ -473,13 +473,13 @@ class MyCheckCommand(CommandExecutor):
 
 The import below is **required** because it triggers the `@register_command()` decorator when the command class is imported.
 
-Update `src/kuma_sentinel/cli/commands/__init__.py`:
+Update `src/kuma_scout/cli/commands/__init__.py`:
 
 ```python
 # Imports trigger registration via the decorator
-from kuma_sentinel.cli.commands.portscan import PortscanCommand  # noqa: E402
-from kuma_sentinel.cli.commands.kopiasnapshotstatus import KopiaSnapshotStatusCommand  # noqa: E402
-from kuma_sentinel.cli.commands.mycheck import MyCheckCommand  # noqa: E402  # Add this
+from kuma_scout.cli.commands.portscan import PortscanCommand  # noqa: E402
+from kuma_scout.cli.commands.kopiasnapshotstatus import KopiaSnapshotStatusCommand  # noqa: E402
+from kuma_scout.cli.commands.mycheck import MyCheckCommand  # noqa: E402  # Add this
 ```
 
 Once this import is added, the `app.py` auto-discovery will automatically find your command!
@@ -494,8 +494,8 @@ Create `tests/checkers/test_mycheck_checker.py`:
 import pytest
 from unittest.mock import MagicMock
 
-from kuma_sentinel.core.checkers.mycheck_checker import MyCheckChecker
-from kuma_sentinel.core.config.mycheck_config import MyCheckConfig
+from kuma_scout.core.checkers.mycheck_checker import MyCheckChecker
+from kuma_scout.core.config.mycheck_config import MyCheckConfig
 
 
 def test_mycheck_execute_success():
@@ -532,7 +532,7 @@ uv run pytest
 uv run pytest tests/checkers/test_mycheck_checker.py -v
 
 # Run with coverage
-uv run pytest --cov=src/kuma_sentinel
+uv run pytest --cov=src/kuma_scout
 
 # Check types
 uv run mypy src/ tests/
@@ -541,7 +541,7 @@ uv run mypy src/ tests/
 hatch run check
 
 # Try the new command
-kuma-sentinel mycheck --help
+kuma-scout mycheck --help
 ```
 
 ### Configuration File Example
@@ -559,7 +559,7 @@ mycheck:
 ### Authentication Token Example
 
 ```bash
-export KUMA_SENTINEL_MYCHECK_TOKEN=your-token
+export KUMA_SCOUT_MYCHECK_TOKEN=your-token
 ```
 
 **Note:** Only authentication tokens (suffixed with `_TOKEN`) are supported via environment variables. All other configuration must use YAML files or CLI arguments.
@@ -583,7 +583,7 @@ Don't forget to update:
 
 ### Import Errors
 
-If you get import errors like `ModuleNotFoundError: No module named 'kuma_sentinel'`:
+If you get import errors like `ModuleNotFoundError: No module named 'kuma_scout'`:
 
 ```bash
 # Ensure package is installed in development mode
@@ -596,7 +596,7 @@ If pytest can't find tests:
 
 ```bash
 # Make sure you're in the project root
-cd /code/projects/kuma-sentinel
+cd /code/projects/kuma-scout
 
 # Run pytest
 uv run pytest
@@ -619,7 +619,7 @@ uv run pytest
 uv sync --all-extras
 
 # Run tests with coverage
-uv run pytest --cov=src/kuma_sentinel --cov-report=html
+uv run pytest --cov=src/kuma_scout --cov-report=html
 
 # Format code
 uv run black src/ tests/

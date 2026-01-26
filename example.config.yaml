@@ -1,9 +1,9 @@
-# Kuma Sentinel Configuration (YAML)
-# This is the main configuration file for kuma-sentinel monitoring agent
+# Kuma Scout Configuration (YAML)
+# This is the main configuration file for kuma-scout monitoring agent
 
 logging:
-  # Log file path (default: /var/log/kuma-sentinel.log)
-  log_file: /var/log/kuma-sentinel.log
+  # Log file path (default: /var/log/kuma-scout.log)
+  log_file: /var/log/kuma-scout.log
   
   # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
   log_level: INFO

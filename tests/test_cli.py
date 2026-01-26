@@ -2,7 +2,7 @@
 
 from click.testing import CliRunner
 
-from kuma_sentinel.cli.app import cli
+from kuma_scout.cli.app import cli
 
 
 def test_cli_version():

@@ -32,7 +32,7 @@ class ZfsPoolStatusConfig(ConfigBase):
                     converter=int,
                 ),
                 "command_token": FieldMapping(
-                    env_var="KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN",
+                    env_var="KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN",
                     arg_key="zfspoolstatus_token",
                     yaml_path="zfspoolstatus.uptime_kuma.token",
                 ),

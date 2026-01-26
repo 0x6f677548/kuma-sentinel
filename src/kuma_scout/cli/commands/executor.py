@@ -1,4 +1,4 @@
-"""Unified command executor for Kuma Sentinel monitoring commands."""
+"""Unified command executor for Kuma Scout monitoring commands."""
 
 import logging
 import sys
@@ -8,10 +8,10 @@ from typing import Any, Dict
 
 import click
 
-from kuma_sentinel.cli.commands.base import Command
-from kuma_sentinel.core.config.base import ConfigBase
-from kuma_sentinel.core.logger import setup_default_logging, setup_logging
-from kuma_sentinel.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
+from kuma_scout.cli.commands.base import Command
+from kuma_scout.core.config.base import ConfigBase
+from kuma_scout.core.logger import setup_default_logging, setup_logging
+from kuma_scout.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
 
 
 class CommandExecutor(Command):
@@ -174,14 +174,14 @@ class CommandExecutor(Command):
         self.config.load_from_env()
 
         # Step 3: Load from config file if provided or if default exists
-        config_file = args.get("config") or "/etc/kuma-sentinel/config.yaml"
+        config_file = args.get("config") or "/etc/kuma-scout/config.yaml"
         if config_file and sys.modules.get("os"):
             import os
 
             if os.path.exists(config_file):
                 # Check file permissions unless user explicitly ignores them
                 ignore_perms = args.get("ignore_file_permissions", False)
-                from kuma_sentinel.core.logger import get_logger
+                from kuma_scout.core.logger import get_logger
 
                 logger = get_logger()
                 try:
@@ -214,13 +214,11 @@ class CommandExecutor(Command):
         try:
             self.config.validate()
         except ValueError as e:
-            from kuma_sentinel.core.logger import get_logger
+            from kuma_scout.core.logger import get_logger
 
             logger = get_logger()
             logger.error(f"Configuration error: {e}")
-            logger.info(
-                f"Use 'kuma-sentinel {command_name} --help' for usage information"
-            )
+            logger.info(f"Use 'kuma-scout {command_name} --help' for usage information")
             sys.exit(1)
 
         return self.config
@@ -230,7 +228,7 @@ class CommandExecutor(Command):
     ) -> None:
         """Log configuration summary. Delegates to subclass for format customization."""
         logger.info("=" * 70)
-        logger.info(f"🔍 KUMA SENTINEL - {command_name.upper()} CONFIGURATION")
+        logger.info(f"🔍 KUMA SCOUT - {command_name.upper()} CONFIGURATION")
         logger.info("=" * 70)
 
         config_summary = cfg.get_summary(mask_tokens=True)

@@ -6,8 +6,8 @@ import time
 from logging import Logger
 from typing import Dict, List, Optional, Tuple
 
-from kuma_sentinel.core.config.zfs_pool_config import ZfsPoolStatusConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.config.zfs_pool_config import ZfsPoolStatusConfig
+from kuma_scout.core.models import CheckResult
 
 from .base import Checker
 
@@ -250,7 +250,7 @@ class ZfsPoolStatusChecker(Checker):
             )
 
         except Exception as e:
-            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            from kuma_scout.core.utils.sanitizer import DataSanitizer
 
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(

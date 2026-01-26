@@ -91,7 +91,7 @@ class KopiaSnapshotConfig(ConfigBase):
                     converter=int,
                 ),
                 "command_token": FieldMapping(
-                    env_var="KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN",
+                    env_var="KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN",
                     arg_key="kopiasnapshotstatus_token",
                     yaml_path="kopiasnapshotstatus.uptime_kuma.token",
                 ),
@@ -107,7 +107,7 @@ class KopiaSnapshotConfig(ConfigBase):
         # Validate snapshot paths if any are configured
         # (paths are optional at config time, but will be validated at execution time)
         if self.kopiasnapshotstatus_snapshots:
-            from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
+            from kuma_scout.core.checkers.kopia_snapshot_checker import (
                 _validate_snapshot_path,
             )
 

@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Optional
 
-from kuma_sentinel.core.uptime_kuma import send_push
+from kuma_scout.core.uptime_kuma import send_push
 
 
 class HeartbeatService:

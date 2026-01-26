@@ -68,7 +68,7 @@ class CmdCheckConfig(ConfigBase):
                     converter=self._parse_bool,
                 ),
                 "command_token": FieldMapping(
-                    env_var="KUMA_SENTINEL_CMDCHECK_TOKEN",
+                    env_var="KUMA_SCOUT_CMDCHECK_TOKEN",
                     yaml_path="cmdcheck.uptime_kuma.token",
                 ),
             }

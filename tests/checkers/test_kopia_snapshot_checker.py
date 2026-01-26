@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
+from kuma_scout.core.checkers.kopia_snapshot_checker import (
     KopiaSnapshotChecker,
     _get_latest_snapshot_age,
     _parse_iso_timestamp,
@@ -15,8 +15,8 @@ from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
     _run_kopia_command,
     _validate_snapshot_path,
 )
-from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.config.kopia_snapshot_config import KopiaSnapshotConfig
+from kuma_scout.core.models import CheckResult
 
 
 class TestParseSnapshotTimestamp:
@@ -114,7 +114,7 @@ class TestParseIsoTimestamp:
 class TestRunKopiaCommand:
     """Test kopia command execution."""
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
     def test_successful_command(self, mock_run):
         """Test successful command execution."""
         mock_run.return_value = MagicMock(
@@ -130,7 +130,7 @@ class TestRunKopiaCommand:
         assert stdout == "output"
         assert stderr == ""
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
     def test_failed_command(self, mock_run):
         """Test failed command execution."""
         mock_run.return_value = MagicMock(
@@ -144,7 +144,7 @@ class TestRunKopiaCommand:
 
         assert success is False
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
     def test_command_timeout(self, mock_run):
         """Test command timeout."""
 
@@ -183,7 +183,7 @@ class TestGetLatestSnapshotAge:
             "retentionReason": ["latest-1", "daily-1"],
         }
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_fresh_snapshot_age(self, mock_run):
         """Test getting age of fresh snapshot from JSON."""
         now = datetime.now()
@@ -197,7 +197,7 @@ class TestGetLatestSnapshotAge:
         logger = MagicMock()
 
         with patch(
-            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+            "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
         ) as mock_datetime:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
@@ -211,7 +211,7 @@ class TestGetLatestSnapshotAge:
         assert metadata["stats"]["fileCount"] == 20291
         assert "daily-1" in metadata["retention_reason"]
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_no_snapshots(self, mock_run):
         """Test when no snapshots exist."""
         output = json.dumps([])
@@ -223,7 +223,7 @@ class TestGetLatestSnapshotAge:
         assert age is None
         assert metadata is None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_command_failed(self, mock_run):
         """Test when kopia command fails."""
         mock_run.return_value = (False, None, "Connection refused")
@@ -234,7 +234,7 @@ class TestGetLatestSnapshotAge:
         assert age is None
         assert metadata is None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_malformed_json(self, mock_run):
         """Test when JSON is malformed."""
         mock_run.return_value = (True, "not valid json", None)
@@ -245,7 +245,7 @@ class TestGetLatestSnapshotAge:
         assert age is None
         assert metadata is None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_missing_end_time(self, mock_run):
         """Test when snapshot is missing endTime field."""
         snapshot = self.create_json_snapshot("2026-01-19T00:00:11.570523988Z")
@@ -259,7 +259,7 @@ class TestGetLatestSnapshotAge:
         assert age is None
         assert metadata is None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_single_object_response(self, mock_run):
         """Test when kopia returns a single object instead of array."""
         now = datetime.now()
@@ -273,7 +273,7 @@ class TestGetLatestSnapshotAge:
         logger = MagicMock()
 
         with patch(
-            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+            "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
         ) as mock_datetime:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
@@ -284,7 +284,7 @@ class TestGetLatestSnapshotAge:
         assert 0.9 < age < 1.1  # Should be approximately 1 hour
         assert metadata is not None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_with_errors(self, mock_run):
         """Test when snapshot has errors (errorCount > 0)."""
         now = datetime.now()
@@ -306,7 +306,7 @@ class TestGetLatestSnapshotAge:
         # Verify error was logged
         logger.error.assert_called()
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_command_includes_all_flag(self, mock_run):
         """Test that the command includes --all flag to see snapshots from all users."""
         now = datetime.now()
@@ -343,9 +343,7 @@ class TestKopiaSnapshotChecker:
             "retention_reason": ["daily-1"],
         }
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_all_fresh(self, mock_age):
         """Test execution when all snapshots are fresh."""
         metadata1 = self.create_metadata()
@@ -373,9 +371,7 @@ class TestKopiaSnapshotChecker:
         assert result.details["snapshots"]["/data"]["age_hours"] == 5.0
         assert result.details["snapshots"]["/backups"]["age_hours"] == 12.0
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_snapshot_too_old(self, mock_age):
         """Test execution when snapshot is too old."""
         metadata1 = self.create_metadata()
@@ -400,9 +396,7 @@ class TestKopiaSnapshotChecker:
         assert result.status == "down"
         assert "too old" in result.message.lower()
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_per_path_max_age_hours(self, mock_age):
         """Test execution with per-path max_age_hours thresholds."""
         metadata1 = self.create_metadata()
@@ -430,9 +424,7 @@ class TestKopiaSnapshotChecker:
         assert result.details["snapshots"]["/data"]["age_hours"] == 5.0
         assert result.details["snapshots"]["/backups"]["age_hours"] == 30.0
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_per_path_max_age_hours_fallback_to_default(self, mock_age):
         """Test execution using default max_age_hours for paths without explicit threshold."""
         metadata1 = self.create_metadata()
@@ -458,9 +450,7 @@ class TestKopiaSnapshotChecker:
         assert result.status == "up"
         assert result.details["snapshots"]["/backups"]["age_hours"] == 12.0
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_snapshot_missing(self, mock_age):
         """Test execution when snapshot cannot be retrieved."""
         metadata1 = self.create_metadata()
@@ -497,9 +487,7 @@ class TestKopiaSnapshotChecker:
         assert result.status == "down"
         assert "no snapshots" in result.message.lower()
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_result_has_required_fields(self, mock_age):
         """Test result has all required fields."""
         metadata = self.create_metadata()
@@ -702,9 +690,7 @@ class TestValidateSnapshotPath:
         with self.error_context():
             _validate_snapshot_path("...")
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_with_invalid_snapshot_path(self, mock_age):
         """Test execution with invalid snapshot path configuration."""
         config = KopiaSnapshotConfig()
@@ -743,9 +729,7 @@ class TestValidateSnapshotPath:
         # The actual behavior is it returns "up" since there were no failed validations
         assert result.status == "up"
 
-    @patch(
-        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
-    )
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age")
     def test_execute_with_exception(self, mock_age):
         """Test execution with unexpected exception."""
         mock_age.side_effect = RuntimeError("Unexpected error")
@@ -765,7 +749,7 @@ class TestValidateSnapshotPath:
         assert result.status == "down"
         assert "error" in result.message.lower()
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_with_missing_stats(self, mock_run):
         """Test snapshot age calculation when stats field is missing."""
         now = datetime.now()
@@ -785,7 +769,7 @@ class TestValidateSnapshotPath:
         logger = MagicMock()
 
         with patch(
-            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+            "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
         ) as mock_datetime:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
@@ -796,7 +780,7 @@ class TestValidateSnapshotPath:
         assert age is not None
         assert metadata is not None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_run_kopia_command_with_exception(self, mock_run):
         """Test kopia command execution with general exception."""
         mock_run.side_effect = RuntimeError("General error")
@@ -807,7 +791,7 @@ class TestValidateSnapshotPath:
         assert success is False
         assert stderr is not None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_parsing_error_missing_field(self, mock_run):
         """Test snapshot age when required field is missing (KeyError)."""
         snapshot = {
@@ -824,7 +808,7 @@ class TestValidateSnapshotPath:
         assert metadata is None
         logger.error.assert_called()
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_with_timezone_aware_datetime(self, mock_run):
         """Test snapshot age calculation with timezone-aware datetime."""
         now = datetime.now()
@@ -845,7 +829,7 @@ class TestValidateSnapshotPath:
         logger = MagicMock()
 
         with patch(
-            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+            "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
         ) as mock_datetime:
             # For now(), use our real datetime
             mock_datetime.now.return_value = now
@@ -858,7 +842,7 @@ class TestValidateSnapshotPath:
         assert age is not None
         assert metadata is not None
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
     def test_run_kopia_command_empty_stdout(self, mock_run):
         """Test kopia command with empty stdout."""
         mock_run.return_value = MagicMock(
@@ -878,7 +862,7 @@ class TestValidateSnapshotPath:
 class TestGetLatestSnapshotAgeParsing:
     """Test snapshot age parsing with various input scenarios."""
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_invalid_timestamp_format(self, mock_run):
         """Test snapshot age when endTime has invalid format (parse returns None)."""
         snapshot = {
@@ -902,7 +886,7 @@ class TestGetLatestSnapshotAgeParsing:
             "Failed to parse snapshot timestamp" in str(call) for call in error_calls
         )
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_missing_endtime(self, mock_run):
         """Test snapshot age when endTime is None in snapshot data."""
         snapshot = {
@@ -924,7 +908,7 @@ class TestGetLatestSnapshotAgeParsing:
         error_calls = [call[0][0] for call in logger.error.call_args_list]
         assert any("Missing endTime" in str(call) for call in error_calls)
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_with_error_count(self, mock_run):
         """Test snapshot age when snapshot has errors."""
         snapshot = {
@@ -946,7 +930,7 @@ class TestGetLatestSnapshotAgeParsing:
         error_calls = [call[0][0] for call in logger.error.call_args_list]
         assert any("error(s)" in str(call) for call in error_calls)
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_json_decode_error(self, mock_run):
         """Test snapshot age when JSON output is invalid."""
         mock_run.return_value = (True, "invalid json {{{", None)
@@ -962,7 +946,7 @@ class TestGetLatestSnapshotAgeParsing:
         error_calls = [call[0][0] for call in logger.error.call_args_list]
         assert any("Failed to parse JSON" in str(call) for call in error_calls)
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_empty_snapshots_list(self, mock_run):
         """Test snapshot age when snapshots list is empty."""
         output = json.dumps([])
@@ -976,7 +960,7 @@ class TestGetLatestSnapshotAgeParsing:
         assert metadata is None
         logger.warning.assert_called()
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_run_command_failed(self, mock_run):
         """Test snapshot age when kopia command fails."""
         mock_run.return_value = (False, None, "Permission denied")
@@ -989,7 +973,7 @@ class TestGetLatestSnapshotAgeParsing:
         assert metadata is None
         logger.error.assert_called()
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_successful_with_metadata(self, mock_run):
         """Test snapshot age calculation with complete metadata."""
         now = datetime.now()
@@ -1021,7 +1005,7 @@ class TestGetLatestSnapshotAgeParsing:
         assert metadata["stats"]["size"] == 5000
         assert metadata["retention_reason"] == ["policy1", "policy2"]
 
-    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_malformed_snapshot_data(self, mock_run):
         """Test snapshot age when snapshot data is malformed (raises KeyError)."""
         # Create data that will cause issues when trying to access dict methods

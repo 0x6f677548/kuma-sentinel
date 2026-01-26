@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  kuma-sentinel:
+  kuma-scout:
     build:
       context: .
       dockerfile: Dockerfile
-    image: kuma-sentinel:latest
-    container_name: kuma-sentinel
+    image: kuma-scout:latest
+    container_name: kuma-scout
     
     # Load authentication tokens from .env file
     # All other configuration must be provided via config.yaml file
@@ -15,9 +15,9 @@ services:
     
     # Volume mounts for logs, data, and configuration
     volumes:
-      - ./logs:/var/log/kuma-sentinel
+      - ./logs:/var/log/kuma-scout
       - ./data:/data
-      - ./config.yaml:/etc/kuma-sentinel/config.yaml:ro
+      - ./config.yaml:/etc/kuma-scout/config.yaml:ro
     
     # Run in interactive mode
     stdin_open: true

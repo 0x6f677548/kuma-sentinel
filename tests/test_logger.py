@@ -5,7 +5,7 @@ import logging.handlers
 import sys
 from unittest.mock import MagicMock, patch
 
-from kuma_sentinel.core.logger import (
+from kuma_scout.core.logger import (
     _add_console_handler,
     _add_file_handler,
     _add_syslog_handler,
@@ -38,8 +38,8 @@ class TestAddConsoleHandler:
 
         handler = logger.handlers[0]
         assert handler.formatter is not None
-        assert "[%(asctime)s]" in handler.formatter._fmt
-        assert "%(message)s" in handler.formatter._fmt
+        assert "[%(asctime)s]" in str(handler.formatter._fmt)
+        assert "%(message)s" in str(handler.formatter._fmt)
 
     def test_add_console_handler_uses_stdout(self):
         """Test that console handler uses stdout stream."""
@@ -49,6 +49,7 @@ class TestAddConsoleHandler:
         _add_console_handler(logger)
 
         handler = logger.handlers[0]
+        assert isinstance(handler, logging.StreamHandler)
         assert handler.stream == sys.stdout
 
 
@@ -112,7 +113,7 @@ class TestAddSyslogHandler:
             # Verify formatter was set
             mock_handler.setFormatter.assert_called_once()
             call_args = mock_handler.setFormatter.call_args[0][0]
-            assert "kuma-sentinel" in call_args._fmt
+            assert "kuma-scout" in call_args._fmt
 
     def test_add_syslog_handler_creates_with_correct_params(self):
         """Test that SysLogHandler is created with correct parameters."""
@@ -159,8 +160,8 @@ class TestAddFileHandler:
 
         handler = logger.handlers[0]
         assert handler.formatter is not None
-        assert "[%(asctime)s]" in handler.formatter._fmt
-        assert "%(message)s" in handler.formatter._fmt
+        assert "[%(asctime)s]" in str(handler.formatter._fmt)
+        assert "%(message)s" in str(handler.formatter._fmt)
 
     def test_add_file_handler_permission_error(self, capsys):
         """Test handling of PermissionError during file creation."""
@@ -210,7 +211,7 @@ class TestSetupDefaultLogging:
 
     def setup_method(self):
         """Clean up logger before each test."""
-        logger = logging.getLogger("kuma_sentinel")
+        logger = logging.getLogger("kuma_scout")
         logger.handlers.clear()
 
     def test_setup_default_logging_returns_logger(self):
@@ -218,7 +219,7 @@ class TestSetupDefaultLogging:
         logger = setup_default_logging()
 
         assert isinstance(logger, logging.Logger)
-        assert logger.name == "kuma_sentinel"
+        assert logger.name == "kuma_scout"
 
     def test_setup_default_logging_sets_level_to_info(self):
         """Test that default logging level is set to INFO."""
@@ -237,7 +238,7 @@ class TestSetupDefaultLogging:
 
     def test_setup_default_logging_clears_existing_handlers(self):
         """Test that existing handlers are cleared before adding new ones."""
-        logger = logging.getLogger("kuma_sentinel")
+        logger = logging.getLogger("kuma_scout")
         # Add a dummy handler
         dummy_handler = logging.NullHandler()
         logger.addHandler(dummy_handler)
@@ -249,7 +250,7 @@ class TestSetupDefaultLogging:
 
     def test_setup_default_logging_calls_syslog_silent(self):
         """Test that syslog handler is added in silent mode."""
-        with patch("kuma_sentinel.core.logger._add_syslog_handler") as mock_syslog:
+        with patch("kuma_scout.core.logger._add_syslog_handler") as mock_syslog:
             setup_default_logging()
 
             # Verify syslog was called with silent=True
@@ -263,7 +264,7 @@ class TestSetupLogging:
 
     def setup_method(self):
         """Clean up logger before each test."""
-        logger = logging.getLogger("kuma_sentinel")
+        logger = logging.getLogger("kuma_scout")
         logger.handlers.clear()
 
     def test_setup_logging_returns_logger(self, tmp_path):
@@ -272,7 +273,7 @@ class TestSetupLogging:
         logger = setup_logging(str(log_file))
 
         assert isinstance(logger, logging.Logger)
-        assert logger.name == "kuma_sentinel"
+        assert logger.name == "kuma_scout"
 
     def test_setup_logging_with_info_level(self, tmp_path):
         """Test setup_logging with INFO level."""
@@ -346,7 +347,7 @@ class TestSetupLogging:
     def test_setup_logging_clears_existing_handlers(self, tmp_path):
         """Test that existing handlers are cleared."""
         log_file = tmp_path / "app.log"
-        logger = logging.getLogger("kuma_sentinel")
+        logger = logging.getLogger("kuma_scout")
 
         # Add a dummy handler
         dummy_handler = logging.NullHandler()
@@ -361,7 +362,7 @@ class TestSetupLogging:
         """Test that syslog handler is added in non-silent mode."""
         log_file = tmp_path / "app.log"
 
-        with patch("kuma_sentinel.core.logger._add_syslog_handler") as mock_syslog:
+        with patch("kuma_scout.core.logger._add_syslog_handler") as mock_syslog:
             setup_logging(str(log_file))
 
             # Verify syslog was called with silent=False
@@ -384,12 +385,12 @@ class TestSetupLogging:
 class TestGetLogger:
     """Tests for get_logger function."""
 
-    def test_get_logger_returns_kuma_sentinel_logger(self):
-        """Test that get_logger returns the kuma_sentinel logger."""
+    def test_get_logger_returns_kuma_scout_logger(self):
+        """Test that get_logger returns the kuma_scout logger."""
         logger = get_logger()
 
         assert isinstance(logger, logging.Logger)
-        assert logger.name == "kuma_sentinel"
+        assert logger.name == "kuma_scout"
 
     def test_get_logger_returns_same_instance(self):
         """Test that get_logger returns the same logger instance on multiple calls."""
@@ -544,7 +545,7 @@ class TestLoggerIntegration:
 
     def setup_method(self):
         """Clean up logger before each test."""
-        logger = logging.getLogger("kuma_sentinel")
+        logger = logging.getLogger("kuma_scout")
         logger.handlers.clear()
 
     def test_setup_default_then_setup_logging(self, tmp_path):

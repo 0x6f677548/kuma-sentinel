@@ -1,6 +1,6 @@
 """Tests for configuration loading with proper precedence and edge cases."""
 
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
+from kuma_scout.core.config.portscan_config import PortscanConfig
 
 
 class TestConfigPrecedence:

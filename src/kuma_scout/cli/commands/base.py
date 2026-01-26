@@ -1,4 +1,4 @@
-"""Abstract base class for sentinel CLI commands."""
+"""Abstract base class for scout CLI commands."""
 
 from abc import ABC, abstractmethod
 
@@ -6,7 +6,7 @@ import click
 
 
 class Command(ABC):
-    """Base class for sentinel CLI commands.
+    """Base class for scout CLI commands.
 
     Subclasses should implement register_command() to return a Click command.
     """

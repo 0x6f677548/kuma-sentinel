@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # Links Docker image with repository
-LABEL org.opencontainers.image.source=https://go.hugobatista.com/gh/kuma-sentinel
+LABEL org.opencontainers.image.source=https://go.hugobatista.com/gh/kuma-scout
 LABEL security.scan="true"
 LABEL maintainer="Hugo Batista <mail@hugobatista.com>"
 
@@ -20,17 +20,17 @@ COPY . /app
 RUN pip install --no-cache --upgrade pip \
  && pip install --no-cache /app \
  && addgroup --system app && adduser --system --group app \
- && mkdir -p /var/log/kuma-sentinel \
+ && mkdir -p /var/log/kuma-scout \
  && mkdir -p /data \
- && chown -R app:app /var/log/kuma-sentinel \
+ && chown -R app:app /var/log/kuma-scout \
  && chown -R app:app /data
 
 USER app
 
-VOLUME /var/log/kuma-sentinel
+VOLUME /var/log/kuma-scout
 VOLUME /data
 
 HEALTHCHECK --interval=300s --timeout=10s --start-period=5s --retries=3 \
-    CMD kuma-sentinel --version || exit 1
+    CMD kuma-scout --version || exit 1
 
-ENTRYPOINT ["kuma-sentinel"]
+ENTRYPOINT ["kuma-scout"]

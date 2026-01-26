@@ -1,4 +1,4 @@
-"""Sentinel commands."""
+"""Scout commands."""
 
 from typing import Dict, Type
 
@@ -40,12 +40,12 @@ def register_command(
 
 
 # Imports trigger registration via the decorator
-from kuma_sentinel.cli.commands.cmdcheck import CmdCheckCommand  # noqa: E402
-from kuma_sentinel.cli.commands.kopiasnapshotstatus import (  # noqa: E402
+from kuma_scout.cli.commands.cmdcheck import CmdCheckCommand  # noqa: E402
+from kuma_scout.cli.commands.kopiasnapshotstatus import (  # noqa: E402
     KopiaSnapshotStatusCommand,
 )  # noqa: E402
-from kuma_sentinel.cli.commands.portscan import PortscanCommand  # noqa: E402
-from kuma_sentinel.cli.commands.zfspoolstatus import ZfsPoolStatusCommand  # noqa: E402
+from kuma_scout.cli.commands.portscan import PortscanCommand  # noqa: E402
+from kuma_scout.cli.commands.zfspoolstatus import ZfsPoolStatusCommand  # noqa: E402
 
 __all__ = [
     "CmdCheckCommand",

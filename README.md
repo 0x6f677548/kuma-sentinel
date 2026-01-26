@@ -396,6 +396,8 @@ One of the challenges with traditional monitoring is getting enough detail to tr
 ```
 Uptime Kuma dashboard shows the exact status in one line without needing to SSH and inspect logs.
 
+**Note**: Any sensitive data in the actual output (passwords, tokens, connection strings) would be automatically sanitized before display, even though raw output is shown in documentation examples for clarity.
+
 **Example - Multiple Commands Result**:
 ```
 ✗ 2/3 passed, 1/3 failed: nginx (exit 1); postgresql ✓; cache ✓
@@ -563,7 +565,7 @@ logging:
 
 heartbeat:
   enabled: true
-  interval: 300
+  interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
   uptime_kuma:
     token: your-heartbeat-token
 

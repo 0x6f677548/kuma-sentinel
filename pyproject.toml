@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kuma-sentinel"
-version = "0.0.2"
+version = "0.1.0"
 description = "Uptime Kuma monitoring agent for internal server monitoring. Execute custom checks, scan ports, monitor backups and storage—then report to Uptime Kuma via push API."
 readme = "README.md"
 requires-python = ">=3.10"

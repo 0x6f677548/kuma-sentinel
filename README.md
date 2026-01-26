@@ -299,7 +299,10 @@ kuma-sentinel zfspoolstatus --config /etc/kuma-sentinel/config.yaml
 # Or with CLI arguments
 kuma-sentinel zfspoolstatus \
   --pool tank 10 \
-  --pool backup 20
+  --pool backup 20 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-zfs-token
 ```
 
 Multiple pools with different free space thresholds:

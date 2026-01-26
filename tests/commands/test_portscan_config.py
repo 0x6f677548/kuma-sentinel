@@ -746,3 +746,374 @@ class TestConfigPrecedence:
         ), "ports should be overridden by CLI arguments when provided"
 
         config.validate()
+
+
+class TestConfigBaseValidation:
+    """Test validation methods from ConfigBase through PortscanConfig."""
+
+    def test_validate_uptime_kuma_url_valid_http(self):
+        """Test URL validation accepts valid HTTP URL."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        ConfigBase.validate_uptime_kuma_url("http://localhost:3001")
+        ConfigBase.validate_uptime_kuma_url("http://192.168.1.1/api/push")
+
+    def test_validate_uptime_kuma_url_valid_https(self):
+        """Test URL validation accepts valid HTTPS URL."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        ConfigBase.validate_uptime_kuma_url("https://uptime.example.com/api/push")
+
+    def test_validate_uptime_kuma_url_invalid_scheme(self):
+        """Test URL validation rejects invalid scheme."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(ValueError, match="scheme must be"):
+            ConfigBase.validate_uptime_kuma_url("ftp://example.com")
+
+    def test_validate_uptime_kuma_url_no_hostname(self):
+        """Test URL validation rejects URL without hostname."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(ValueError, match="hostname"):
+            ConfigBase.validate_uptime_kuma_url("http://")
+
+    def test_validate_uptime_kuma_url_empty(self):
+        """Test URL validation rejects empty URL."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(ValueError, match="cannot be empty"):
+            ConfigBase.validate_uptime_kuma_url("")
+
+    def test_validate_uptime_kuma_url_with_spaces(self):
+        """Test URL validation rejects URL with spaces."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(ValueError, match="spaces"):
+            ConfigBase.validate_uptime_kuma_url("http://example.com/api push")
+
+    def test_validate_uptime_kuma_url_trailing_slash(self):
+        """Test URL validation rejects URL with trailing slash."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(ValueError, match="trailing slash"):
+            ConfigBase.validate_uptime_kuma_url("http://example.com/")
+
+    def test_validate_config_file_permissions_secure(self, tmp_path):
+        """Test file permissions validation passes for 0o600."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        test_file = tmp_path / "config.yaml"
+        test_file.write_text("test")
+        test_file.chmod(0o600)
+
+        result = ConfigBase.validate_config_file_permissions(str(test_file))
+        assert result is True
+
+    def test_validate_config_file_permissions_insecure_ignore(self, tmp_path):
+        """Test file permissions validation with insecure permissions and ignore flag."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        test_file = tmp_path / "config.yaml"
+        test_file.write_text("test")
+        test_file.chmod(0o644)
+
+        result = ConfigBase.validate_config_file_permissions(
+            str(test_file), ignore_warning=True
+        )
+        assert result is False
+
+    def test_validate_config_file_permissions_insecure_fail(self, tmp_path):
+        """Test file permissions validation fails for insecure permissions."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        test_file = tmp_path / "config.yaml"
+        test_file.write_text("test")
+        test_file.chmod(0o644)
+
+        with pytest.raises(RuntimeError, match="Security check failed"):
+            ConfigBase.validate_config_file_permissions(
+                str(test_file), ignore_warning=False
+            )
+
+    def test_validate_config_file_permissions_nonexistent_file(self):
+        """Test file permissions validation handles missing file."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        with pytest.raises(RuntimeError, match="Failed to check"):
+            ConfigBase.validate_config_file_permissions(
+                "/nonexistent/file.yaml", ignore_warning=False
+            )
+
+    def test_validate_config_file_permissions_nonexistent_file_ignore(self):
+        """Test file permissions validation handles missing file with ignore flag."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        result = ConfigBase.validate_config_file_permissions(
+            "/nonexistent/file.yaml", ignore_warning=True
+        )
+        assert result is False
+
+
+class TestConfigBaseFieldMappings:
+    """Test field mapping and conversion methods through PortscanConfig."""
+
+    def test_parse_bool_true_variants(self):
+        """Test _parse_bool handles true variants."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        assert ConfigBase._parse_bool(True) is True
+        assert ConfigBase._parse_bool("true") is True
+        assert ConfigBase._parse_bool("True") is True
+        assert ConfigBase._parse_bool("TRUE") is True
+        assert ConfigBase._parse_bool("yes") is True
+        assert ConfigBase._parse_bool("1") is True
+        assert ConfigBase._parse_bool("on") is True
+
+    def test_parse_bool_false_variants(self):
+        """Test _parse_bool handles false variants."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        assert ConfigBase._parse_bool(False) is False
+        assert ConfigBase._parse_bool("false") is False
+        assert ConfigBase._parse_bool("no") is False
+        assert ConfigBase._parse_bool("0") is False
+        assert ConfigBase._parse_bool("off") is False
+        assert ConfigBase._parse_bool("") is False
+
+    def test_parse_bool_non_string(self):
+        """Test _parse_bool handles non-string values."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        assert ConfigBase._parse_bool(1) is True
+        assert ConfigBase._parse_bool(0) is False
+        assert ConfigBase._parse_bool([1, 2]) is True
+        assert ConfigBase._parse_bool([]) is False
+
+    def test_get_nested_value_simple(self):
+        """Test _get_nested_value with simple path."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        data = {"key": "value"}
+        result = ConfigBase._get_nested_value(data, "key")
+        assert result == "value"
+
+    def test_get_nested_value_nested(self):
+        """Test _get_nested_value with nested path."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        data = {"section": {"subsection": {"key": "value"}}}
+        result = ConfigBase._get_nested_value(data, "section.subsection.key")
+        assert result == "value"
+
+    def test_get_nested_value_missing(self):
+        """Test _get_nested_value with missing path."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        data = {"section": {"key": "value"}}
+        result = ConfigBase._get_nested_value(data, "section.missing.key")
+        assert result is None
+
+    def test_get_nested_value_non_dict(self):
+        """Test _get_nested_value with non-dict in path."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        data = {"section": "not_a_dict"}
+        result = ConfigBase._get_nested_value(data, "section.key")
+        assert result is None
+
+    def test_convert_value_bool_passthrough(self):
+        """Test _convert_value with bool value."""
+        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+
+        mapping = FieldMapping(converter=ConfigBase._parse_bool)
+        result = ConfigBase._convert_value(True, mapping)
+        assert result is True
+
+    def test_convert_value_int_passthrough(self):
+        """Test _convert_value with int value."""
+        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+
+        mapping = FieldMapping(converter=int)
+        result = ConfigBase._convert_value(42, mapping)
+        assert result == 42
+
+    def test_convert_value_list_passthrough(self):
+        """Test _convert_value with list value."""
+        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+
+        mapping = FieldMapping()
+        result = ConfigBase._convert_value([1, 2, 3], mapping)
+        assert result == [1, 2, 3]
+
+    def test_convert_value_string_with_converter(self):
+        """Test _convert_value with string and converter."""
+        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+
+        mapping = FieldMapping(converter=int)
+        result = ConfigBase._convert_value("42", mapping)
+        assert result == 42
+
+    def test_mask_token_with_masking(self):
+        """Test _mask_token with masking enabled."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        result = ConfigBase._mask_token("secret_token", mask=True)
+        assert result == "***"
+
+    def test_mask_token_without_masking(self):
+        """Test _mask_token with masking disabled."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        result = ConfigBase._mask_token("secret_token", mask=False)
+        assert result == "secret_token"
+
+    def test_mask_token_none(self):
+        """Test _mask_token with None token."""
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        result = ConfigBase._mask_token(None, mask=True)
+        assert result is None
+
+    def test_load_from_env_with_heartbeat_token(self, monkeypatch):
+        """Test load_from_env applies heartbeat token from environment."""
+        monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_hb_token")
+        config = PortscanConfig()
+        config.load_from_env()
+        assert config.heartbeat_token == "env_hb_token"
+
+    def test_load_from_env_with_portscan_token(self, monkeypatch):
+        """Test load_from_env applies portscan token from environment."""
+        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "env_portscan_token")
+        config = PortscanConfig()
+        config.load_from_env()
+        assert config.command_token == "env_portscan_token"
+
+    def test_apply_field_mappings_from_yaml_boolean(self, tmp_path):
+        """Test YAML loading applies boolean field conversions."""
+        yaml_content = """
+heartbeat:
+  enabled: false
+  interval: 600
+uptime_kuma:
+  url: http://localhost
+portscan:
+  ip_ranges:
+    - 192.168.1.0/24
+  uptime_kuma:
+    token: test_token
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml_content)
+
+        config = PortscanConfig()
+        config.load_from_yaml(str(config_file))
+        assert config.heartbeat_enabled is False
+        assert config.heartbeat_interval == 600
+
+    def test_apply_field_mappings_from_args_list(self):
+        """Test args loading converts tuples to lists for List[str] fields."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "hb_token"
+        config.command_token = "cmd_token"
+
+        # Simulate Click's multiple=True which returns tuples
+        args = {
+            "ip_ranges": ("192.168.1.0/24", "10.0.0.0/8"),
+            "exclude": ("192.168.1.1", "192.168.1.2"),
+            "ports": None,
+            "timing": None,
+        }
+        config.load_from_args(args)
+
+        # Verify tuples were converted to lists
+        assert config.portscan_ip_ranges == ["192.168.1.0/24", "10.0.0.0/8"]
+        assert config.portscan_exclude == ["192.168.1.1", "192.168.1.2"]
+
+    def test_apply_field_mappings_from_args_empty_tuple(self):
+        """Test args loading treats empty tuples as empty lists (doesn't override)."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "hb_token"
+        config.command_token = "cmd_token"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]  # Pre-existing value
+
+        # Empty tuple from Click should not override
+        args = {
+            "ip_ranges": (),
+            "exclude": (),
+            "ports": None,
+            "timing": None,
+        }
+        config.load_from_args(args)
+
+        # Value should be preserved (empty tuples don't override)
+        assert config.portscan_ip_ranges == ["192.168.1.0/24"]
+
+    def test_validate_and_log_url_valid(self):
+        """Test _validate_and_log_url with valid URL."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+        config.heartbeat_token = "hb_token"
+        config.command_token = "cmd_token"
+
+        errors = config._validate_and_log_url()
+        assert errors == []
+
+    def test_validate_and_log_url_missing(self):
+        """Test _validate_and_log_url with missing URL."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = None
+
+        errors = config._validate_and_log_url()
+        assert len(errors) > 0
+        assert "not provided" in errors[0]
+
+    def test_validate_and_log_url_invalid(self):
+        """Test _validate_and_log_url with invalid URL."""
+        config = PortscanConfig()
+        config.uptime_kuma_url = "ftp://localhost/"
+
+        errors = config._validate_and_log_url()
+        assert len(errors) > 0
+        assert "Invalid" in errors[0]
+
+    def test_validate_and_log_tokens_both_present(self):
+        """Test _validate_and_log_tokens with both tokens present."""
+        config = PortscanConfig()
+        config.heartbeat_token = "hb_token"
+        config.command_token = "cmd_token"
+
+        errors = config._validate_and_log_tokens()
+        assert errors == []
+
+    def test_validate_and_log_tokens_missing_heartbeat(self):
+        """Test _validate_and_log_tokens with missing heartbeat token."""
+        config = PortscanConfig()
+        config.heartbeat_token = None
+        config.command_token = "cmd_token"
+
+        errors = config._validate_and_log_tokens()
+        assert len(errors) > 0
+        assert "Heartbeat" in errors[0]
+
+    def test_validate_and_log_tokens_missing_command(self):
+        """Test _validate_and_log_tokens with missing command token."""
+        config = PortscanConfig()
+        config.heartbeat_token = "hb_token"
+        config.command_token = None
+
+        errors = config._validate_and_log_tokens()
+        assert len(errors) > 0
+        assert "Command" in errors[0]
+
+    def test_validate_and_log_tokens_both_missing(self):
+        """Test _validate_and_log_tokens with both tokens missing."""
+        config = PortscanConfig()
+        config.heartbeat_token = None
+        config.command_token = None
+
+        errors = config._validate_and_log_tokens()
+        assert len(errors) == 2

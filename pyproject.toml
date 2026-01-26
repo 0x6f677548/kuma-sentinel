@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "kuma-sentinel"
 version = "0.0.2"
-description = "Extensible monitoring agent with Uptime Kuma integration. Includes port scanning with heartbeat monitoring."
+description = "Uptime Kuma monitoring agent for internal server monitoring. Execute custom checks, scan ports, monitor backups and storage—then report to Uptime Kuma via push API."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Hugo Batista", email = "mail@hugobatista.com" }
 ]
-keywords = ["port-scanner", "network", "uptime-kuma", "monitoring", "nmap", "monitoring-agent"]
+keywords = ["uptime-kuma-agent", "uptime-kuma", "monitoring-agent", "uptime-monitoring", "server-monitoring", "port-scanner", "network-monitoring", "system-monitoring", "nmap", "backup-monitoring"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

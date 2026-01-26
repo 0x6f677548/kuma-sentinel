@@ -7,9 +7,9 @@
 [![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/0x6f677548/kuma-sentinel)](https://gitmcp.io/0x6f677548/kuma-sentinel)
 
 
-# Kuma-Sentinel
+# Kuma-Sentinel: Uptime Kuma Monitoring Agent
 
-**The CLI tool that acts as Uptime Kuma's missing agent.**
+**The open-source monitoring agent for Uptime Kuma. Monitor internal systems, custom checks, and server health—then push results back to your Uptime Kuma instance.**
 
 While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for external monitoring (HTTP, Ping, TCP), it lacks a native agent to monitor internal system states, processes, or run custom checking scripts.
 

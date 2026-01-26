@@ -1,8 +1,12 @@
 """Tests for ZfsPoolStatusChecker."""
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
-from kuma_sentinel.core.checkers.zfs_pool_checker import ZfsPoolStatusChecker
+from kuma_sentinel.core.checkers.zfs_pool_checker import (
+    ZfsPoolStatusChecker,
+    _get_pool_status,
+)
 from kuma_sentinel.core.config.zfs_pool_config import ZfsPoolStatusConfig
 
 
@@ -321,3 +325,266 @@ class TestZfsPoolStatusChecker:
         assert result.check_name == "zfspoolstatus"
         assert "pool_details" in result.details
         assert "tank" in result.details["pool_details"]
+
+
+# Tests for _get_pool_status function
+class TestGetPoolStatus:
+    """Test _get_pool_status internal function."""
+
+    @patch("subprocess.run")
+    def test_get_pool_status_success_online(self, mock_run):
+        """Test successful pool status retrieval with ONLINE status."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55%\tONLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "ONLINE"
+        assert free_percent == 45.0  # 100 - 55
+
+    @patch("subprocess.run")
+    def test_get_pool_status_success_degraded(self, mock_run):
+        """Test successful pool status retrieval with DEGRADED status."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t75%\tDEGRADED\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "DEGRADED"
+        assert free_percent == 25.0  # 100 - 75
+
+    @patch("subprocess.run")
+    def test_get_pool_status_success_faulted(self, mock_run):
+        """Test successful pool status retrieval with FAULTED status."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t90%\tFAULTED\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "FAULTED"
+        assert free_percent == 10.0  # 100 - 90
+
+    @patch("subprocess.run")
+    def test_get_pool_status_empty_output(self, mock_run):
+        """Test when pool command returns empty output."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(stdout="", returncode=0)
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.warning.assert_called()
+
+    @patch("subprocess.run")
+    def test_get_pool_status_insufficient_fields(self, mock_run):
+        """Test when zpool output has fewer than expected fields."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\n",  # Only 3 fields instead of 6
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.warning.assert_called()
+
+    @patch("subprocess.run")
+    def test_get_pool_status_invalid_capacity_format(self, mock_run):
+        """Test when capacity field cannot be parsed."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\tINVALID\tONLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.warning.assert_called()
+
+    @patch("subprocess.run")
+    def test_get_pool_status_decimal_capacity(self, mock_run):
+        """Test capacity parsing with decimal percentage."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55.5%\tONLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "ONLINE"
+        assert free_percent == 44.5  # 100 - 55.5
+
+    @patch("subprocess.run")
+    def test_get_pool_status_timeout(self, mock_run):
+        """Test timeout during zpool command execution."""
+        logger = MagicMock()
+        mock_run.side_effect = subprocess.TimeoutExpired("zpool", 30)
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.error.assert_called()
+        assert "timeout" in logger.error.call_args[0][0].lower()
+
+    @patch("subprocess.run")
+    def test_get_pool_status_called_process_error(self, mock_run):
+        """Test CalledProcessError from zpool command."""
+        logger = MagicMock()
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, "zpool", stderr="no such pool"
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.error.assert_called()
+        assert "zpool list failed" in logger.error.call_args[0][0]
+
+    @patch("subprocess.run")
+    def test_get_pool_status_file_not_found(self, mock_run):
+        """Test FileNotFoundError when zpool command not found."""
+        logger = MagicMock()
+        mock_run.side_effect = FileNotFoundError("zpool not found")
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health is None
+        assert free_percent is None
+        logger.error.assert_called()
+        assert "zpool command not found" in logger.error.call_args[0][0]
+        assert "ZFS installed" in logger.error.call_args[0][0]
+
+    @patch("subprocess.run")
+    def test_get_pool_status_subprocess_call(self, mock_run):
+        """Test that subprocess.run is called with correct arguments."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55%\tONLINE\n",
+            returncode=0,
+        )
+
+        _get_pool_status(logger, "tank")
+
+        # Verify subprocess.run was called with correct args
+        call_args = mock_run.call_args
+        assert call_args[0][0] == [
+            "zpool",
+            "list",
+            "-H",
+            "-o",
+            "name,size,alloc,free,cap,health",
+            "tank",
+        ]
+        assert call_args[1]["timeout"] == 30
+        assert call_args[1]["check"] is True
+
+    @patch("subprocess.run")
+    def test_get_pool_status_multiple_pools_different_values(self, mock_run):
+        """Test querying multiple pools returns different values."""
+        logger = MagicMock()
+
+        # First call
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55%\tONLINE\n",
+            returncode=0,
+        )
+        health1, free1 = _get_pool_status(logger, "tank")
+
+        # Second call
+        mock_run.return_value = MagicMock(
+            stdout="backup\t2.0T\t1.5T\t500G\t75%\tONLINE\n",
+            returncode=0,
+        )
+        health2, free2 = _get_pool_status(logger, "backup")
+
+        assert health1 == "ONLINE"
+        assert free1 == 45.0
+        assert health2 == "ONLINE"
+        assert free2 == 25.0
+
+    @patch("subprocess.run")
+    def test_get_pool_status_edge_case_0_percent_capacity(self, mock_run):
+        """Test pool with 0% capacity (100% free)."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t0\t1.81T\t0%\tONLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "ONLINE"
+        assert free_percent == 100.0
+
+    @patch("subprocess.run")
+    def test_get_pool_status_edge_case_100_percent_capacity(self, mock_run):
+        """Test pool with 100% capacity (0% free)."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.81T\t0\t100%\tONLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "ONLINE"
+        assert free_percent == 0.0
+
+    @patch("subprocess.run")
+    def test_get_pool_status_whitespace_handling(self, mock_run):
+        """Test proper handling of whitespace in output."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="  tank  \t  1.81T  \t  1.00T  \t  828G  \t  55%  \t  ONLINE  \n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "ONLINE"
+        assert free_percent == 45.0
+
+    @patch("subprocess.run")
+    def test_get_pool_status_offline_status(self, mock_run):
+        """Test pool with OFFLINE status."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55%\tOFFLINE\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "OFFLINE"
+        assert free_percent == 45.0
+
+    @patch("subprocess.run")
+    def test_get_pool_status_unavail_status(self, mock_run):
+        """Test pool with UNAVAIL status."""
+        logger = MagicMock()
+        mock_run.return_value = MagicMock(
+            stdout="tank\t1.81T\t1.00T\t828G\t55%\tUNAVAIL\n",
+            returncode=0,
+        )
+
+        health, free_percent = _get_pool_status(logger, "tank")
+
+        assert health == "UNAVAIL"
+        assert free_percent == 45.0

@@ -6,6 +6,8 @@ import tempfile
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from kuma_sentinel.core.checkers.port_checker import (
     PortChecker,
     _build_nmap_command,
@@ -1115,8 +1117,6 @@ class TestCheckerBaseClass:
         config = MagicMock(spec=ConfigBase)
 
         with patch.object(BrokenChecker, "name", ""):
-            import pytest
-
             with pytest.raises(ValueError, match="must define 'name'"):
                 BrokenChecker(logger, config)
 
@@ -1135,8 +1135,6 @@ class TestCheckerBaseClass:
         config = MagicMock(spec=ConfigBase)
 
         with patch.object(BrokenChecker, "description", ""):
-            import pytest
-
             with pytest.raises(ValueError, match="must define 'description'"):
                 BrokenChecker(logger, config)
 
@@ -1177,7 +1175,7 @@ class TestCheckerBaseClass:
         """Test heartbeat initialization with string 'true' for enabled."""
         logger = MagicMock()
         config = PortscanConfig()
-        config.heartbeat_enabled = "true"  # String instead of bool
+        config.heartbeat_enabled = True  # Boolean value
         config.heartbeat_token = "token"
         config.uptime_kuma_url = "http://localhost"
         config.heartbeat_interval = 300
@@ -1192,7 +1190,7 @@ class TestCheckerBaseClass:
         """Test heartbeat initialization with string 'false' for enabled."""
         logger = MagicMock()
         config = PortscanConfig()
-        config.heartbeat_enabled = "false"  # String instead of bool
+        config.heartbeat_enabled = False  # Boolean value
         config.heartbeat_token = "token"
         config.uptime_kuma_url = "http://localhost"
         config.portscan_ip_ranges = ["192.168.1.0/24"]

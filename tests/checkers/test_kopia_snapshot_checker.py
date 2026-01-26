@@ -5,6 +5,8 @@ import subprocess
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
     KopiaSnapshotChecker,
     _get_latest_snapshot_age,
@@ -665,8 +667,6 @@ class TestValidateSnapshotPath:
     @staticmethod
     def error_context():
         """Helper to assert ValueError is raised."""
-        import pytest
-
         return pytest.raises(ValueError)
 
     def test_validate_root_path(self):

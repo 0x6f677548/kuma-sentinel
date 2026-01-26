@@ -174,8 +174,7 @@ cmdcheck:
     - command: "test -f /var/run/app.pid"
       name: "app_pid"
       timeout: 5
-    - command: "df"
-      args: ["/"]
+    - command: "df /"
       name: "disk_space"
       success_pattern: "(\\d{2,}|[1-9]\\d{5,})"  # Match if available space exists
       timeout: 10

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from kuma_sentinel.core.checkers.cmdcheck_checker import CmdCheckChecker
-from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.core.checkers.cmdcheck_checker import CmdCheckChecker
+from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
 
 
 class TestPrivilegeEscalationProtection:

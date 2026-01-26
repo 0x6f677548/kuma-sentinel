@@ -4,10 +4,10 @@ from typing import Dict
 
 import click
 
-from kuma_sentinel.cli.commands import register_command
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.core.checkers.zfs_pool_checker import ZfsPoolStatusChecker
-from kuma_sentinel.core.config.zfs_pool_config import ZfsPoolStatusConfig
+from kuma_scout.cli.commands import register_command
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.core.checkers.zfs_pool_checker import ZfsPoolStatusChecker
+from kuma_scout.core.config.zfs_pool_config import ZfsPoolStatusConfig
 
 
 @register_command(

@@ -44,4 +44,4 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run pytest
-        run: uv run pytest --cov=src/kuma_sentinel
+        run: uv run pytest --cov=src/kuma_scout

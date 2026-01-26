@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "kuma-sentinel"
+name = "kuma-scout"
 version = "0.1.0"
 description = "Uptime Kuma monitoring agent for internal server monitoring. Execute custom checks, scan ports, monitor backups and storage—then report to Uptime Kuma via push API."
 readme = "README.md"
@@ -44,19 +44,19 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://go.hugobatista.com/gh/kuma-sentinel"
-Documentation = "https://go.hugobatista.com/gh/kuma-sentinel#readme"
-Repository = "https://go.hugobatista.com/gh/kuma-sentinel.git"
-Issues = "https://go.hugobatista.com/gh/kuma-sentinel/issues"
+Homepage = "https://go.hugobatista.com/gh/kuma-scout"
+Documentation = "https://go.hugobatista.com/gh/kuma-scout#readme"
+Repository = "https://go.hugobatista.com/gh/kuma-scout.git"
+Issues = "https://go.hugobatista.com/gh/kuma-scout/issues"
 
 [project.scripts]
-kuma-sentinel = "kuma_sentinel.cli.app:cli"
+kuma-scout = "kuma_scout.cli.app:cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kuma_sentinel"]
+packages = ["src/kuma_scout"]
 
 [tool.setuptools.package-data]
-kuma_sentinel = ["py.typed"]
+kuma_scout = ["py.typed"]
 
 [tool.black]
 line-length = 88
@@ -105,7 +105,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["kuma_sentinel"]
+known-first-party = ["kuma_scout"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -120,7 +120,7 @@ ignore_missing_imports = true
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-ra --strict-markers --cov=src/kuma_sentinel --cov-report=html --cov-report=term-missing"
+addopts = "-ra --strict-markers --cov=src/kuma_scout --cov-report=html --cov-report=term-missing"
 
 [tool.hatch.envs.default]
 dependencies = [

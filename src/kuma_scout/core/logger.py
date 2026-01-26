@@ -1,4 +1,4 @@
-"""Logging configuration for kuma sentinel."""
+"""Logging configuration for kuma scout."""
 
 import logging
 import logging.handlers
@@ -8,7 +8,7 @@ from pathlib import Path
 # Log format constants
 _LOG_FORMAT = "[%(asctime)s] %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-_SYSLOG_FORMAT = "kuma-sentinel[%(process)d]: %(message)s"
+_SYSLOG_FORMAT = "kuma-scout[%(process)d]: %(message)s"
 
 
 def _add_console_handler(logger: logging.Logger) -> None:
@@ -73,7 +73,7 @@ def setup_default_logging():
     Uses INFO level by default to provide visibility during initialization.
     Later, setup_logging() will be called with config values to upgrade the configuration.
     """
-    logger = logging.getLogger("kuma_sentinel")
+    logger = logging.getLogger("kuma_scout")
     logger.setLevel(logging.INFO)
 
     # Remove existing handlers to avoid duplicates
@@ -93,7 +93,7 @@ def setup_logging(log_file, log_level="INFO"):
         log_file: Path to log file
         log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
-    logger = logging.getLogger("kuma_sentinel")
+    logger = logging.getLogger("kuma_scout")
     # Convert string log level to logging constant
     level = getattr(logging, log_level.upper(), logging.INFO)
     logger.setLevel(level)
@@ -111,7 +111,7 @@ def setup_logging(log_file, log_level="INFO"):
 
 def get_logger():
     """Get the logger instance."""
-    return logging.getLogger("kuma_sentinel")
+    return logging.getLogger("kuma_scout")
 
 
 def log_security_event(

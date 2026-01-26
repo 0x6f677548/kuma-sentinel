@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, Mock, patch
 import click
 import pytest
 
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.core.config.kopia_snapshot_config import KopiaSnapshotConfig
+from kuma_scout.core.config.portscan_config import PortscanConfig
+from kuma_scout.core.models import CheckResult
 
 
 class ConcreteExecutor(CommandExecutor):
@@ -140,8 +140,8 @@ class TestCommandExecutor:
 class TestExecuteWithOrchestration:
     """Test the execute_with_orchestration orchestration flow."""
 
-    @patch("kuma_sentinel.cli.commands.executor.setup_logging")
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.setup_logging")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_execute_with_orchestration_success(
         self, mock_send_push, mock_setup_logging
     ):
@@ -201,8 +201,8 @@ class TestExecuteWithOrchestration:
                 # Verify alert was sent
                 mock_send_push.assert_called_once()
 
-    @patch("kuma_sentinel.cli.commands.executor.setup_logging")
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.setup_logging")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_execute_with_orchestration_checker_error(
         self, mock_send_push, mock_setup_logging
     ):
@@ -243,7 +243,7 @@ class TestExecuteWithOrchestration:
                 # Verify error alert was sent
                 mock_send_push.assert_called_once()
 
-    @patch("kuma_sentinel.cli.commands.executor.setup_logging")
+    @patch("kuma_scout.cli.commands.executor.setup_logging")
     def test_execute_with_orchestration_config_error(self, mock_setup_logging):
         """Test orchestration handles config validation errors."""
         executor = ConcreteExecutor()
@@ -267,8 +267,8 @@ class TestExecuteWithOrchestration:
                 with pytest.raises(ValueError):
                     executor.execute_with_orchestration(ctx, args)
 
-    @patch("kuma_sentinel.cli.commands.executor.setup_logging")
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.setup_logging")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_execute_with_orchestration_result_status_down(
         self, mock_send_push, mock_setup_logging
     ):
@@ -315,7 +315,7 @@ class TestExecuteWithOrchestration:
                 # Verify alert was sent
                 mock_send_push.assert_called_once()
 
-    @patch("kuma_sentinel.cli.commands.executor.setup_logging")
+    @patch("kuma_scout.cli.commands.executor.setup_logging")
     def test_execute_with_orchestration_check_duration_logged(self, mock_setup_logging):
         """Test check duration is correctly calculated and logged."""
 
@@ -353,8 +353,8 @@ class TestExecuteWithOrchestration:
             mock_load.return_value = mock_config
 
             with patch("sys.exit"):
-                with patch("kuma_sentinel.cli.commands.executor.send_push"):
-                    with patch("kuma_sentinel.cli.commands.executor.time") as mock_time:
+                with patch("kuma_scout.cli.commands.executor.send_push"):
+                    with patch("kuma_scout.cli.commands.executor.time") as mock_time:
                         mock_time.time.side_effect = [
                             100.0,
                             101.5,
@@ -557,7 +557,7 @@ class TestLogConfigSummary:
 class TestSendResultAlert:
     """Test the _send_result_alert and send_result_alert methods."""
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_result_alert_with_success_result(self, mock_send_push):
         """Test sending alert for successful result."""
         executor = ConcreteExecutor()
@@ -584,7 +584,7 @@ class TestSendResultAlert:
         call_args = mock_send_push.call_args
         assert "passed" in str(call_args).lower()
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_result_alert_with_down_result(self, mock_send_push):
         """Test sending alert for failed result."""
         executor = ConcreteExecutor()
@@ -607,7 +607,7 @@ class TestSendResultAlert:
         # Verify send_push was called
         mock_send_push.assert_called_once()
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_result_alert_no_token(self, mock_send_push):
         """Test send_result_alert skips sending when no command token."""
         executor = ConcreteExecutor()
@@ -633,7 +633,7 @@ class TestSendResultAlert:
 class TestSendErrorAlert:
     """Test the _send_error_alert and send_error_alert methods."""
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_error_alert_with_message(self, mock_send_push):
         """Test sending error alert with error message."""
         executor = ConcreteExecutor()
@@ -653,7 +653,7 @@ class TestSendErrorAlert:
         call_args = mock_send_push.call_args
         assert "Network timeout" in str(call_args)
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_error_alert_no_token(self, mock_send_push):
         """Test send_error_alert skips sending when no command token."""
         executor = ConcreteExecutor()
@@ -670,7 +670,7 @@ class TestSendErrorAlert:
         # Verify send_push was NOT called when no token
         mock_send_push.assert_not_called()
 
-    @patch("kuma_sentinel.cli.commands.executor.send_push")
+    @patch("kuma_scout.cli.commands.executor.send_push")
     def test_send_error_alert_with_zero_duration(self, mock_send_push):
         """Test send_error_alert with zero duration."""
         executor = ConcreteExecutor()

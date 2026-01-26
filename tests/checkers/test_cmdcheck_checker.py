@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kuma_sentinel.core.checkers.cmdcheck_checker import CmdCheckChecker
-from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.core.checkers.cmdcheck_checker import CmdCheckChecker
+from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
 
 
 @pytest.fixture

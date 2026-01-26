@@ -193,7 +193,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kuma-sentinel"
+name = "kuma-scout"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

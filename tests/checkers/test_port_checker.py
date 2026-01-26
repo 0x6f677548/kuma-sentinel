@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from kuma_sentinel.core.checkers.port_checker import (
+from kuma_scout.core.checkers.port_checker import (
     PortChecker,
     _build_nmap_command,
     _create_nmap_xml_file,
@@ -19,8 +19,8 @@ from kuma_sentinel.core.checkers.port_checker import (
     _run_nmap_scan,
     parse_nmap_xml,
 )
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.config.portscan_config import PortscanConfig
+from kuma_scout.core.models import CheckResult
 
 
 def test_extract_host_ip():
@@ -280,7 +280,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
@@ -333,7 +333,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
@@ -362,9 +362,7 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch(
-            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
-        ) as mock_scan:
+        with patch("kuma_scout.core.checkers.port_checker._run_nmap_scan") as mock_scan:
             mock_scan.return_value = (False, None)
 
             result = checker.execute()
@@ -393,7 +391,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=0):
                     mock_scan.return_value = (True, xml_file)
@@ -419,9 +417,7 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch(
-            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
-        ) as mock_scan:
+        with patch("kuma_scout.core.checkers.port_checker._run_nmap_scan") as mock_scan:
             mock_scan.return_value = (True, "/nonexistent/file.xml")
 
             result = checker.execute()
@@ -453,7 +449,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
@@ -490,7 +486,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
@@ -515,9 +511,7 @@ class TestPortCheckerExecute:
 
         checker = PortChecker(logger, config)
 
-        with patch(
-            "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
-        ) as mock_scan:
+        with patch("kuma_scout.core.checkers.port_checker._run_nmap_scan") as mock_scan:
             mock_scan.side_effect = Exception("Unexpected error")
 
             result = checker.execute()
@@ -572,7 +566,7 @@ class TestPortCheckerExecute:
 
         try:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._run_nmap_scan"
+                "kuma_scout.core.checkers.port_checker._run_nmap_scan"
             ) as mock_scan:
                 with patch("os.path.getsize", return_value=100):
                     mock_scan.return_value = (True, xml_file)
@@ -797,13 +791,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap", "-p", "80,443"]
@@ -827,13 +821,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap", "-p", "22"]
@@ -857,13 +851,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap"]
@@ -888,13 +882,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap"]
@@ -910,7 +904,7 @@ class TestRunNmapScan:
         config = MagicMock(spec=PortscanConfig)
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             mock_create.side_effect = Exception("File creation error")
 
@@ -930,13 +924,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap"]
@@ -956,13 +950,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap"]
@@ -982,13 +976,13 @@ class TestRunNmapScan:
         config.portscan_nmap_timeout = 300
 
         with patch(
-            "kuma_sentinel.core.checkers.port_checker._create_nmap_xml_file"
+            "kuma_scout.core.checkers.port_checker._create_nmap_xml_file"
         ) as mock_create:
             with patch(
-                "kuma_sentinel.core.checkers.port_checker._build_nmap_command"
+                "kuma_scout.core.checkers.port_checker._build_nmap_command"
             ) as mock_build:
                 with patch(
-                    "kuma_sentinel.core.checkers.port_checker._run_nmap_process"
+                    "kuma_scout.core.checkers.port_checker._run_nmap_process"
                 ) as mock_run:
                     mock_create.return_value = "/tmp/nmap.xml"
                     mock_build.return_value = ["nmap"]
@@ -1104,8 +1098,8 @@ class TestCheckerBaseClass:
 
     def test_checker_init_missing_name(self):
         """Test Checker initialization fails without name."""
-        from kuma_sentinel.core.checkers.base import Checker
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.checkers.base import Checker
+        from kuma_scout.core.config.base import ConfigBase
 
         class BrokenChecker(Checker):
             description = "test"
@@ -1122,8 +1116,8 @@ class TestCheckerBaseClass:
 
     def test_checker_init_missing_description(self):
         """Test Checker initialization fails without description."""
-        from kuma_sentinel.core.checkers.base import Checker
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.checkers.base import Checker
+        from kuma_scout.core.config.base import ConfigBase
 
         class BrokenChecker(Checker):
             name = "test"
@@ -1181,7 +1175,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService"):
+        with patch("kuma_scout.core.checkers.base.HeartbeatService"):
             checker = PortChecker(logger, config)
             # Should initialize heartbeat because "true" string is recognized
             assert checker.heartbeat is not None
@@ -1208,7 +1202,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb:
+        with patch("kuma_scout.core.checkers.base.HeartbeatService") as mock_hb:
             checker = PortChecker(logger, config)
             assert checker.heartbeat is not None
             # Verify HeartbeatService was instantiated with correct parameters
@@ -1226,9 +1220,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch(
-            "kuma_sentinel.core.checkers.base.HeartbeatService"
-        ) as mock_hb_class:
+        with patch("kuma_scout.core.checkers.base.HeartbeatService") as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1288,9 +1280,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch(
-            "kuma_sentinel.core.checkers.base.HeartbeatService"
-        ) as mock_hb_class:
+        with patch("kuma_scout.core.checkers.base.HeartbeatService") as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1320,9 +1310,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch(
-            "kuma_sentinel.core.checkers.base.HeartbeatService"
-        ) as mock_hb_class:
+        with patch("kuma_scout.core.checkers.base.HeartbeatService") as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 
@@ -1352,9 +1340,7 @@ class TestCheckerBaseClass:
         config.heartbeat_interval = 300
         config.portscan_ip_ranges = ["192.168.1.0/24"]
 
-        with patch(
-            "kuma_sentinel.core.checkers.base.HeartbeatService"
-        ) as mock_hb_class:
+        with patch("kuma_scout.core.checkers.base.HeartbeatService") as mock_hb_class:
             mock_heartbeat = MagicMock()
             mock_hb_class.return_value = mock_heartbeat
 

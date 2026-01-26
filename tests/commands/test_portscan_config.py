@@ -6,7 +6,7 @@ import tempfile
 import pytest
 import yaml
 
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
+from kuma_scout.core.config.portscan_config import PortscanConfig
 
 
 def test_portscan_config_factory():
@@ -118,7 +118,7 @@ def test_portscan_config_get_summary():
 
 def test_portscan_config_load_heartbeat_token_from_env(monkeypatch):
     """Test loading heartbeat token from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat_token")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "env_heartbeat_token")
 
     config = PortscanConfig()
     config.load_from_env()
@@ -128,7 +128,7 @@ def test_portscan_config_load_heartbeat_token_from_env(monkeypatch):
 
 def test_portscan_config_load_portscan_token_from_env(monkeypatch):
     """Test loading portscan token from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "env_portscan_token")
+    monkeypatch.setenv("KUMA_SCOUT_PORTSCAN_TOKEN", "env_portscan_token")
 
     config = PortscanConfig()
     config.load_from_env()
@@ -146,8 +146,8 @@ def test_token_loading_priority_portscan(monkeypatch, tmp_path):
     4. Defaults (lowest)
     """
     # Set environment variables
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat")
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "env_portscan")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "env_heartbeat")
+    monkeypatch.setenv("KUMA_SCOUT_PORTSCAN_TOKEN", "env_portscan")
 
     # Create YAML file with tokens
     config_file = tmp_path / "config.yaml"
@@ -332,8 +332,8 @@ def test_portscan_parse_comma_separated_edge_cases():
 
 def test_portscan_config_validation_success(monkeypatch, tmp_path):
     """Test validation succeeds with all required fields."""
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "heartbeat_token_123")
-    monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "command_token_456")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "heartbeat_token_123")
+    monkeypatch.setenv("KUMA_SCOUT_PORTSCAN_TOKEN", "command_token_456")
 
     # Create YAML config with IP ranges since env vars only support tokens
     config_file = tmp_path / "config.yaml"
@@ -753,55 +753,55 @@ class TestConfigBaseValidation:
 
     def test_validate_uptime_kuma_url_valid_http(self):
         """Test URL validation accepts valid HTTP URL."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         ConfigBase.validate_uptime_kuma_url("http://localhost:3001")
         ConfigBase.validate_uptime_kuma_url("http://192.168.1.1/api/push")
 
     def test_validate_uptime_kuma_url_valid_https(self):
         """Test URL validation accepts valid HTTPS URL."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         ConfigBase.validate_uptime_kuma_url("https://uptime.example.com/api/push")
 
     def test_validate_uptime_kuma_url_invalid_scheme(self):
         """Test URL validation rejects invalid scheme."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(ValueError, match="scheme must be"):
             ConfigBase.validate_uptime_kuma_url("ftp://example.com")
 
     def test_validate_uptime_kuma_url_no_hostname(self):
         """Test URL validation rejects URL without hostname."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(ValueError, match="hostname"):
             ConfigBase.validate_uptime_kuma_url("http://")
 
     def test_validate_uptime_kuma_url_empty(self):
         """Test URL validation rejects empty URL."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(ValueError, match="cannot be empty"):
             ConfigBase.validate_uptime_kuma_url("")
 
     def test_validate_uptime_kuma_url_with_spaces(self):
         """Test URL validation rejects URL with spaces."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(ValueError, match="spaces"):
             ConfigBase.validate_uptime_kuma_url("http://example.com/api push")
 
     def test_validate_uptime_kuma_url_trailing_slash(self):
         """Test URL validation rejects URL with trailing slash."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(ValueError, match="trailing slash"):
             ConfigBase.validate_uptime_kuma_url("http://example.com/")
 
     def test_validate_config_file_permissions_secure(self, tmp_path):
         """Test file permissions validation passes for 0o600."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         test_file = tmp_path / "config.yaml"
         test_file.write_text("test")
@@ -812,7 +812,7 @@ class TestConfigBaseValidation:
 
     def test_validate_config_file_permissions_insecure_ignore(self, tmp_path):
         """Test file permissions validation with insecure permissions and ignore flag."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         test_file = tmp_path / "config.yaml"
         test_file.write_text("test")
@@ -825,7 +825,7 @@ class TestConfigBaseValidation:
 
     def test_validate_config_file_permissions_insecure_fail(self, tmp_path):
         """Test file permissions validation fails for insecure permissions."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         test_file = tmp_path / "config.yaml"
         test_file.write_text("test")
@@ -838,7 +838,7 @@ class TestConfigBaseValidation:
 
     def test_validate_config_file_permissions_nonexistent_file(self):
         """Test file permissions validation handles missing file."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         with pytest.raises(RuntimeError, match="Failed to check"):
             ConfigBase.validate_config_file_permissions(
@@ -847,7 +847,7 @@ class TestConfigBaseValidation:
 
     def test_validate_config_file_permissions_nonexistent_file_ignore(self):
         """Test file permissions validation handles missing file with ignore flag."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         result = ConfigBase.validate_config_file_permissions(
             "/nonexistent/file.yaml", ignore_warning=True
@@ -860,7 +860,7 @@ class TestConfigBaseFieldMappings:
 
     def test_parse_bool_true_variants(self):
         """Test _parse_bool handles true variants."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         assert ConfigBase._parse_bool(True) is True
         assert ConfigBase._parse_bool("true") is True
@@ -872,7 +872,7 @@ class TestConfigBaseFieldMappings:
 
     def test_parse_bool_false_variants(self):
         """Test _parse_bool handles false variants."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         assert ConfigBase._parse_bool(False) is False
         assert ConfigBase._parse_bool("false") is False
@@ -883,7 +883,7 @@ class TestConfigBaseFieldMappings:
 
     def test_parse_bool_non_string(self):
         """Test _parse_bool handles non-string values."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         assert ConfigBase._parse_bool(1) is True
         assert ConfigBase._parse_bool(0) is False
@@ -892,7 +892,7 @@ class TestConfigBaseFieldMappings:
 
     def test_get_nested_value_simple(self):
         """Test _get_nested_value with simple path."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         data = {"key": "value"}
         result = ConfigBase._get_nested_value(data, "key")
@@ -900,7 +900,7 @@ class TestConfigBaseFieldMappings:
 
     def test_get_nested_value_nested(self):
         """Test _get_nested_value with nested path."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         data = {"section": {"subsection": {"key": "value"}}}
         result = ConfigBase._get_nested_value(data, "section.subsection.key")
@@ -908,7 +908,7 @@ class TestConfigBaseFieldMappings:
 
     def test_get_nested_value_missing(self):
         """Test _get_nested_value with missing path."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         data = {"section": {"key": "value"}}
         result = ConfigBase._get_nested_value(data, "section.missing.key")
@@ -916,7 +916,7 @@ class TestConfigBaseFieldMappings:
 
     def test_get_nested_value_non_dict(self):
         """Test _get_nested_value with non-dict in path."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         data = {"section": "not_a_dict"}
         result = ConfigBase._get_nested_value(data, "section.key")
@@ -924,7 +924,7 @@ class TestConfigBaseFieldMappings:
 
     def test_convert_value_bool_passthrough(self):
         """Test _convert_value with bool value."""
-        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+        from kuma_scout.core.config.base import ConfigBase, FieldMapping
 
         mapping = FieldMapping(converter=ConfigBase._parse_bool)
         result = ConfigBase._convert_value(True, mapping)
@@ -932,7 +932,7 @@ class TestConfigBaseFieldMappings:
 
     def test_convert_value_int_passthrough(self):
         """Test _convert_value with int value."""
-        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+        from kuma_scout.core.config.base import ConfigBase, FieldMapping
 
         mapping = FieldMapping(converter=int)
         result = ConfigBase._convert_value(42, mapping)
@@ -940,7 +940,7 @@ class TestConfigBaseFieldMappings:
 
     def test_convert_value_list_passthrough(self):
         """Test _convert_value with list value."""
-        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+        from kuma_scout.core.config.base import ConfigBase, FieldMapping
 
         mapping = FieldMapping()
         result = ConfigBase._convert_value([1, 2, 3], mapping)
@@ -948,7 +948,7 @@ class TestConfigBaseFieldMappings:
 
     def test_convert_value_string_with_converter(self):
         """Test _convert_value with string and converter."""
-        from kuma_sentinel.core.config.base import ConfigBase, FieldMapping
+        from kuma_scout.core.config.base import ConfigBase, FieldMapping
 
         mapping = FieldMapping(converter=int)
         result = ConfigBase._convert_value("42", mapping)
@@ -956,35 +956,35 @@ class TestConfigBaseFieldMappings:
 
     def test_mask_token_with_masking(self):
         """Test _mask_token with masking enabled."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         result = ConfigBase._mask_token("secret_token", mask=True)
         assert result == "***"
 
     def test_mask_token_without_masking(self):
         """Test _mask_token with masking disabled."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         result = ConfigBase._mask_token("secret_token", mask=False)
         assert result == "secret_token"
 
     def test_mask_token_none(self):
         """Test _mask_token with None token."""
-        from kuma_sentinel.core.config.base import ConfigBase
+        from kuma_scout.core.config.base import ConfigBase
 
         result = ConfigBase._mask_token(None, mask=True)
         assert result is None
 
     def test_load_from_env_with_heartbeat_token(self, monkeypatch):
         """Test load_from_env applies heartbeat token from environment."""
-        monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_hb_token")
+        monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "env_hb_token")
         config = PortscanConfig()
         config.load_from_env()
         assert config.heartbeat_token == "env_hb_token"
 
     def test_load_from_env_with_portscan_token(self, monkeypatch):
         """Test load_from_env applies portscan token from environment."""
-        monkeypatch.setenv("KUMA_SENTINEL_PORTSCAN_TOKEN", "env_portscan_token")
+        monkeypatch.setenv("KUMA_SCOUT_PORTSCAN_TOKEN", "env_portscan_token")
         config = PortscanConfig()
         config.load_from_env()
         assert config.command_token == "env_portscan_token"

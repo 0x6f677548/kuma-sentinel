@@ -3,11 +3,11 @@
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from kuma_sentinel.core.checkers.zfs_pool_checker import (
+from kuma_scout.core.checkers.zfs_pool_checker import (
     ZfsPoolStatusChecker,
     _get_pool_status,
 )
-from kuma_sentinel.core.config.zfs_pool_config import ZfsPoolStatusConfig
+from kuma_scout.core.config.zfs_pool_config import ZfsPoolStatusConfig
 
 
 class TestZfsPoolStatusChecker:
@@ -29,7 +29,7 @@ class TestZfsPoolStatusChecker:
         config.zfspoolstatus_free_space_percent_default = default_threshold
         return config
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_all_pools_healthy(self, mock_status):
         """Test successful execution with all pools healthy and sufficient space."""
         mock_status.side_effect = [
@@ -54,7 +54,7 @@ class TestZfsPoolStatusChecker:
         assert result.details["pool_details"]["tank"]["free_percent"] == 25.0
         assert result.details["pool_details"]["backup"]["free_percent"] == 50.0
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_per_pool_threshold_override(self, mock_status):
         """Test per-pool threshold overrides global default."""
         mock_status.side_effect = [
@@ -77,7 +77,7 @@ class TestZfsPoolStatusChecker:
         assert result.status == "up"
         assert "All pools healthy" in result.message
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_per_pool_uses_global_default(self, mock_status):
         """Test pool without explicit threshold uses global default."""
         mock_status.side_effect = [
@@ -102,7 +102,7 @@ class TestZfsPoolStatusChecker:
         assert "All pools healthy" in result.message
         assert result.details["pool_details"]["tank"]["threshold"] == 10
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_unhealthy_pool_online_but_low_space(self, mock_status):
         """Test detection of low free space."""
         mock_status.side_effect = [
@@ -124,7 +124,7 @@ class TestZfsPoolStatusChecker:
         assert "tank: 8.0% < 10%" in result.message
         assert result.details["low_space_pools"] == [("tank", 8.0, 10)]
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_unhealthy_pool_degraded_status(self, mock_status):
         """Test that non-ONLINE status triggers DOWN."""
         mock_status.side_effect = [
@@ -146,7 +146,7 @@ class TestZfsPoolStatusChecker:
         assert "tank" in result.message
         assert result.details["unhealthy_pools"] == ["tank"]
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_unhealthy_pool_faulted_status(self, mock_status):
         """Test FAULTED pool status triggers DOWN."""
         mock_status.side_effect = [
@@ -167,7 +167,7 @@ class TestZfsPoolStatusChecker:
         assert "Unhealthy pools" in result.message
         assert "tank" in result.message
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_unhealthy_pool_offline_status(self, mock_status):
         """Test OFFLINE pool status triggers DOWN."""
         mock_status.side_effect = [
@@ -187,7 +187,7 @@ class TestZfsPoolStatusChecker:
         assert result.status == "down"
         assert "Unhealthy pools" in result.message
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_multiple_pools_one_unhealthy(self, mock_status):
         """Test with multiple pools where one is unhealthy."""
         mock_status.side_effect = [
@@ -211,7 +211,7 @@ class TestZfsPoolStatusChecker:
         assert "backup" in result.message
         assert result.details["unhealthy_pools"] == ["backup"]
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_multiple_pools_multiple_issues(self, mock_status):
         """Test priority: unhealthy pools reported before low space."""
         mock_status.side_effect = [
@@ -235,7 +235,7 @@ class TestZfsPoolStatusChecker:
         assert "Unhealthy pools" in result.message
         assert "tank" in result.message
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_pool_status_retrieval_fails(self, mock_status):
         """Test when pool status cannot be retrieved."""
         mock_status.side_effect = [
@@ -269,7 +269,7 @@ class TestZfsPoolStatusChecker:
         assert "No ZFS pools configured" in result.message
         assert result.details["error"] == "no_pools"
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_exception_handling(self, mock_status):
         """Test that unexpected exceptions are caught and reported."""
         config = self.create_config(
@@ -289,7 +289,7 @@ class TestZfsPoolStatusChecker:
         assert result.status == "down"
         assert "error" in result.message.lower()
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_result_duration(self, mock_status):
         """Test that result duration is tracked."""
         mock_status.return_value = ("ONLINE", 25.0)
@@ -307,7 +307,7 @@ class TestZfsPoolStatusChecker:
         assert result.duration_seconds >= 0
         assert isinstance(result.duration_seconds, int)
 
-    @patch("kuma_sentinel.core.checkers.zfs_pool_checker._get_pool_status")
+    @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")
     def test_execute_checker_name_and_metadata(self, mock_status):
         """Test that result has correct checker name and metadata."""
         mock_status.return_value = ("ONLINE", 25.0)

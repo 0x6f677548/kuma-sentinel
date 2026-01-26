@@ -1,18 +1,18 @@
-"""Click CLI application for kuma sentinel."""
+"""Click CLI application for kuma scout."""
 
 from importlib.metadata import version
 
 import click
 
-__version__ = version("kuma-sentinel")
-from kuma_sentinel.cli.commands import _COMMAND_REGISTRY
+__version__ = version("kuma-scout")
+from kuma_scout.cli.commands import _COMMAND_REGISTRY
 
 
 def print_version(ctx, param, value):
     """Print version and exit."""
     if not value or ctx.resilient_parsing:
         return
-    click.echo(f"kuma-sentinel version {__version__}")
+    click.echo(f"kuma-scout version {__version__}")
     ctx.exit()
 
 
@@ -27,7 +27,7 @@ def print_version(ctx, param, value):
 )
 @click.pass_context
 def cli(ctx: click.Context):
-    """Kuma Sentinel - Extensible Monitoring Agent.
+    """Kuma Scout - Extensible Monitoring Agent.
 
     Monitor services and systems with reports to Uptime Kuma.
     Use subcommands for specific checks: portscan, etc.

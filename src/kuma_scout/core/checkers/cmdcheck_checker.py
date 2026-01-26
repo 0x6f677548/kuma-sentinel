@@ -7,10 +7,10 @@ import time
 from logging import Logger
 from typing import Any, Dict, List, Optional, Tuple
 
-from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
-from kuma_sentinel.core.logger import log_security_event
-from kuma_sentinel.core.models import CheckResult
-from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.core.logger import log_security_event
+from kuma_scout.core.models import CheckResult
+from kuma_scout.core.utils.sanitizer import DataSanitizer
 
 from .base import Checker
 

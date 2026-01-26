@@ -1,4 +1,4 @@
-"""Kopia snapshot status checker for sentinel."""
+"""Kopia snapshot status checker for scout."""
 
 import json
 import re
@@ -8,8 +8,8 @@ from datetime import datetime
 from logging import Logger
 from typing import Optional, Tuple
 
-from kuma_sentinel.core.checkers.base import Checker
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.checkers.base import Checker
+from kuma_scout.core.models import CheckResult
 
 
 def _validate_snapshot_path(path: str) -> None:
@@ -95,7 +95,7 @@ def _run_kopia_command(
         logger.error("❌ Kopia command timed out")
         return False, None, "Command timed out"
     except Exception as e:
-        from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+        from kuma_scout.core.utils.sanitizer import DataSanitizer
 
         sanitized_error = DataSanitizer.sanitize_error_message(e)
         logger.error(f"❌ Error running kopia: {sanitized_error}")
@@ -234,7 +234,7 @@ def _get_latest_snapshot_age(
 
 
 class KopiaSnapshotChecker(Checker):
-    """Kopia snapshot status checker for sentinel."""
+    """Kopia snapshot status checker for scout."""
 
     name = "kopiasnapshotstatus"
     description = "Checks Kopia snapshot freshness and reports to Uptime Kuma"
@@ -382,7 +382,7 @@ class KopiaSnapshotChecker(Checker):
             )
 
         except Exception as e:
-            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            from kuma_scout.core.utils.sanitizer import DataSanitizer
 
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(

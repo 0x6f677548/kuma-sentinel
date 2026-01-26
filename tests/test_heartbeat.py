@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from kuma_sentinel.core.heartbeat import HeartbeatService
+from kuma_scout.core.heartbeat import HeartbeatService
 
 
 class TestHeartbeatService:
@@ -111,7 +111,7 @@ class TestHeartbeatService:
 
         service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
 
-        with patch("kuma_sentinel.core.heartbeat.send_push") as mock_send:
+        with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
             mock_send.return_value = True
 
             result = service.send_message("Test message")
@@ -125,7 +125,7 @@ class TestHeartbeatService:
 
         service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
 
-        with patch("kuma_sentinel.core.heartbeat.send_push") as mock_send:
+        with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
             mock_send.return_value = False
 
             result = service.send_message("Test message")
@@ -140,7 +140,7 @@ class TestHeartbeatService:
             logger, "http://localhost/api/push", "test_token", check_name="PortScan"
         )
 
-        with patch("kuma_sentinel.core.heartbeat.send_push") as mock_send:
+        with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
             mock_send.return_value = True
 
             service.send_message("Custom status")
@@ -204,7 +204,7 @@ class TestHeartbeatService:
             check_name="TestCheck",
         )
 
-        with patch("kuma_sentinel.core.heartbeat.time.sleep") as mock_sleep:
+        with patch("kuma_scout.core.heartbeat.time.sleep") as mock_sleep:
             with patch.object(service, "send_message") as mock_send:
                 mock_send.return_value = True
 
@@ -247,7 +247,7 @@ class TestHeartbeatService:
             check_name="KopiaCheck",
         )
 
-        with patch("kuma_sentinel.core.heartbeat.time.sleep"):
+        with patch("kuma_scout.core.heartbeat.time.sleep"):
             with patch.object(service, "send_message") as mock_send:
                 mock_send.return_value = True
 
@@ -255,7 +255,7 @@ class TestHeartbeatService:
                     service.stop_event.set()
 
                 with patch(
-                    "kuma_sentinel.core.heartbeat.time.sleep",
+                    "kuma_scout.core.heartbeat.time.sleep",
                     side_effect=stop_after_sleep,
                 ):
                     service.stop_event.clear()
@@ -285,9 +285,7 @@ class TestHeartbeatService:
             if call_count[0] > 1:
                 service.stop_event.set()
 
-        with patch(
-            "kuma_sentinel.core.heartbeat.time.sleep", side_effect=sleep_and_stop
-        ):
+        with patch("kuma_scout.core.heartbeat.time.sleep", side_effect=sleep_and_stop):
             with patch.object(service, "send_message") as mock_send:
                 mock_send.return_value = True
                 service.stop_event.clear()

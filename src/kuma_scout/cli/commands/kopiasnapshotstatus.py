@@ -4,10 +4,10 @@ from typing import Dict
 
 import click
 
-from kuma_sentinel.cli.commands import register_command
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.core.checkers.kopia_snapshot_checker import KopiaSnapshotChecker
-from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
+from kuma_scout.cli.commands import register_command
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.core.checkers.kopia_snapshot_checker import KopiaSnapshotChecker
+from kuma_scout.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 
 
 @register_command(

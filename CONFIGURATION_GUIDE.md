@@ -1,8 +1,8 @@
-# Configuration Guide for Kuma Sentinel
+# Configuration Guide for Kuma Scout
 
 ## Overview: How Configuration Works
 
-Kuma Sentinel supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
+Kuma Scout supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
 - Store sensitive authentication tokens in environment variables
 - Use YAML files for detailed, reusable configurations
 - Override settings via command-line arguments for one-off executions
@@ -12,8 +12,8 @@ Kuma Sentinel supports multiple configuration sources that work together with a 
 ### Configuration Priority (Highest to Lowest)
 
 1. **CLI Arguments** - Command-line flags override everything
-2. **YAML Config File** - Settings in `/etc/kuma-sentinel/config.yaml` (or custom path via `--config`)
-3. **Token Environment Variables** - Authentication tokens prefixed with `KUMA_SENTINEL_*_TOKEN`
+2. **YAML Config File** - Settings in `/etc/kuma-scout/config.yaml` (or custom path via `--config`)
+3. **Token Environment Variables** - Authentication tokens prefixed with `KUMA_SCOUT_*_TOKEN`
 4. **Hardcoded Defaults** - Built-in fallback values
 
 This means if you set a value in multiple places, CLI arguments win, followed by YAML, then token environment variables.
@@ -32,8 +32,8 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 - Centralized configuration
 - Easy to version control and audit
 - Supports complex scenarios (multiple paths, pools, snapshots)
-- Default location: `/etc/kuma-sentinel/config.yaml`
-- Override location: `kuma-sentinel COMMAND --config /path/to/config.yaml`
+- Default location: `/etc/kuma-scout/config.yaml`
+- Override location: `kuma-scout COMMAND --config /path/to/config.yaml`
 
 **Method 2: Token Environment Variables (For authentication tokens only)**
 - Secure token storage
@@ -72,7 +72,7 @@ heartbeat:
 **Logging:**
 ```yaml
 logging:
-  log_file: /var/log/kuma-sentinel.log  # Log file path
+  log_file: /var/log/kuma-scout.log  # Log file path
   log_level: INFO                        # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
@@ -103,7 +103,7 @@ cmdcheck:
 
 **CLI (Single Command Only):**
 ```bash
-kuma-sentinel cmdcheck \
+kuma-scout cmdcheck \
   --command "systemctl is-active nginx" \
   http://uptimekuma:3001/api/push \
   your-heartbeat-token \
@@ -157,7 +157,7 @@ cmdcheck:
 
 **CLI with Pattern:**
 ```bash
-kuma-sentinel cmdcheck \
+kuma-scout cmdcheck \
   --command "systemctl status myapp" \
   --failure-pattern "failed|error" \
   --success-pattern "active.*running"
@@ -167,7 +167,7 @@ kuma-sentinel cmdcheck \
 
 **Environment Variable:**
 ```bash
-KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
+KUMA_SCOUT_CMDCHECK_TOKEN=your-cmdcheck-token
 ```
 
 **Or in YAML:**
@@ -506,7 +506,7 @@ cmdcheck:
 
 ### Security Considerations
 
-⚠️ **SECURITY FIRST**: Kuma Sentinel is designed with security as a primary concern.
+⚠️ **SECURITY FIRST**: Kuma Scout is designed with security as a primary concern.
 
 #### Command Execution Security
 
@@ -519,7 +519,7 @@ Commands are executed **without shell interpretation** (`shell=False`) to preven
 
 #### Configuration Security
 
-Kuma Sentinel assumes **configuration is admin-controlled** (YAML files, CLI arguments, environment variables are set by administrators only).
+Kuma Scout assumes **configuration is admin-controlled** (YAML files, CLI arguments, environment variables are set by administrators only).
 
 If you need complex shell logic:
 1. Create a dedicated shell script (stored securely with 755 permissions)
@@ -540,7 +540,7 @@ This separates data (configuration) from logic (scripts) and enables proper code
 
 #### Dangerous Command Pattern Detection
 
-Kuma Sentinel monitors for and **warns about dangerous commands** that could modify system state when executed with elevated privileges (via sudo). This is a **non-blocking security feature** that helps prevent accidental or malicious system modifications.
+Kuma Scout monitors for and **warns about dangerous commands** that could modify system state when executed with elevated privileges (via sudo). This is a **non-blocking security feature** that helps prevent accidental or malicious system modifications.
 
 **Detection is automatic** - dangerous patterns trigger warning messages in logs but commands still execute. This allows administrators to review and audit commands while maintaining operational continuity.
 
@@ -569,19 +569,19 @@ Kuma Sentinel monitors for and **warns about dangerous commands** that could mod
 Only grant sudo access to **read-only** commands that your monitoring actually needs:
 
 ```sudoers
-# /etc/sudoers.d/kuma-sentinel
+# /etc/sudoers.d/kuma-scout
 # Allow monitoring user to check service status (read-only)
-kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl status *
-kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl is-active *
+kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl status *
+kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl is-active *
 
 # Allow checking ZFS pool status (read-only)
-kuma-sentinel ALL=(root) NOPASSWD: /usr/sbin/zpool list
-kuma-sentinel ALL=(root) NOPASSWD: /usr/sbin/zpool status
+kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool list
+kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool status
 
 # Do NOT grant write permissions to ANY tools
-# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl *  (too broad)
-# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/apt *        (package manager)
-# ❌ AVOID: kuma-sentinel ALL=(root) NOPASSWD: /bin/rm *             (destructive)
+# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl *  (too broad)
+# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /usr/bin/apt *        (package manager)
+# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /bin/rm *             (destructive)
 ```
 
 **Safe Monitoring Patterns:**
@@ -622,24 +622,24 @@ cmdcheck:
 
 #### Configuration File Permission Validation
 
-Kuma Sentinel **enforces** that your configuration file has **restricted permissions (0o600)** to prevent unauthorized access to sensitive tokens and credentials.
+Kuma Scout **enforces** that your configuration file has **restricted permissions (0o600)** to prevent unauthorized access to sensitive tokens and credentials.
 
 **What it checks:**
 - Config file should only be readable/writable by its owner
-- Typical location: `/etc/kuma-sentinel/config.yaml` (owner: kuma-sentinel)
+- Typical location: `/etc/kuma-scout/config.yaml` (owner: kuma-scout)
 - Restrictive permissions prevent other users from reading your Uptime Kuma tokens
 
 **If validation fails**, execution **BLOCKS** with an error:
 ```
-❌ Security check failed: Config file /etc/kuma-sentinel/config.yaml has overly permissive mode 0o644.
-Recommended: 0o600. Run: chmod 600 /etc/kuma-sentinel/config.yaml
+❌ Security check failed: Config file /etc/kuma-scout/config.yaml has overly permissive mode 0o644.
+Recommended: 0o600. Run: chmod 600 /etc/kuma-scout/config.yaml
 To bypass this check, use --ignore-file-permissions flag or set logging.ignore_file_permissions: true in config.
 ```
 
 **To bypass this check** (development or testing only):
 ```bash
 # Using CLI flag
-kuma-sentinel cmdcheck --ignore-file-permissions --config ./config.yaml
+kuma-scout cmdcheck --ignore-file-permissions --config ./config.yaml
 
 # Using YAML configuration
 logging:
@@ -652,53 +652,53 @@ logging:
 
 1. **Run under dedicated user:**
    ```bash
-   useradd -r -s /bin/false kuma-sentinel
-   chown kuma-sentinel:kuma-sentinel /etc/kuma-sentinel/config.yaml
-   chmod 600 /etc/kuma-sentinel/config.yaml
+   useradd -r -s /bin/false kuma-scout
+   chown kuma-scout:kuma-scout /etc/kuma-scout/config.yaml
+   chmod 600 /etc/kuma-scout/config.yaml
    ```
 
 2. **Use systemd service with restricted capabilities:**
    ```ini
    [Service]
-   User=kuma-sentinel
-   Group=kuma-sentinel
+   User=kuma-scout
+   Group=kuma-scout
    NoNewPrivileges=yes
    ProtectSystem=strict
    ProtectHome=yes
-   ReadWritePaths=/var/log/kuma-sentinel
+   ReadWritePaths=/var/log/kuma-scout
    ```
 
 3. **Enable sudo for specific commands if needed:**
    ```bash
-   # /etc/sudoers.d/kuma-sentinel
-   kuma-sentinel ALL=(root) NOPASSWD: /usr/bin/systemctl, /usr/bin/zpool
+   # /etc/sudoers.d/kuma-scout
+   kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl, /usr/bin/zpool
    ```
 
 4. **Container deployment (recommended):**
    ```dockerfile
    FROM python:3.11-slim
-   RUN useradd -r -s /bin/false kuma-sentinel
-   COPY --chown=kuma-sentinel:kuma-sentinel config.yaml /etc/kuma-sentinel/
-   USER kuma-sentinel
+   RUN useradd -r -s /bin/false kuma-scout
+   COPY --chown=kuma-scout:kuma-scout config.yaml /etc/kuma-scout/
+   USER kuma-scout
    ```
 
 5. **Centralized logging:**
    ```bash
    # Send all command output and errors to centralized logging
-   kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml 2>&1 | \
-     logger -t kuma-sentinel -s
+   kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml 2>&1 | \
+     logger -t kuma-scout -s
    ```
 
 #### What NOT to Do
 
 - ❌ Don't run commands that output passwords, API keys, or PII (output visible to Uptime Kuma)
 - ❌ Don't allow user-provided commands via web interfaces
-- ❌ Don't run kuma-sentinel as root unless absolutely necessary
+- ❌ Don't run kuma-scout as root unless absolutely necessary
 - ❌ Don't expose Uptime Kuma push tokens in logs or metrics
 - ❌ Don't use shell=True with unchecked user input
 #### Automatic Output Sanitization
 
-⚠️ **SECURITY FEATURE**: Kuma Sentinel automatically sanitizes command output to prevent accidental exposure of sensitive data.
+⚠️ **SECURITY FEATURE**: Kuma Scout automatically sanitizes command output to prevent accidental exposure of sensitive data.
 
 **By default, the following patterns are masked with `[REDACTED]`:**
 - Passwords and secrets: `password=value`, `secret: value`, `api_key=...`
@@ -919,11 +919,11 @@ Full per-command breakdown is logged locally for detailed debugging:
 
 Check logs with:
 ```bash
-# All kuma-sentinel logs
-docker logs kuma-sentinel
+# All kuma-scout logs
+docker logs kuma-scout
 
 # Or journalctl if running as systemd service
-journalctl -u kuma-sentinel -n 100
+journalctl -u kuma-scout -n 100
 ```
 
 ---
@@ -950,14 +950,14 @@ kopiasnapshotstatus:
 ### Command Line
 ```bash
 # Override with CLI
-kuma-sentinel kopiasnapshotstatus \
+kuma-scout kopiasnapshotstatus \
   --snapshot /data 24 \
   --snapshot /backups 48
 ```
 
 ### Authentication Token
 ```bash
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ```
 
 ## Key Features
@@ -1009,24 +1009,24 @@ kopiasnapshotstatus:
 Only the token environment variable is supported:
 
 ```bash
-KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ```
 
 ### CLI Arguments
 
 ```bash
 # Single snapshot
-kuma-sentinel kopiasnapshotstatus --snapshot /data 24
+kuma-scout kopiasnapshotstatus --snapshot /data 24
 
 # Multiple snapshots
-kuma-sentinel kopiasnapshotstatus \
+kuma-scout kopiasnapshotstatus \
   --snapshot /data 24 \
   --snapshot /backups 48 \
   --snapshot "user@host:/path" 72
 
 # With config file and additional settings
-kuma-sentinel kopiasnapshotstatus \
-  --config /etc/kuma-sentinel/config.yaml \
+kuma-scout kopiasnapshotstatus \
+  --config /etc/kuma-scout/config.yaml \
   --max-age-hours 24
 ```
 
@@ -1088,12 +1088,12 @@ max_age_hours: 24  # All use 24h
 
 ### Single snapshot
 ```bash
-kuma-sentinel kopiasnapshotstatus --snapshot /data 24
+kuma-scout kopiasnapshotstatus --snapshot /data 24
 ```
 
 ### Multiple snapshots
 ```bash
-kuma-sentinel kopiasnapshotstatus \
+kuma-scout kopiasnapshotstatus \
   --snapshot /data 24 \
   --snapshot /backups 48 \
   --snapshot "user@host:/path" 72
@@ -1101,8 +1101,8 @@ kuma-sentinel kopiasnapshotstatus \
 
 ### Override config file
 ```bash
-kuma-sentinel kopiasnapshotstatus \
-  --config /etc/kuma-sentinel/config.yaml \
+kuma-scout kopiasnapshotstatus \
+  --config /etc/kuma-scout/config.yaml \
   --snapshot /critical 12 \
   --snapshot /archive 240
 ```
@@ -1175,10 +1175,10 @@ portscan:
 ### Command Line
 ```bash
 # Basic port scan
-kuma-sentinel portscan 192.168.1.0/24
+kuma-scout portscan 192.168.1.0/24
 
 # With custom ports and timing
-kuma-sentinel portscan \
+kuma-scout portscan \
   --ports 22,80,443,3389 \
   --timing T4 \
   192.168.1.0/24
@@ -1186,7 +1186,7 @@ kuma-sentinel portscan \
 
 ### Authentication Token
 ```bash
-KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
+KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token
 ```
 
 ## Configuration Reference
@@ -1212,25 +1212,25 @@ portscan:
 
 ```bash
 # Single IP range
-kuma-sentinel portscan 192.168.1.0/24
+kuma-scout portscan 192.168.1.0/24
 
 # Multiple IP ranges
-kuma-sentinel portscan 192.168.1.0/24 10.0.0.0/8
+kuma-scout portscan 192.168.1.0/24 10.0.0.0/8
 
 # With custom ports
-kuma-sentinel portscan --ports 22,80,443 192.168.1.0/24
+kuma-scout portscan --ports 22,80,443 192.168.1.0/24
 
 # With exclusions
-kuma-sentinel portscan \
+kuma-scout portscan \
   --exclude 192.168.1.1 \
   --exclude 192.168.1.254 \
   192.168.1.0/24
 
 # With nmap timing
-kuma-sentinel portscan --timing T4 192.168.1.0/24
+kuma-scout portscan --timing T4 192.168.1.0/24
 
 # All options combined
-kuma-sentinel portscan \
+kuma-scout portscan \
   --ports 1-10000 \
   --timing T4 \
   --exclude 192.168.1.1 \
@@ -1336,7 +1336,7 @@ zfspoolstatus:
 ### Command Line
 ```bash
 # Monitor multiple pools with thresholds
-kuma-sentinel zfspoolstatus \
+kuma-scout zfspoolstatus \
   --pool tank 10 \
   --pool backup 20 \
   http://uptimekuma:3001/api/push \
@@ -1346,7 +1346,7 @@ kuma-sentinel zfspoolstatus \
 
 ### Authentication Token
 ```bash
-KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 ```
 
 ## Key Features
@@ -1375,20 +1375,20 @@ zfspoolstatus:
 
 ```bash
 # Single pool
-kuma-sentinel zfspoolstatus --pool tank 10
+kuma-scout zfspoolstatus --pool tank 10
 
 # Multiple pools
-kuma-sentinel zfspoolstatus \
+kuma-scout zfspoolstatus \
   --pool tank 10 \
   --pool backup 20 \
   --pool archive 15
 
 # With config file
-kuma-sentinel zfspoolstatus \
-  --config /etc/kuma-sentinel/config.yaml
+kuma-scout zfspoolstatus \
+  --config /etc/kuma-scout/config.yaml
 
 # Override global default
-kuma-sentinel zfspoolstatus \
+kuma-scout zfspoolstatus \
   --pool tank 10 \
   --free-space-percent 15
 ```
@@ -1507,19 +1507,19 @@ All commands support these shared settings:
 Only authentication tokens are supported via environment variables. All other configuration must use YAML files or CLI arguments.
 
 **Supported token environment variables:**
-- `KUMA_SENTINEL_HEARTBEAT_TOKEN` - Shared heartbeat notifications token
-- `KUMA_SENTINEL_CMDCHECK_TOKEN` - Command execution monitoring token
-- `KUMA_SENTINEL_PORTSCAN_TOKEN` - Port scan results token
-- `KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN` - Backup snapshot monitoring token
-- `KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN` - ZFS pool monitoring token
+- `KUMA_SCOUT_HEARTBEAT_TOKEN` - Shared heartbeat notifications token
+- `KUMA_SCOUT_CMDCHECK_TOKEN` - Command execution monitoring token
+- `KUMA_SCOUT_PORTSCAN_TOKEN` - Port scan results token
+- `KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN` - Backup snapshot monitoring token
+- `KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN` - ZFS pool monitoring token
 
 **Example:**
 ```bash
-export KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token
-export KUMA_SENTINEL_CMDCHECK_TOKEN=your-cmdcheck-token
-export KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token
-export KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
-export KUMA_SENTINEL_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+export KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token
+export KUMA_SCOUT_CMDCHECK_TOKEN=your-cmdcheck-token
+export KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token
+export KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+export KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 ```
 
 **Or in YAML:**
@@ -1548,7 +1548,7 @@ zfspoolstatus:
 ### Logging (YAML Only)
 ```yaml
 logging:
-  log_file: /var/log/kuma-sentinel.log
+  log_file: /var/log/kuma-scout.log
   log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
@@ -1579,7 +1579,7 @@ Configuration is loaded in the following priority order (highest to lowest):
 
 1. **CLI arguments** - Command-line flags (highest priority)
 2. **YAML file** - Configuration from `--config` file
-3. **Token Environment Variables** - Only `KUMA_SENTINEL_*_TOKEN` variables
+3. **Token Environment Variables** - Only `KUMA_SCOUT_*_TOKEN` variables
 4. **Defaults** - Built-in default values (lowest priority)
 
 **Loading order in code:**
@@ -1607,14 +1607,14 @@ portscan:
 
 ```bash
 # CLI argument (highest priority - takes final effect)
-kuma-sentinel portscan --ports 1-65535
+kuma-scout portscan --ports 1-65535
 ```
 
 **Result:** Scans ports `1-65535` (CLI argument wins)
 
 If you remove the CLI argument:
 ```bash
-kuma-sentinel portscan
+kuma-scout portscan
 # Result: Scans ports 1-1000 (YAML file wins)
 ```
 
@@ -1624,7 +1624,7 @@ kuma-sentinel portscan
 
 ## Input Validation
 
-Kuma Sentinel performs comprehensive validation on all configuration inputs to prevent invalid configurations and security issues. This section describes the validation rules for key configuration fields.
+Kuma Scout performs comprehensive validation on all configuration inputs to prevent invalid configurations and security issues. This section describes the validation rules for key configuration fields.
 
 ### Uptime Kuma URL Validation
 
@@ -1753,7 +1753,7 @@ portscan:
 
 ### Configuration Validation on Startup
 
-All configuration is validated when you start Kuma Sentinel. If validation fails, the application will:
+All configuration is validated when you start Kuma Scout. If validation fails, the application will:
 
 1. **Log a detailed error message** showing exactly what failed
 2. **Refuse to start** the monitoring service
@@ -1790,7 +1790,7 @@ ERROR: Configuration validation failed
 # - Examples: "22", "80-443", "22,80,443-445"
 
 # Use verbose logging to see what's being validated
-kuma-sentinel portscan --log-level DEBUG --config config.yaml
+kuma-scout portscan --log-level DEBUG --config config.yaml
 ```
 
 ---
@@ -1805,7 +1805,7 @@ python -c "import yaml; yaml.safe_load(open('config.yaml'))"
 
 ### Dry run with verbose logging
 ```bash
-kuma-sentinel portscan --log-level DEBUG --config config.yaml
+kuma-scout portscan --log-level DEBUG --config config.yaml
 ```
 
 ### Run configuration tests

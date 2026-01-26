@@ -1,4 +1,4 @@
-"""Base configuration management for kuma sentinel."""
+"""Base configuration management for kuma scout."""
 
 import os
 from abc import ABC, abstractmethod
@@ -48,10 +48,10 @@ class ConfigBase(ABC):
             logger: Optional logger for configuration operations.
                    If not provided, will use the default logger.
         """
-        from kuma_sentinel.core.logger import get_logger
+        from kuma_scout.core.logger import get_logger
 
         # Shared attributes
-        self.log_file = "/var/log/kuma-sentinel.log"
+        self.log_file = "/var/log/kuma-scout.log"
         self.log_level = "INFO"
         self.uptime_kuma_url: Optional[str] = None
         self.heartbeat_enabled = True
@@ -92,7 +92,7 @@ class ConfigBase(ABC):
                 converter=int,
             ),
             "heartbeat_token": FieldMapping(
-                env_var="KUMA_SENTINEL_HEARTBEAT_TOKEN",
+                env_var="KUMA_SCOUT_HEARTBEAT_TOKEN",
                 arg_key="heartbeat_token",
                 yaml_path="heartbeat.uptime_kuma.token",
             ),
@@ -382,7 +382,7 @@ class ConfigBase(ABC):
 
                 if ignore_warning:
                     if logger:
-                        from kuma_sentinel.core.logger import log_security_event
+                        from kuma_scout.core.logger import log_security_event
 
                         logger.warning(f"⚠️  {error_msg}")
                         log_security_event(

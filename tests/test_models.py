@@ -2,7 +2,7 @@
 
 import pytest
 
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.models import CheckResult
 
 
 class TestCheckResult:

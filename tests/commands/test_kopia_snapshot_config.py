@@ -6,7 +6,7 @@ import tempfile
 import pytest
 import yaml
 
-from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
+from kuma_scout.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 
 
 def test_kopia_config_factory():
@@ -65,7 +65,7 @@ def test_kopia_config_validation():
 
 def test_kopia_config_load_heartbeat_token_from_env(monkeypatch):
     """Test loading heartbeat token from environment variable."""
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat_token")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "env_heartbeat_token")
 
     config = KopiaSnapshotConfig()
     config.load_from_env()
@@ -76,8 +76,8 @@ def test_kopia_config_load_heartbeat_token_from_env(monkeypatch):
 def test_token_loading_priority_kopia(monkeypatch, tmp_path):
     """Test token loading priority: CLI > YAML > Env > Defaults for kopia."""
     # Set environment variables
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "env_heartbeat")
-    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN", "env_kopia")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "env_heartbeat")
+    monkeypatch.setenv("KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN", "env_kopia")
 
     # Create YAML file with tokens
     config_file = tmp_path / "config.yaml"
@@ -272,8 +272,8 @@ def test_kopia_config_get_summary_without_snapshots():
 
 def test_kopia_config_validation_success(monkeypatch):
     """Test validation succeeds with all required fields."""
-    monkeypatch.setenv("KUMA_SENTINEL_HEARTBEAT_TOKEN", "heartbeat_token_123")
-    monkeypatch.setenv("KUMA_SENTINEL_KOPIASNAPSHOTSTATUS_TOKEN", "command_token_456")
+    monkeypatch.setenv("KUMA_SCOUT_HEARTBEAT_TOKEN", "heartbeat_token_123")
+    monkeypatch.setenv("KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN", "command_token_456")
 
     config = KopiaSnapshotConfig()
     config.uptime_kuma_url = (

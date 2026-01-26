@@ -2,7 +2,7 @@
 
 import unittest
 
-from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.utils.sanitizer import DataSanitizer
 
 
 class TestErrorSanitization(unittest.TestCase):

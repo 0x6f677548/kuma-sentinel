@@ -1,5 +1,5 @@
 include README.md
 include LICENSE
 include example.config.yaml
-recursive-include src/kuma_sentinel *.py
+recursive-include src/kuma_scout *.py
 recursive-include tests *.py

@@ -1,4 +1,4 @@
-"""Port scanning checker for sentinel."""
+"""Port scanning checker for scout."""
 
 import os
 import subprocess
@@ -8,9 +8,9 @@ import xml.etree.ElementTree as ET
 from logging import Logger
 from typing import List, Optional, Tuple
 
-from kuma_sentinel.core.checkers.base import Checker
-from kuma_sentinel.core.config.portscan_config import PortscanConfig
-from kuma_sentinel.core.models import CheckResult
+from kuma_scout.core.checkers.base import Checker
+from kuma_scout.core.config.portscan_config import PortscanConfig
+from kuma_scout.core.models import CheckResult
 
 
 def _build_nmap_command(config: PortscanConfig) -> List[str]:
@@ -219,7 +219,7 @@ def _run_nmap_scan(
             return False, nmap_xml
 
     except Exception as e:
-        from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+        from kuma_scout.core.utils.sanitizer import DataSanitizer
 
         sanitized_error = DataSanitizer.sanitize_error_message(e)
         logger.error(f"❌ Error running nmap: {sanitized_error}")
@@ -227,7 +227,7 @@ def _run_nmap_scan(
 
 
 class PortChecker(Checker):
-    """Port scanning checker for sentinel."""
+    """Port scanning checker for scout."""
 
     name = "portscan"
     description = "Scans TCP ports on target IP ranges and reports to Uptime Kuma"
@@ -291,7 +291,7 @@ class PortChecker(Checker):
                 )
 
         except Exception as e:
-            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+            from kuma_scout.core.utils.sanitizer import DataSanitizer
 
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(

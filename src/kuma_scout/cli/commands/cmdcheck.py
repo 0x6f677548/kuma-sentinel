@@ -4,10 +4,10 @@ from typing import Dict
 
 import click
 
-from kuma_sentinel.cli.commands import register_command
-from kuma_sentinel.cli.commands.executor import CommandExecutor
-from kuma_sentinel.core.checkers.cmdcheck_checker import CmdCheckChecker
-from kuma_sentinel.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.cli.commands import register_command
+from kuma_scout.cli.commands.executor import CommandExecutor
+from kuma_scout.core.checkers.cmdcheck_checker import CmdCheckChecker
+from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
 
 
 @register_command(

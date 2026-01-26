@@ -1,6 +1,7 @@
 """Tests for Kopia snapshot checker."""
 
 import json
+import subprocess
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ from kuma_sentinel.core.checkers.kopia_snapshot_checker import (
     _parse_iso_timestamp,
     _parse_snapshot_timestamp,
     _run_kopia_command,
+    _validate_snapshot_path,
 )
 from kuma_sentinel.core.config.kopia_snapshot_config import KopiaSnapshotConfig
 from kuma_sentinel.core.models import CheckResult
@@ -143,7 +145,6 @@ class TestRunKopiaCommand:
     @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
     def test_command_timeout(self, mock_run):
         """Test command timeout."""
-        import subprocess
 
         mock_run.side_effect = subprocess.TimeoutExpired("cmd", 30)
 
@@ -518,3 +519,357 @@ class TestKopiaSnapshotChecker:
         assert result.message is not None
         assert result.duration_seconds >= 0
         assert result.details is not None
+
+
+# Tests for _validate_snapshot_path function
+class TestValidateSnapshotPath:
+    """Test snapshot path validation."""
+
+    def test_validate_local_absolute_path(self):
+        """Test valid local absolute path."""
+        _validate_snapshot_path("/mnt/data")  # Should not raise
+
+    def test_validate_local_absolute_path_with_subdirs(self):
+        """Test valid local absolute path with multiple subdirectories."""
+        _validate_snapshot_path("/mnt/backup/incremental/daily")  # Should not raise
+
+    def test_validate_local_relative_path(self):
+        """Test valid relative path."""
+        _validate_snapshot_path("./data")  # Should not raise
+
+    def test_validate_local_relative_path_nested(self):
+        """Test valid relative nested path."""
+        _validate_snapshot_path("data/backups/2024")  # Should not raise
+
+    def test_validate_home_path(self):
+        """Test path starting with tilde."""
+        _validate_snapshot_path("~/backups")  # Should not raise
+
+    def test_validate_ssh_path_simple(self):
+        """Test valid SSH path."""
+        _validate_snapshot_path("user@host:/data")  # Should not raise
+
+    def test_validate_ssh_path_with_domain(self):
+        """Test valid SSH path with FQDN."""
+        _validate_snapshot_path(
+            "admin@backup.example.com:/backups/data"
+        )  # Should not raise
+
+    def test_validate_ssh_path_with_underscores(self):
+        """Test valid SSH path with underscores in hostname."""
+        _validate_snapshot_path("user@backup_host:/data")  # Should not raise
+
+    def test_validate_path_with_numbers(self):
+        """Test path with numbers."""
+        _validate_snapshot_path("/mnt/data2024")  # Should not raise
+
+    def test_validate_path_with_hyphens(self):
+        """Test path with hyphens."""
+        _validate_snapshot_path("/mnt/data-backup-2024")  # Should not raise
+
+    def test_validate_path_with_dots(self):
+        """Test path with dots."""
+        _validate_snapshot_path("/mnt/data.backup.v1")  # Should not raise
+
+    def test_validate_empty_path(self):
+        """Test that empty path is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("")
+
+    def test_validate_path_traversal_double_dot(self):
+        """Test that path traversal (..) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data/../config")
+
+    def test_validate_path_traversal_at_start(self):
+        """Test that path traversal at start is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("../data")
+
+    def test_validate_shell_metachar_dollar(self):
+        """Test that dollar sign ($) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/$data")
+
+    def test_validate_shell_metachar_backtick(self):
+        """Test that backtick (`) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/`data`")
+
+    def test_validate_shell_metachar_semicolon(self):
+        """Test that semicolon (;) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data;rm")
+
+    def test_validate_shell_metachar_pipe(self):
+        """Test that pipe (|) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data|cat")
+
+    def test_validate_shell_metachar_ampersand(self):
+        """Test that ampersand (&) is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data&dangerous")
+
+    def test_validate_shell_metachar_parentheses(self):
+        """Test that parentheses are rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data(subdir)")
+
+    def test_validate_shell_metachar_angle_brackets(self):
+        """Test that angle brackets are rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data<>file")
+
+    def test_validate_shell_metachar_exclamation(self):
+        """Test that exclamation mark is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data!important")
+
+    def test_validate_shell_metachar_asterisk(self):
+        """Test that asterisk is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data*")
+
+    def test_validate_shell_metachar_question_mark(self):
+        """Test that question mark is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/data?")
+
+    def test_validate_ssh_invalid_format_missing_colon(self):
+        """Test that SSH path without colon is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("user@host/data")
+
+    def test_validate_ssh_invalid_format_missing_at(self):
+        """Test that SSH-like path without @ is rejected."""
+        with self.error_context():
+            _validate_snapshot_path("user:host:/data")
+
+    def test_validate_path_with_spaces(self):
+        """Test that spaces in path are rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/my data")
+
+    def test_validate_path_with_special_unicode(self):
+        """Test that non-ASCII characters are rejected."""
+        with self.error_context():
+            _validate_snapshot_path("/mnt/dätä")
+
+    def test_validate_ssh_with_port_like_notation(self):
+        """Test SSH path - port should not be included in validation."""
+        with self.error_context():
+            # This should fail because : is not allowed twice in SSH format
+            _validate_snapshot_path("user@host:22:/data")
+
+    @staticmethod
+    def error_context():
+        """Helper to assert ValueError is raised."""
+        import pytest
+
+        return pytest.raises(ValueError)
+
+    def test_validate_root_path(self):
+        """Test root path."""
+        _validate_snapshot_path("/")  # Should not raise
+
+    def test_validate_nested_deep_path(self):
+        """Test deeply nested path."""
+        _validate_snapshot_path("/mnt/backup/2024/01/15/hourly/0")  # Should not raise
+
+    def test_validate_ssh_with_hyphenated_domain(self):
+        """Test SSH with hyphenated domain name."""
+        _validate_snapshot_path("admin@my-backup-server:/data")  # Should not raise
+
+    def test_validate_ssh_with_dotted_domain(self):
+        """Test SSH with dotted domain name."""
+        _validate_snapshot_path(
+            "admin@backup.corp.example.com:/data/backups"
+        )  # Should not raise
+
+    def test_validate_path_ending_with_slash(self):
+        """Test path ending with slash - should work as regex allows it."""
+        # The validation regex accepts trailing slashes in path components
+        _validate_snapshot_path("/mnt/data/")  # Should not raise
+
+    def test_validate_path_starting_with_dot_dot(self):
+        """Test that .. at start fails."""
+        with self.error_context():
+            _validate_snapshot_path("..")
+
+    def test_validate_path_with_only_dots(self):
+        """Test path with only dots (invalid)."""
+        with self.error_context():
+            _validate_snapshot_path("...")
+
+    @patch(
+        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
+    )
+    def test_execute_with_invalid_snapshot_path(self, mock_age):
+        """Test execution with invalid snapshot path configuration."""
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/mnt/data$invalid", "max_age_hours": 24},  # Invalid path
+        ]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+        result = checker.execute()
+
+        assert result.status == "down"
+        assert (
+            "Invalid snapshot path" in result.message
+            or "failed" in result.message.lower()
+        )
+
+    def test_execute_with_missing_path_field(self):
+        """Test execution with snapshot config missing path field."""
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshots = [
+            {"max_age_hours": 24},  # Missing 'path' field
+        ]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+        result = checker.execute()
+
+        # When path is missing, it gets skipped - if all paths are missing, treated as "no snapshots checked"
+        # The actual behavior is it returns "up" since there were no failed validations
+        assert result.status == "up"
+
+    @patch(
+        "kuma_sentinel.core.checkers.kopia_snapshot_checker._get_latest_snapshot_age"
+    )
+    def test_execute_with_exception(self, mock_age):
+        """Test execution with unexpected exception."""
+        mock_age.side_effect = RuntimeError("Unexpected error")
+
+        config = KopiaSnapshotConfig()
+        config.kopiasnapshotstatus_snapshots = [
+            {"path": "/data", "max_age_hours": 24},
+        ]
+        config.kopiasnapshotstatus_max_age_hours = 24
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_enabled = False
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+        result = checker.execute()
+
+        assert result.status == "down"
+        assert "error" in result.message.lower()
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_with_missing_stats(self, mock_run):
+        """Test snapshot age calculation when stats field is missing."""
+        now = datetime.now()
+        recent = now - timedelta(hours=2)
+        end_time = recent.isoformat() + "Z"
+
+        snapshot = {
+            "id": "test-id",
+            "endTime": end_time,
+            "startTime": "2026-01-19T00:00:11.570523988Z",
+            # Missing stats field
+            "retentionReason": ["daily-1"],
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+
+        with patch(
+            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+        ) as mock_datetime:
+            mock_datetime.now.return_value = now
+            mock_datetime.fromisoformat = datetime.fromisoformat
+
+            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should still work with empty stats dict
+        assert age is not None
+        assert metadata is not None
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_run_kopia_command_with_exception(self, mock_run):
+        """Test kopia command execution with general exception."""
+        mock_run.side_effect = RuntimeError("General error")
+
+        logger = MagicMock()
+        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+
+        assert success is False
+        assert stderr is not None
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_parsing_error_missing_field(self, mock_run):
+        """Test snapshot age when required field is missing (KeyError)."""
+        snapshot = {
+            "id": "test-id",
+            # Missing endTime - will cause KeyError in parsing
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_with_timezone_aware_datetime(self, mock_run):
+        """Test snapshot age calculation with timezone-aware datetime."""
+        now = datetime.now()
+        recent = now - timedelta(hours=3)
+        # Create timezone-aware datetime with +05:30 offset
+        end_time = recent.isoformat() + "+05:30"
+
+        snapshot = {
+            "id": "test-id",
+            "endTime": end_time,
+            "startTime": "2026-01-19T00:00:11.570523988Z",
+            "stats": {"errorCount": 0, "fileCount": 100},
+            "retentionReason": ["daily-1"],
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+
+        with patch(
+            "kuma_sentinel.core.checkers.kopia_snapshot_checker.datetime"
+        ) as mock_datetime:
+            # For now(), use our real datetime
+            mock_datetime.now.return_value = now
+            # For fromisoformat, use the real function
+            mock_datetime.fromisoformat = datetime.fromisoformat
+
+            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should still calculate approximate age correctly even with timezone
+        assert age is not None
+        assert metadata is not None
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker.subprocess.run")
+    def test_run_kopia_command_empty_stdout(self, mock_run):
+        """Test kopia command with empty stdout."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        logger = MagicMock()
+        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+
+        assert success is True
+        assert stdout == ""
+        assert stderr == ""

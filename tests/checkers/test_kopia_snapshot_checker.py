@@ -873,3 +873,234 @@ class TestValidateSnapshotPath:
         assert success is True
         assert stdout == ""
         assert stderr == ""
+
+
+class TestGetLatestSnapshotAgeParsing:
+    """Test snapshot age parsing with various input scenarios."""
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_invalid_timestamp_format(self, mock_run):
+        """Test snapshot age when endTime has invalid format (parse returns None)."""
+        snapshot = {
+            "id": "test-id",
+            "endTime": "invalid-timestamp-format",
+            "stats": {"size": 1000},
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None when timestamp parsing fails
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+        # Verify specific error about timestamp parsing
+        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        assert any("Failed to parse snapshot timestamp" in str(call) for call in error_calls)
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_missing_endtime(self, mock_run):
+        """Test snapshot age when endTime is None in snapshot data."""
+        snapshot = {
+            "id": "test-id",
+            "endTime": None,
+            "stats": {"size": 1000},
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None when endTime is None
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+        # Verify error about missing endTime
+        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        assert any("Missing endTime" in str(call) for call in error_calls)
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_with_error_count(self, mock_run):
+        """Test snapshot age when snapshot has errors."""
+        snapshot = {
+            "id": "test-id",
+            "endTime": "2026-01-19T00:00:11Z",
+            "stats": {"size": 1000, "errorCount": 5},
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None when snapshot has errors
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+        # Verify error about snapshot errors
+        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        assert any("error(s)" in str(call) for call in error_calls)
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_json_decode_error(self, mock_run):
+        """Test snapshot age when JSON output is invalid."""
+        mock_run.return_value = (True, "invalid json {{{", None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None on JSON parse error
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+        # Verify JSON error
+        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        assert any("Failed to parse JSON" in str(call) for call in error_calls)
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_empty_snapshots_list(self, mock_run):
+        """Test snapshot age when snapshots list is empty."""
+        output = json.dumps([])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None when no snapshots
+        assert age is None
+        assert metadata is None
+        logger.warning.assert_called()
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_run_command_failed(self, mock_run):
+        """Test snapshot age when kopia command fails."""
+        mock_run.return_value = (False, None, "Permission denied")
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return None when command fails
+        assert age is None
+        assert metadata is None
+        logger.error.assert_called()
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_successful_with_metadata(self, mock_run):
+        """Test snapshot age calculation with complete metadata."""
+        now = datetime.now()
+        past_time = now - timedelta(hours=2)
+        iso_timestamp = past_time.isoformat() + "Z"
+
+        snapshot = {
+            "id": "snap-123",
+            "endTime": iso_timestamp,
+            "stats": {
+                "size": 5000,
+                "files": 100,
+                "dirs": 10,
+                "errorCount": 0,
+            },
+            "retentionReason": ["policy1", "policy2"],
+        }
+        output = json.dumps([snapshot])
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should return age and metadata
+        assert age is not None
+        assert 1.9 <= age <= 2.1  # Approximately 2 hours
+        assert metadata is not None
+        assert metadata["id"] == "snap-123"
+        assert metadata["stats"]["size"] == 5000
+        assert metadata["retention_reason"] == ["policy1", "policy2"]
+
+    @patch("kuma_sentinel.core.checkers.kopia_snapshot_checker._run_kopia_command")
+    def test_get_snapshot_age_malformed_snapshot_data(self, mock_run):
+        """Test snapshot age when snapshot data is malformed (raises KeyError)."""
+        # Create data that will cause issues when trying to access dict methods
+        # Use a non-dict snapshot object
+        output = json.dumps([{"id": "test"}])  # Missing critical fields
+        mock_run.return_value = (True, output, None)
+
+        logger = MagicMock()
+        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+
+        # Should handle gracefully
+        assert age is None
+        assert metadata is None
+
+
+class TestRunKopiaCommandExceptions:
+    """Test _run_kopia_command exception handling."""
+
+    @patch("subprocess.run")
+    def test_run_kopia_command_subprocess_exception(self, mock_run):
+        """Test kopia command when subprocess raises an unexpected exception."""
+        # Simulate an OSError being raised during subprocess.run
+        mock_run.side_effect = OSError("Process error")
+
+        logger = MagicMock()
+        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+
+        # Should handle exception and return False
+        assert success is False
+        assert stdout is None
+        assert stderr is not None
+        logger.error.assert_called()
+
+    @patch("subprocess.run")
+    def test_run_kopia_command_attribute_error(self, mock_run):
+        """Test kopia command when subprocess raises AttributeError."""
+        mock_run.side_effect = AttributeError("Unexpected attribute error")
+
+        logger = MagicMock()
+        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+
+        # Should handle exception gracefully
+        assert success is False
+        assert stdout is None
+        assert stderr is not None
+        logger.error.assert_called()
+
+    @patch("subprocess.run")
+    def test_run_kopia_command_value_error(self, mock_run):
+        """Test kopia command when subprocess raises ValueError."""
+        mock_run.side_effect = ValueError("Invalid argument")
+
+        logger = MagicMock()
+        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+
+        # Should handle exception
+        assert success is False
+        assert stdout is None
+        assert stderr is not None
+        logger.error.assert_called()
+
+
+class TestValidateSnapshotPathEdgeCases:
+    """Test edge cases in snapshot path validation."""
+
+    def test_validate_path_valid_local_path(self):
+        """Test that valid local paths pass validation."""
+        _validate_snapshot_path("/mnt/data")
+        _validate_snapshot_path("/home/user/backups")
+        _validate_snapshot_path("./relative/path")
+        _validate_snapshot_path("~/home/backups")
+
+    def test_validate_path_valid_ssh_path(self):
+        """Test that valid SSH paths pass validation."""
+        _validate_snapshot_path("user@host:/path")
+        _validate_snapshot_path("root@server.com:/data")
+        _validate_snapshot_path("admin@192.168.1.1:/backups")
+
+    def test_validate_path_with_hyphens_and_underscores(self):
+        """Test paths with allowed special characters."""
+        _validate_snapshot_path("/mnt/backup-2024-01")
+        _validate_snapshot_path("/path/with_underscores")
+        _validate_snapshot_path("user_name@host-server:/path")
+        _validate_snapshot_path("/path/with-multiple_special-chars")

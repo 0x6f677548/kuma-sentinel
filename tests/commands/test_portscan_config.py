@@ -603,14 +603,14 @@ class TestConfigPrecedence:
         """
         # Create config and load from YAML
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_ip_ranges == ["192.168.100.110-199"]
         assert config.portscan_exclude == []
 
         # Simulate Click's behavior when multiple=True option not provided
         # Click returns empty tuple () for unprovided multiple options
         args_from_click = {
-            "config": "test.config.yaml",
+            "config": "example.config.yaml",
             "log_file": None,
             "uptime_kuma_url": None,
             "heartbeat_token": None,
@@ -636,12 +636,12 @@ class TestConfigPrecedence:
         """Test that CLI arguments DO override YAML when values are provided."""
         # Create config and load from YAML
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_ip_ranges == ["192.168.100.110-199"]
 
         # Simulate Click providing actual arguments (as tuples)
         args_from_click = {
-            "config": "test.config.yaml",
+            "config": "example.config.yaml",
             "log_file": None,
             "uptime_kuma_url": None,
             "heartbeat_token": None,
@@ -666,7 +666,7 @@ class TestConfigPrecedence:
     def test_timing_string_preserved_when_click_not_provided(self):
         """Test that string values from YAML are preserved when Click provides None."""
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_timing == "T5"
 
         # Simulate Click not providing timing argument
@@ -687,7 +687,7 @@ class TestConfigPrecedence:
     def test_string_value_overridden_when_provided(self):
         """Test that string CLI arguments override YAML values."""
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_timing == "T5"
 
         # Simulate Click providing timing argument
@@ -708,7 +708,7 @@ class TestConfigPrecedence:
     def test_ports_string_preserved_when_click_not_provided(self):
         """Test that comma-separated string ports from YAML are preserved."""
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_ports == "1-1000"
 
         args_from_click = {
@@ -728,7 +728,7 @@ class TestConfigPrecedence:
     def test_ports_string_overridden_when_provided(self):
         """Test that CLI ports argument overrides YAML."""
         config = PortscanConfig()
-        config.load_from_yaml("test.config.yaml")
+        config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_ports == "1-1000"
 
         args_from_click = {

@@ -110,7 +110,7 @@ portscan:
   nmap:
     # Nmap timing level: T0-T5 (default: T3)
     # T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane
-    timing: T3
+    timing: T5
     
     # Nmap scan timeout in seconds (default: 3600)
     timeout: 3600
@@ -131,7 +131,7 @@ portscan:
   # IP ranges to scan as a list
   # Example: ["192.168.1.0/24", "10.0.0.0/8"]
   ip_ranges:
-    - 192.168.1.0/24
+    - 192.168.100.110-199
 
 # === KOPIA SNAPSHOT COMMAND CONFIGURATION ===
 

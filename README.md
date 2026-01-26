@@ -317,20 +317,25 @@ Monitor ANY condition on remote systems using standard shell commands. From serv
 
 **With Kuma Sentinel cmdcheck**: Write a shell command that returns exit code 0 for "healthy" and non-zero for "unhealthy". Deploy once, monitor anything.
 
-**Example setup on monitoring machine**:
-```bash
-# Check multiple critical services and conditions
-kuma-sentinel cmdcheck \
-  --command "systemctl is-active nginx" \
-  --command "systemctl is-active postgresql" \
-  --command "test -f /var/lock/app.running" \
-  --timeout 10 \
-  http://uptime-kuma-instance:3001/api/push \
-  your-heartbeat-token \
-  your-cmdcheck-token
+**Example setup on monitoring machine** (using YAML config for multiple checks):
+```yaml
+# In config file: /etc/kuma-sentinel/config.yaml
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: "web_server"
+    - command: "systemctl is-active postgresql"
+      name: "database"
+    - command: "test -f /var/lock/app.running"
+      name: "app_running"
+  timeout: 10
+  uptime_kuma:
+    token: your-cmdcheck-token
 ```
 
-**Additional examples**:
+Then run: `kuma-sentinel cmdcheck --config /etc/kuma-sentinel/config.yaml`
+
+**Additional examples** (single command via CLI):
 ```bash
 # Check service status
 kuma-sentinel cmdcheck \

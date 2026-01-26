@@ -136,7 +136,8 @@ docker run -it --rm \
   -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token \
   -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token \
   kuma-sentinel:latest \
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push
+  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push \
+  your-heartbeat-token your-portscan-token
 
 # Windows (PowerShell)
 docker run -it --rm `
@@ -145,7 +146,8 @@ docker run -it --rm `
   -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token `
   -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token `
   kuma-sentinel:latest `
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push
+  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push `
+  your-heartbeat-token your-portscan-token
 ```
 
 ## Usage
@@ -269,7 +271,10 @@ kuma-sentinel kopiasnapshotstatus --config /etc/kuma-sentinel/config.yaml
 # Or with CLI arguments
 kuma-sentinel kopiasnapshotstatus \
   --snapshot /data 24 \
-  --snapshot /backups 48
+  --snapshot /backups 48 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-kopia-token
 ```
 
 Multiple snapshots with different age requirements:
@@ -277,7 +282,10 @@ Multiple snapshots with different age requirements:
 kuma-sentinel kopiasnapshotstatus \
   --snapshot /data 24 \
   --snapshot /backups 48 \
-  --snapshot /archive 168
+  --snapshot /archive 168 \
+  http://uptimekuma:3001/api/push \
+  your-heartbeat-token \
+  your-kopia-token
 ```
 
 ### ZFS Pool Status

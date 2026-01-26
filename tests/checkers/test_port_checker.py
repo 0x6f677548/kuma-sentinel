@@ -1095,3 +1095,278 @@ class TestParseNmapXmlEdgeCases:
             assert "192.168.1.10:22/tcp" in result
         finally:
             os.unlink(xml_file)
+
+
+class TestCheckerBaseClass:
+    """Test base Checker class functionality through PortChecker."""
+
+    def test_checker_init_missing_name(self):
+        """Test Checker initialization fails without name."""
+        from kuma_sentinel.core.checkers.base import Checker
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        class BrokenChecker(Checker):
+            description = "test"
+
+            def execute(self):
+                pass
+
+        logger = MagicMock()
+        config = MagicMock(spec=ConfigBase)
+
+        with patch.object(BrokenChecker, "name", ""):
+            import pytest
+
+            with pytest.raises(ValueError, match="must define 'name'"):
+                BrokenChecker(logger, config)
+
+    def test_checker_init_missing_description(self):
+        """Test Checker initialization fails without description."""
+        from kuma_sentinel.core.checkers.base import Checker
+        from kuma_sentinel.core.config.base import ConfigBase
+
+        class BrokenChecker(Checker):
+            name = "test"
+
+            def execute(self):
+                pass
+
+        logger = MagicMock()
+        config = MagicMock(spec=ConfigBase)
+
+        with patch.object(BrokenChecker, "description", ""):
+            import pytest
+
+            with pytest.raises(ValueError, match="must define 'description'"):
+                BrokenChecker(logger, config)
+
+    def test_initialize_heartbeat_disabled(self):
+        """Test heartbeat initialization when heartbeat is disabled."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = False
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+
+        checker = PortChecker(logger, config)
+        assert checker.heartbeat is None
+
+    def test_initialize_heartbeat_missing_token(self):
+        """Test heartbeat initialization when token is missing."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = None
+        config.uptime_kuma_url = "http://localhost"
+
+        checker = PortChecker(logger, config)
+        assert checker.heartbeat is None
+
+    def test_initialize_heartbeat_missing_url(self):
+        """Test heartbeat initialization when URL is missing."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = None
+
+        checker = PortChecker(logger, config)
+        assert checker.heartbeat is None
+
+    def test_initialize_heartbeat_string_enabled_true(self):
+        """Test heartbeat initialization with string 'true' for enabled."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = "true"  # String instead of bool
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService"):
+            checker = PortChecker(logger, config)
+            # Should initialize heartbeat because "true" string is recognized
+            assert checker.heartbeat is not None
+
+    def test_initialize_heartbeat_string_enabled_false(self):
+        """Test heartbeat initialization with string 'false' for enabled."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = "false"  # String instead of bool
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        checker = PortChecker(logger, config)
+        assert checker.heartbeat is None
+
+    def test_initialize_heartbeat_all_configured(self):
+        """Test successful heartbeat initialization with all required config."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "test_token"
+        config.uptime_kuma_url = "http://localhost:3001"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb:
+            checker = PortChecker(logger, config)
+            assert checker.heartbeat is not None
+            # Verify HeartbeatService was instantiated with correct parameters
+            mock_hb.assert_called_once()
+            call_kwargs = mock_hb.call_args[1]
+            assert call_kwargs["check_name"] == "portscan"
+
+    def test_execute_with_heartbeat_success(self):
+        """Test execute_with_heartbeat on successful check execution."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+            mock_heartbeat = MagicMock()
+            mock_hb_class.return_value = mock_heartbeat
+
+            checker = PortChecker(logger, config)
+
+            # Mock the execute method to return a result
+            with patch.object(checker, "execute") as mock_execute:
+                result = CheckResult(
+                    check_name="portscan",
+                    status="up",
+                    message="Test success",
+                    duration_seconds=1,
+                )
+                mock_execute.return_value = result
+
+                # Call execute_with_heartbeat
+                returned_result = checker.execute_with_heartbeat()
+
+                # Verify heartbeat was called
+                assert mock_heartbeat.send_message.call_count >= 2  # Start and end messages
+                mock_heartbeat.start.assert_called_once()
+                mock_heartbeat.stop.assert_called_once()
+                assert returned_result == result
+
+    def test_execute_with_heartbeat_no_heartbeat(self):
+        """Test execute_with_heartbeat when heartbeat is not configured."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = False
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        checker = PortChecker(logger, config)
+        assert checker.heartbeat is None
+
+        # Mock execute method
+        with patch.object(checker, "execute") as mock_execute:
+            result = CheckResult(
+                check_name="portscan",
+                status="up",
+                message="Test",
+                duration_seconds=1,
+            )
+            mock_execute.return_value = result
+
+            returned_result = checker.execute_with_heartbeat()
+            assert returned_result == result
+
+    def test_execute_with_heartbeat_timeout_error(self):
+        """Test execute_with_heartbeat handles TimeoutError."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+            mock_heartbeat = MagicMock()
+            mock_hb_class.return_value = mock_heartbeat
+
+            checker = PortChecker(logger, config)
+
+            # Mock execute to raise TimeoutError
+            with patch.object(checker, "execute") as mock_execute:
+                mock_execute.side_effect = TimeoutError("Execution timeout")
+
+                import pytest
+
+                with pytest.raises(TimeoutError):
+                    checker.execute_with_heartbeat()
+
+                # Verify heartbeat stop was still called (in finally block)
+                mock_heartbeat.stop.assert_called_once()
+                # Verify error was logged
+                assert logger.error.called
+
+    def test_execute_with_heartbeat_general_exception(self):
+        """Test execute_with_heartbeat handles general exceptions."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+            mock_heartbeat = MagicMock()
+            mock_hb_class.return_value = mock_heartbeat
+
+            checker = PortChecker(logger, config)
+
+            # Mock execute to raise Exception
+            with patch.object(checker, "execute") as mock_execute:
+                mock_execute.side_effect = RuntimeError("Unexpected error")
+
+                import pytest
+
+                with pytest.raises(RuntimeError):
+                    checker.execute_with_heartbeat()
+
+                # Verify heartbeat stop was still called (in finally block)
+                mock_heartbeat.stop.assert_called_once()
+                # Verify error was logged
+                assert logger.error.called
+
+    def test_execute_with_heartbeat_down_status(self):
+        """Test execute_with_heartbeat with DOWN status result."""
+        logger = MagicMock()
+        config = PortscanConfig()
+        config.heartbeat_enabled = True
+        config.heartbeat_token = "token"
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_interval = 300
+        config.portscan_ip_ranges = ["192.168.1.0/24"]
+
+        with patch("kuma_sentinel.core.checkers.base.HeartbeatService") as mock_hb_class:
+            mock_heartbeat = MagicMock()
+            mock_hb_class.return_value = mock_heartbeat
+
+            checker = PortChecker(logger, config)
+
+            # Mock execute method to return DOWN status
+            with patch.object(checker, "execute") as mock_execute:
+                result = CheckResult(
+                    check_name="portscan",
+                    status="down",
+                    message="Check failed",
+                    duration_seconds=2,
+                )
+                mock_execute.return_value = result
+
+                returned_result = checker.execute_with_heartbeat()
+
+                # Verify heartbeat was called with DOWN emoji
+                assert mock_heartbeat.send_message.called
+                # Check that end message contains the DOWN emoji
+                calls = mock_heartbeat.send_message.call_args_list
+                end_message = calls[-1][0][0]  # Last message sent
+                assert "❌" in end_message or "down" in end_message.lower()

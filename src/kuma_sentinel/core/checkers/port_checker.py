@@ -9,36 +9,24 @@ from logging import Logger
 from typing import List, Optional, Tuple
 
 from kuma_sentinel.core.checkers.base import Checker
+from kuma_sentinel.core.config.portscan_config import PortscanConfig
 from kuma_sentinel.core.models import CheckResult
 
-DEFAULT_PORTSCAN_NMAP_TIMEOUT = 3600  # seconds
 
-
-def _build_nmap_command(config) -> List[str]:
+def _build_nmap_command(config: PortscanConfig) -> List[str]:
     """Build the nmap command based on config.
 
     Args:
-        config: Configuration dict or object
+        config: PortscanConfig object
 
     Returns:
         List of command arguments
     """
-    ports = (
-        config.get("portscan_nmap_ports", "1-65535")
-        if isinstance(config, dict)
-        else getattr(config, "portscan_nmap_ports", "1-65535")
-    )
-    timing = (
-        config.get("portscan_nmap_timing", "T3")
-        if isinstance(config, dict)
-        else getattr(config, "portscan_nmap_timing", "T3")
-    )
-
     cmd = [
         "nmap",
         "-p",
-        str(ports),
-        f"-{timing}",
+        str(config.portscan_nmap_ports),
+        f"-{config.portscan_nmap_timing}",
         "-oX",
     ]
     return cmd
@@ -70,6 +58,7 @@ def _run_nmap_process(
         Tuple of (success: bool, stderr_msg: Optional[str])
     """
     try:
+        logger.debug(f"🔧 Running nmap command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -185,12 +174,14 @@ def _parse_nmap_xml(logger: Logger, xml_file: str) -> List[str]:
         return []
 
 
-def _run_nmap_scan(logger: Logger, config) -> Tuple[bool, Optional[str]]:
+def _run_nmap_scan(
+    logger: Logger, config: PortscanConfig
+) -> Tuple[bool, Optional[str]]:
     """Run nmap scan with periodic heartbeat pings.
 
     Args:
         logger: Logger instance
-        config: Configuration dict or object
+        config: PortscanConfig object
 
     Returns:
         Tuple of (success: bool, nmap_xml_path: Optional[str])
@@ -202,32 +193,22 @@ def _run_nmap_scan(logger: Logger, config) -> Tuple[bool, Optional[str]]:
         cmd = _build_nmap_command(config)
         cmd.append(nmap_xml)
 
-        # Get config values handling both dict and object access
-        exclude_ips = (
-            config.get("portscan_exclude_ips")
-            if isinstance(config, dict)
-            else config.portscan_exclude_ips
-        )
-        nmap_args = (
-            config.get("portscan_nmap_arguments", [])
-            if isinstance(config, dict)
-            else (config.portscan_nmap_arguments or [])
-        )
-        portscan_ip_ranges = (
-            config.get("portscan_ip_ranges", [])
-            if isinstance(config, dict)
-            else (config.portscan_ip_ranges or [])
-        )
+        # Get config values
+        exclude_hosts = config.portscan_exclude
+        nmap_args = config.portscan_nmap_arguments or []
+        portscan_ip_ranges = config.portscan_ip_ranges or []
 
-        if exclude_ips:
-            cmd.extend(["--exclude", exclude_ips])
+        if exclude_hosts:
+            # Join list into comma-separated string for nmap
+            exclude_str = ",".join(exclude_hosts)
+            cmd.extend(["--exclude", exclude_str])
         cmd.extend(nmap_args)
         cmd.extend(portscan_ip_ranges)
 
         logger.info(f"🔍 Running: {' '.join(cmd)}")
 
         # Run nmap scan
-        success, stderr = _run_nmap_process(logger, cmd, DEFAULT_PORTSCAN_NMAP_TIMEOUT)
+        success, stderr = _run_nmap_process(logger, cmd, config.portscan_nmap_timeout)
 
         if success:
             logger.info("✅ Nmap scan completed successfully")
@@ -238,7 +219,10 @@ def _run_nmap_scan(logger: Logger, config) -> Tuple[bool, Optional[str]]:
             return False, nmap_xml
 
     except Exception as e:
-        logger.error(f"❌ Error running nmap: {str(e)}")
+        from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
+        sanitized_error = DataSanitizer.sanitize_error_message(e)
+        logger.error(f"❌ Error running nmap: {sanitized_error}")
         return False, nmap_xml
 
 
@@ -259,8 +243,8 @@ class PortChecker(Checker):
         try:
             self.logger.info("🔍 Starting port scan check")
 
-            # Run nmap scan
-            scan_success, nmap_xml = _run_nmap_scan(self.logger, self.config)
+            # Run nmap scan - cast config to PortscanConfig
+            scan_success, nmap_xml = _run_nmap_scan(self.logger, self.config)  # type: ignore
 
             # Parse XML results
             hosts_with_ports = []
@@ -274,7 +258,7 @@ class PortChecker(Checker):
             # Cleanup
             if nmap_xml and os.path.exists(nmap_xml):
                 self.logger.info(f"📋 XML output saved to: {nmap_xml}")
-                if not self.config.get("nmap_keep_xmloutput", False):
+                if not self.config.portscan_nmap_keep_xmloutput:  # type: ignore
                     os.remove(nmap_xml)
 
             # Determine result
@@ -283,7 +267,7 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message="Port scan execution failed",
+                    message=f"[{self.name}] ✗ Port scan execution failed",
                     duration_seconds=scan_duration,
                     details={"error": "scan_execution_failed"},
                 )
@@ -293,7 +277,7 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message=f"Open ports found: {open_ports_str}",
+                    message=f"[{self.name}] ✗ Open ports found: {open_ports_str}",
                     duration_seconds=scan_duration,
                     details={"open_hosts": hosts_with_ports},
                 )
@@ -302,20 +286,25 @@ class PortChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="up",
-                    message="No open ports found",
+                    message=f"[{self.name}] ✓ No open ports found",
                     duration_seconds=scan_duration,
                 )
 
         except Exception as e:
-            self.logger.error(f"❌ Unexpected error during port scan: {str(e)}")
+            from kuma_sentinel.core.utils.sanitizer import DataSanitizer
+
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
+            self.logger.error(
+                f"❌ Unexpected error during port scan: {sanitized_error}"
+            )
             scan_end = time.time()
             scan_duration = int(scan_end - scan_start)
             return CheckResult(
                 check_name=self.name,
                 status="down",
-                message=f"Port scan error: {str(e)}",
+                message=f"[{self.name}] ✗ Port scan error: {sanitized_error}",
                 duration_seconds=scan_duration,
-                details={"error": str(e)},
+                details={"error": sanitized_error},
             )
 
 

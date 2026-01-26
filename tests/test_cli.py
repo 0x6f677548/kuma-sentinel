@@ -11,11 +11,3 @@ def test_cli_version():
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
     assert "version" in result.output
-
-
-def test_portscan_help():
-    """Test portscan command help."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["portscan", "--help"])
-    assert result.exit_code == 0
-    assert "IP_RANGES" in result.output

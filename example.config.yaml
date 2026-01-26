@@ -1,0 +1,175 @@
+# Kuma Sentinel Configuration (YAML)
+# This is the main configuration file for kuma-sentinel monitoring agent
+
+logging:
+  # Log file path (default: /var/log/kuma-sentinel.log)
+  log_file: /var/log/kuma-sentinel.log
+  
+  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
+  log_level: INFO
+  
+  # Skip validation that config file has restricted permissions (0o600)
+  # Only set to true for development/testing in environments like Docker
+  # In production, always ensure config file has permissions 0o600
+  # Default: false (permissions are validated)
+  ignore_file_permissions: false
+
+# === SHARED CONFIGURATION ===
+# Settings used across all monitoring commands
+
+uptime_kuma:
+  # Uptime Kuma API base URL
+  url: http://uptimekuma:3001/api/push
+
+heartbeat:
+  # Enable heartbeat pings during checks (default: true)
+  enabled: true
+  
+  # Interval in seconds between heartbeat pings (default: 300)
+  interval: 300
+  
+  uptime_kuma:
+    # Push token for heartbeat monitor
+    token: your_heartbeat_token_here
+
+# === COMMAND CHECK CONFIGURATION ===
+# Execute arbitrary shell commands and monitor the results
+# Commands are always stored as a list, even for single commands.
+# 
+# IMPORTANT SECURITY NOTE:
+# Commands are executed WITHOUT shell interpretation (shell=False) to prevent
+# command injection attacks. This means shell metacharacters are NOT evaluated.
+# See CONFIGURATION_GUIDE.md for supported command syntax and migration guide.
+
+cmdcheck:
+  uptime_kuma:
+    # Push token for cmdcheck command
+    token: your_cmdcheck_token_here
+  
+  # Commands list (required) - always a list, even for single command
+  commands:
+    # ✅ SUPPORTED: Simple command with arguments
+    - command: "systemctl is-active nginx"
+      name: "nginx_status"
+      timeout: 10
+      expect_exit_code: 0
+      capture_output: true
+    
+    # ✅ SUPPORTED: Command with quoted arguments
+    - command: "grep -i error /var/log/nginx/error.log"
+      name: "nginx_errors"
+      timeout: 10
+    
+    # ✅ SUPPORTED: File existence test
+    - command: "test -f /var/run/app.pid"
+      name: "app_pid_file"
+      timeout: 5
+      expect_exit_code: 0
+    
+    # ✅ SUPPORTED: Pattern matching on output
+    # - command: "systemctl status nginx"
+    #   name: "nginx_detailed"
+    #   failure_pattern: "failed|error"
+    #   success_pattern: "active.*running"
+    #   timeout: 10
+    
+    # ❌ NOT SUPPORTED: Shell pipes, operators, substitution
+    # ❌ DON'T USE: "systemctl is-active nginx | grep active"
+    # ❌ DON'T USE: "systemctl is-active nginx && echo 'OK'"
+    # ❌ DON'T USE: "echo $(whoami)"
+    # See CONFIGURATION_GUIDE.md for how to handle complex commands
+  
+  # Default timeout for all commands in seconds (used if not specified per-command)
+  timeout: 30
+  
+  # Default expected exit code (used if not specified per-command)
+  expect_exit_code: 0
+  
+  # Default output capture (last 500 chars sent to Uptime Kuma)
+  capture_output: true
+  
+  # Automatically sanitize sensitive data from output (default: true)
+  # Masks passwords, API keys, tokens, emails, credit cards, DB strings
+  sanitize_output: true
+  
+  # Optional: Pattern matching for output (takes precedence over exit code)
+  # These are default patterns; can be overridden per-command
+  success_pattern: null
+  failure_pattern: null
+  
+  # Optional: Capture command output by default (default: true)
+  capture_output: true
+
+# === PORT SCAN COMMAND CONFIGURATION ===
+
+portscan:
+  uptime_kuma:
+    # Push token for port scan alert monitor
+    token: your_portscan_token_here
+  
+  nmap:
+    # Nmap timing level: T0-T5 (default: T3)
+    # T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane
+    timing: T5
+    
+    # Nmap scan timeout in seconds (default: 3600)
+    timeout: 3600
+    
+    # Additional nmap arguments as a list
+    arguments: []
+    
+    # Keep nmap XML output file (default: false)
+    keep_xml_output: false
+  
+  # Port range to scan (default: 1-1000)
+  ports: 1-1000
+  
+  # IPs/ranges to exclude from scan (as list)
+  # Example: ["192.168.1.1", "192.168.2.0/24"]
+  exclude: []
+  
+  # IP ranges to scan as a list
+  # Example: ["192.168.1.0/24", "10.0.0.0/8"]
+  ip_ranges:
+    - 192.168.100.110-199
+
+# === KOPIA SNAPSHOT COMMAND CONFIGURATION ===
+
+kopiasnapshotstatus:
+  uptime_kuma:
+    # Push token for kopia snapshot status alerts
+    token: your_kopiasnapshotstatus_token_here
+  
+  # List of snapshots with per-path maximum age thresholds
+  # Format: each snapshot has 'path' and optional 'max_age_hours'
+  # If 'max_age_hours' is omitted, uses the default value below
+  snapshots:
+    - path: /data
+      max_age_hours: 24
+    - path: /backups
+      max_age_hours: 48
+  
+  # Global default maximum age in hours for snapshots (default: 24)
+  # Used for any snapshot path that doesn't specify max_age_hours
+  max_age_hours: 24
+
+# === ZFS POOL STATUS COMMAND CONFIGURATION ===
+# Monitor ZFS pool health and free space
+
+zfspoolstatus:
+  uptime_kuma:
+    # Push token for ZFS pool status alerts
+    token: your_zfspoolstatus_token_here
+  
+  # List of pools to monitor
+  # Each pool can have its own free space threshold
+  pools:
+    - name: tank
+      free_space_percent_min: 10      # Alert if less than 10% free
+    - name: backup
+      free_space_percent_min: 20      # Alert if less than 20% free
+    # - name: archive                  # Will use global default
+  
+  # Global default minimum free space percentage (default: 10)
+  # Used for pools without explicit threshold
+  free_space_percent_default: 10

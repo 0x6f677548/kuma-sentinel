@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "kuma-sentinel"
 version = "0.0.2"
-description = "Extensible monitoring agent with Uptime Kuma integration. Includes port scanning with heartbeat monitoring."
+description = "Uptime Kuma monitoring agent for internal server monitoring. Execute custom checks, scan ports, monitor backups and storage—then report to Uptime Kuma via push API."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Hugo Batista", email = "mail@hugobatista.com" }
 ]
-keywords = ["port-scanner", "network", "uptime-kuma", "monitoring", "nmap", "monitoring-agent"]
+keywords = ["uptime-kuma-agent", "uptime-kuma", "monitoring-agent", "uptime-monitoring", "server-monitoring", "port-scanner", "network-monitoring", "system-monitoring", "nmap", "backup-monitoring"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -22,9 +22,6 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -34,6 +31,7 @@ classifiers = [
 ]
 dependencies = [
     "click>=8.0.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +40,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 
 [project.urls]
@@ -52,6 +51,12 @@ Issues = "https://go.hugobatista.com/gh/kuma-sentinel/issues"
 
 [project.scripts]
 kuma-sentinel = "kuma_sentinel.cli.app:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kuma_sentinel"]
+
+[tool.setuptools.package-data]
+kuma_sentinel = ["py.typed"]
 
 [tool.black]
 line-length = 88
@@ -102,8 +107,37 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["kuma_sentinel"]
 
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-ra --strict-markers --cov=src/kuma_sentinel --cov-report=html --cov-report=term-missing"
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest"
+lint = "ruff check src tests"
+format = "black src tests"
+format-check = "black --check src tests"
+check = [
+    "ruff check src tests",
+    "black --check src tests",
+    "mypy src tests",
+]

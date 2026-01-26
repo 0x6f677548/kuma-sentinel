@@ -1,7 +1,9 @@
-FROM python:3-slim
+FROM python:3.12-slim
 
 # Links Docker image with repository
 LABEL org.opencontainers.image.source=https://go.hugobatista.com/gh/kuma-sentinel
+LABEL security.scan="true"
+LABEL maintainer="Hugo Batista <mail@hugobatista.com>"
 
 # Install nmap (required for port scanning)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,5 +29,8 @@ USER app
 
 VOLUME /var/log/kuma-sentinel
 VOLUME /data
+
+HEALTHCHECK --interval=300s --timeout=10s --start-period=5s --retries=3 \
+    CMD kuma-sentinel --version || exit 1
 
 ENTRYPOINT ["kuma-sentinel"]

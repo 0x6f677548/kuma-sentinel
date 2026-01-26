@@ -9,7 +9,7 @@
 
 # Kuma-Sentinel: Uptime Kuma Monitoring Agent
 
-**The open-source monitoring agent for Uptime Kuma. Monitor internal systems, custom checks, and server health—then push results back to your Uptime Kuma instance.**
+**The monitoring agent for Uptime Kuma. Monitor internal systems, custom checks, and server health—then push results back to your Uptime Kuma instance.**
 
 While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for external monitoring (HTTP, Ping, TCP), it lacks a native agent to monitor internal system states, processes, or run custom checking scripts.
 

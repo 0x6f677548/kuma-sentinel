@@ -132,7 +132,7 @@ docker build -t kuma-sentinel:latest .
 # Linux/macOS
 docker run -it --rm \
   -v $(pwd)/config.yaml:/etc/kuma-sentinel/config.yaml:ro \
-  -v $(pwd)/logs:/var/log/kuma-sentinel \
+  -v $(pwd)/kuma-sentinel.log:/var/log/kuma-sentinel.log \
   -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token \
   -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token \
   kuma-sentinel:latest \
@@ -142,7 +142,7 @@ docker run -it --rm \
 # Windows (PowerShell)
 docker run -it --rm `
   -v ${pwd}/config.yaml:/etc/kuma-sentinel/config.yaml:ro `
-  -v ${pwd}/logs:/var/log/kuma-sentinel `
+  -v ${pwd}/kuma-sentinel.log:/var/log/kuma-sentinel.log `
   -e KUMA_SENTINEL_HEARTBEAT_TOKEN=your-heartbeat-token `
   -e KUMA_SENTINEL_PORTSCAN_TOKEN=your-portscan-token `
   kuma-sentinel:latest `

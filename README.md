@@ -4,7 +4,7 @@
 [![Deploy to PyPI](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/pypi.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/pypi.yml)
 [![Lint](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml)
 [![Test](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/test.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/test.yml)
-[![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/0x6f677548/kuma-scout)](https://gitmcp.io/0x6f677548/kuma-scout)
+[![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/hugobatista/kuma-scout)](https://gitmcp.io/hugobatista/kuma-scout)
 
 
 # Kuma-Scout 🧭

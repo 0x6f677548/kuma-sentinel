@@ -78,8 +78,8 @@ hatch run check         # Run ruff, black, and mypy checks
 uv build
 
 # This creates:
-# - dist/kuma_scout-0.1.0-py3-none-any.whl
-# - dist/kuma_scout-0.1.0.tar.gz
+# - dist/kuma_scout-x.y.z-py3-none-any.whl
+# - dist/kuma_scout-x.y.z.tar.gz
 ```
 
 ## Project Structure

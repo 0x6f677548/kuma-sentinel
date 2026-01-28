@@ -1,50 +1,62 @@
-"""Click CLI application for kuma scout."""
+"""Typer CLI application for kuma scout."""
 
 from importlib.metadata import version
+from typing import Optional
 
-import click
+import typer
 
 __version__ = version("kuma-scout")
 from kuma_scout.cli.commands import _COMMAND_REGISTRY
 
 
-def print_version(ctx, param, value):
-    """Print version and exit."""
-    if not value or ctx.resilient_parsing:
-        return
-    click.echo(f"kuma-scout version {__version__}")
-    ctx.exit()
+def version_callback(value: bool) -> None:
+    """Handle --version flag."""
+    if value:
+        typer.echo(f"kuma-scout version {__version__}")
+        raise typer.Exit()
 
 
-@click.group()
-@click.option(
-    "--version",
-    is_flag=True,
-    callback=print_version,
-    expose_value=False,
-    is_eager=True,
-    help="Show version and exit",
+app = typer.Typer(
+    help="Kuma Scout - Extensible Monitoring Agent scout for Uptime Kuma.\n\nDeploy to servers, run checks, report system health back to push monitors.\nUse subcommands for specific checks: portscan, etc."
 )
-@click.pass_context
-def cli(ctx: click.Context):
-    """Kuma Scout - Extensible Monitoring Agent.
-
-    Monitor services and systems with reports to Uptime Kuma.
-    Use subcommands for specific checks: portscan, etc.
-    """
-    ctx.ensure_object(dict)
 
 
-# Register commands at function definition time (deferred until cli is actually invoked)
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version_flag: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        callback=version_callback,
+        help="Show version and exit",
+        is_eager=True,
+    ),
+):
+    """Kuma Scout - Extensible Monitoring Agent."""
+    # If no command was provided, show error and suggest --help
+    if ctx.invoked_subcommand is None and not version_flag:
+        typer.echo("Error: No command provided.", err=True)
+        typer.echo("", err=True)
+        typer.echo("Use 'kuma-scout --help' to see available commands.", err=True)
+        raise typer.Exit(code=1)
+
+
+# Register commands at function definition time
 def _register_commands():
     """Register all commands from the registry."""
-    for _, command_class in sorted(_COMMAND_REGISTRY.items()):
+    for cmd_name, command_class in sorted(_COMMAND_REGISTRY.items()):
         cmd_instance = command_class()
-        cli.add_command(cmd_instance.register_command())
+        registered_cmd = cmd_instance.register_command()
+        # Use the function's docstring if available, otherwise use the class help text
+        help_text = registered_cmd.__doc__ or command_class._help_text
+        app.command(name=cmd_name, help=help_text)(registered_cmd)
 
 
 # Call registration
 _register_commands()
+
+# Create alias for compatibility
+cli = app
 
 
 if __name__ == "__main__":

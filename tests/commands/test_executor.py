@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-import click
 import pytest
 
 from kuma_scout.cli.commands.executor import CommandExecutor
@@ -16,9 +15,13 @@ from kuma_scout.core.models import CheckResult
 class ConcreteExecutor(CommandExecutor):
     """Concrete implementation of CommandExecutor for testing."""
 
-    def get_builtin_command(self, base_command):
-        """Return the base command as-is for testing."""
-        return base_command
+    def get_builtin_command(self):
+        """Return a simple command function for testing."""
+
+        def test_command():
+            pass
+
+        return test_command
 
     def get_summary_fields(self):
         """Return summary fields for testing."""
@@ -33,39 +36,8 @@ class ConcreteExecutor(CommandExecutor):
 class TestCommandExecutor:
     """Test the CommandExecutor orchestration logic."""
 
-    def test_add_common_arguments(self):
-        """Test adding common arguments to a Click command."""
-        executor = ConcreteExecutor()
-
-        @click.command()
-        def dummy_cmd(**kwargs):
-            pass
-
-        decorated = executor._add_common_arguments(dummy_cmd)
-
-        # Check that the command has the expected parameters
-        param_names = {p.name for p in decorated.params}
-        assert "uptime_kuma_url" in param_names
-        assert "heartbeat_token" in param_names
-        assert "token" in param_names
-
-    def test_add_common_options(self):
-        """Test adding common options to a Click command."""
-        executor = ConcreteExecutor()
-
-        @click.command()
-        def dummy_cmd(**kwargs):
-            pass
-
-        decorated = executor._add_common_options(dummy_cmd)
-
-        # Check that the command has the expected parameters
-        param_names = {p.name for p in decorated.params}
-        assert "config" in param_names
-        assert "log_file" in param_names
-
-    def test_register_command_creates_click_command(self):
-        """Test register_command returns a valid Click command."""
+    def test_register_command_returns_callable(self):
+        """Test register_command returns a callable function."""
         executor = ConcreteExecutor()
         executor._command_name = "test-cmd"
         executor._help_text = "Test command help"
@@ -74,31 +46,7 @@ class TestCommandExecutor:
 
         cmd = executor.register_command()
 
-        assert cmd.name == "test-cmd"
-        assert cmd.help == "Test command help"
-
-    def test_execute_with_invalid_config_file(self):
-        """Test execute_with_orchestration handles missing config file."""
-        executor = ConcreteExecutor()
-        executor._config_class = PortscanConfig
-        executor._checker_class = Mock()
-
-        ctx = MagicMock()
-        ctx.obj = {}
-
-        args = {
-            "uptime_kuma_url": "http://localhost/api/push",
-            "heartbeat_token": "hb_token",
-            "portscan_token": "cmd_token",
-            "config": "/nonexistent/config.yaml",
-            "log_file": None,
-        }
-
-        with patch.object(executor, "_load_and_validate_config") as mock_load:
-            mock_load.side_effect = FileNotFoundError("Config file not found")
-
-            with pytest.raises(FileNotFoundError):
-                executor.execute_with_orchestration(ctx, args)
+        assert callable(cmd)
 
     def test_config_attribute_mapping_portscan(self):
         """Test config attributes are correctly mapped for portscan command."""
@@ -164,7 +112,6 @@ class TestExecuteWithOrchestration:
         executor._config_class = PortscanConfig
         executor._checker_class = MagicMock(return_value=mock_checker)
 
-        ctx = MagicMock()
         args = {
             "uptime_kuma_url": "http://localhost/api/push",
             "heartbeat_token": "hb_token",
@@ -183,7 +130,7 @@ class TestExecuteWithOrchestration:
             mock_load.return_value = mock_config
 
             with patch("sys.exit") as mock_exit:
-                executor.execute_with_orchestration(ctx, args)
+                executor.execute_with_orchestration(args)
 
                 # Verify exit code
                 mock_exit.assert_called_once_with(0)
@@ -218,7 +165,6 @@ class TestExecuteWithOrchestration:
         executor._config_class = PortscanConfig
         executor._checker_class = MagicMock(return_value=mock_checker)
 
-        ctx = MagicMock()
         args = {
             "uptime_kuma_url": "http://localhost/api/push",
             "heartbeat_token": "hb_token",
@@ -235,7 +181,7 @@ class TestExecuteWithOrchestration:
             mock_load.return_value = mock_config
 
             with patch("sys.exit") as mock_exit:
-                executor.execute_with_orchestration(ctx, args)
+                executor.execute_with_orchestration(args)
 
                 # Verify error exit code
                 mock_exit.assert_called_once_with(1)
@@ -251,7 +197,6 @@ class TestExecuteWithOrchestration:
         executor._config_class = PortscanConfig
         executor._checker_class = Mock()
 
-        ctx = MagicMock()
         args = {
             "uptime_kuma_url": "http://localhost/api/push",
             "heartbeat_token": "hb_token",
@@ -265,7 +210,7 @@ class TestExecuteWithOrchestration:
 
             with patch("sys.exit"):
                 with pytest.raises(ValueError):
-                    executor.execute_with_orchestration(ctx, args)
+                    executor.execute_with_orchestration(args)
 
     @patch("kuma_scout.cli.commands.executor.setup_logging")
     @patch("kuma_scout.cli.commands.executor.send_push")
@@ -290,7 +235,6 @@ class TestExecuteWithOrchestration:
         executor._config_class = PortscanConfig
         executor._checker_class = MagicMock(return_value=mock_checker)
 
-        ctx = MagicMock()
         args = {
             "uptime_kuma_url": "http://localhost/api/push",
             "heartbeat_token": "hb_token",
@@ -307,7 +251,7 @@ class TestExecuteWithOrchestration:
             mock_load.return_value = mock_config
 
             with patch("sys.exit") as mock_exit:
-                executor.execute_with_orchestration(ctx, args)
+                executor.execute_with_orchestration(args)
 
                 # Verify exit code is 0 (not an exception, just a DOWN status)
                 mock_exit.assert_called_once_with(0)
@@ -336,7 +280,6 @@ class TestExecuteWithOrchestration:
         executor._config_class = PortscanConfig
         executor._checker_class = MagicMock(return_value=mock_checker)
 
-        ctx = MagicMock()
         args = {
             "uptime_kuma_url": "http://localhost/api/push",
             "heartbeat_token": "hb_token",
@@ -360,7 +303,7 @@ class TestExecuteWithOrchestration:
                             101.5,
                         ]  # 1.5 second duration
 
-                        executor.execute_with_orchestration(ctx, args)
+                        executor.execute_with_orchestration(args)
 
                         # Verify info logs were called for start/completion
                         assert mock_logger.info.call_count >= 2

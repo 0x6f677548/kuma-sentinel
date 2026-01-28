@@ -46,7 +46,7 @@ class ZfsPoolStatusConfig(ConfigBase):
 
         Handles:
         - Environment variable string format: "pool1:10,pool2:15"
-        - Click tuples from CLI: ((pool1, 10), (pool2, 15), ...)
+        - Typer tuples from CLI: ((pool1, 10), (pool2, 15), ...)
         - YAML lists: [{"name": "pool1", "free_space_percent_min": 10}, ...]
         - Already converted lists
 
@@ -62,7 +62,7 @@ class ZfsPoolStatusConfig(ConfigBase):
         if isinstance(pools_input, list):
             return ZfsPoolStatusConfig._parse_pool_list(pools_input)
 
-        # Try to parse as Click tuples
+        # Try to parse as Typer tuples
         try:
             return [
                 {"name": pool, "free_space_percent_min": threshold}

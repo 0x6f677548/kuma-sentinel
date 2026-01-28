@@ -23,7 +23,7 @@ class KopiaSnapshotConfig(ConfigBase):
         """Convert snapshot input to dict list.
 
         Handles multiple input formats:
-        - Click tuples: ((path1, age1), (path2, age2), ...)
+        - Typer tuples: ((path1, age1), (path2, age2), ...)
         - Environment string: "path1:age1,path2:age2"
         - Already converted list: [{"path": path1, "max_age_hours": age1}, ...]
 
@@ -66,7 +66,7 @@ class KopiaSnapshotConfig(ConfigBase):
                     result.append({"path": parts[0].strip()})
             return result
 
-        # If it's Click tuples ((path1, age1), (path2, age2), ...)
+        # If it's Typer tuples ((path1, age1), (path2, age2), ...)
         try:
             return [
                 {"path": path, "max_age_hours": max_age}

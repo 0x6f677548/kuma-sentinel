@@ -443,7 +443,7 @@ class TestCommandsNormalizer:
         assert result[2]["command"] == "test3"
 
     def test_normalizes_tuple_input(self, config):
-        """Test normalizing tuple input (from Click)."""
+        """Test normalizing tuple input (from Typer)."""
         input_tuple = ("test1", "test2", "test3")
 
         result = config._normalize_commands(input_tuple)

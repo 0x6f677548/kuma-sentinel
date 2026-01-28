@@ -264,11 +264,11 @@ class ConfigBase(ABC):
         """Apply field mappings from command-line arguments with intelligent type handling.
 
         Handles:
-        - List[str] fields: Converts tuples from Click's multiple=True to lists
+        - List[str] fields: Converts tuples from Typer's List[] to lists
         - Fields with converter: Applies the converter function
         - Simple fields: Uses value as-is
 
-        Note: Empty lists/tuples from Click's multiple=True are treated as "not provided"
+        Note: Empty lists/tuples from Typer's List[] are treated as "not provided"
         and don't override YAML or environment configurations.
         """
         mappings = self._get_field_mappings()
@@ -282,7 +282,7 @@ class ConfigBase(ABC):
             if arg_value is None:
                 continue
 
-            # Skip empty collections - these come from Click's multiple=True when no args provided
+            # Skip empty collections - these come from Typer's List[] when no args provided
             # We don't want empty tuples/lists to override YAML or env var values
             if isinstance(arg_value, (list, tuple)) and not arg_value:
                 continue
@@ -290,7 +290,7 @@ class ConfigBase(ABC):
             # Get the field's expected type from type hints
             field_type = type_hints.get(field_name)
 
-            # Handle List[str] fields - convert tuple from Click to list
+            # Handle List[str] fields - convert tuple from Typer to list
             if field_type == List[str]:
                 value = list(arg_value) if arg_value else []
 

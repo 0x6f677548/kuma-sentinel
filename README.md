@@ -22,15 +22,15 @@ While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for ex
 ## Quick Example
 
 ```bash
-# Monitor via YAML config (supports multiple commands)
+# Monitor via YAML config (supports multiple commands - recommended)
 kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml
 
 # Or monitor single condition via CLI
 kuma-scout cmdcheck \
   --command "systemctl is-active nginx" \
-  http://uptime-kuma:3001/api/push \
-  heartbeat-token \
-  cmdcheck-token
+  --uptime-kuma-url http://uptime-kuma:3001/api/push \
+  --heartbeat-token heartbeat-token \
+  --token cmdcheck-token
 ```
 
 If all checks pass → Uptime Kuma shows **UP**. If any fail → shows **DOWN** and triggers alerts.
@@ -138,8 +138,11 @@ docker run -it --rm \
   -e KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token \
   -e KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token \
   kuma-scout:latest \
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push \
-  your-heartbeat-token your-portscan-token
+  portscan \
+    --ip-range 192.168.100.110-199 \
+    --uptime-kuma-url http://uptimekuma:3001/api/push \
+    --heartbeat-token your-heartbeat-token \
+    --token your-portscan-token
 
 # Windows (PowerShell)
 docker run -it --rm `
@@ -148,8 +151,11 @@ docker run -it --rm `
   -e KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token `
   -e KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token `
   kuma-scout:latest `
-  portscan 192.168.100.110-199 http://uptimekuma:3001/api/push `
-  your-heartbeat-token your-portscan-token
+  portscan `
+    --ip-range 192.168.100.110-199 `
+    --uptime-kuma-url http://uptimekuma:3001/api/push `
+    --heartbeat-token your-heartbeat-token `
+    --token your-portscan-token
 ```
 
 ## Usage
@@ -162,9 +168,9 @@ Execute arbitrary shell commands on remote systems and push results to Uptime Ku
 ```bash
 kuma-scout cmdcheck \
   --command "systemctl is-active nginx" \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-cmdcheck-token
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-cmdcheck-token
 ```
 
 **Multiple independent checks (YAML config only - all must pass for UP):**
@@ -193,9 +199,9 @@ kuma-scout cmdcheck \
   --failure-pattern "ERROR|CRITICAL|PANIC" \
   --success-pattern "healthy" \
   --timeout 10 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-cmdcheck-token
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-cmdcheck-token
 ```
 
 **Using configuration file (recommended for multiple commands):**
@@ -207,45 +213,54 @@ kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml
 
 See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
 
+## Upgrading Between Versions
+
+When upgrading Kuma-Scout between major versions, please see [MIGRATION.md](MIGRATION.md) for any breaking changes and migration instructions.
+
 ### Port Scan
 
 Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists.
 
 **Basic usage:**
 ```bash
-kuma-scout portscan 192.168.1.0/24 http://uptimekuma:3001/api/push your-heartbeat-token your-portscan-token
+kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 **With custom ports and timing:**
 ```bash
 kuma-scout portscan \
+  --ip-range 192.168.100.0/24 \
   --ports 22,80,443,3389 \
   --timing T4 \
-  192.168.100.0/24 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 **Multiple IP ranges:**
 ```bash
 kuma-scout portscan \
-  192.168.1.0/24 \
-  10.0.0.0/8 \
-  172.16.0.0/12 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
+  --ip-range 192.168.1.0/24 \
+  --ip-range 10.0.0.0/8 \
+  --ip-range 172.16.0.0/12 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 **With exclusions:**
 ```bash
 kuma-scout portscan \
-  --exclude 192.168.1.1,192.168.1.254 \
-  192.168.1.0/24 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
+  --ip-range 192.168.1.0/24 \
+  --exclude 192.168.1.1 \
+  --exclude 192.168.1.254 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 **Using configuration file (recommended):**
@@ -270,24 +285,34 @@ Monitor Kopia backup snapshot freshness with per-path age thresholds:
 # Using configuration file (recommended)
 kuma-scout kopiasnapshotstatus --config /etc/kuma-scout/config.yaml
 
-# Or with CLI arguments
+# Or with CLI arguments (comma-separated format: path,hours)
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data 24 \
-  --snapshot /backups 48 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-kopia-token
+  --snapshot /data,24 \
+  --snapshot /backups,48 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
 ```
 
 Multiple snapshots with different age requirements:
 ```bash
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data 24 \
-  --snapshot /backups 48 \
-  --snapshot /archive 168 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-kopia-token
+  --snapshot /data,24 \
+  --snapshot /backups,48 \
+  --snapshot /archive,168 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
+```
+
+Monitor SSH-based snapshot locations (comma separator handles colons in SSH paths):
+```bash
+kuma-scout kopiasnapshotstatus \
+  --snapshot "/data,24" \
+  --snapshot "root@fileserver:/mnt/shares,48" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
 ```
 
 ### ZFS Pool Status
@@ -298,24 +323,24 @@ Monitor ZFS pool health and free space with per-pool thresholds:
 # Using configuration file (recommended)
 kuma-scout zfspoolstatus --config /etc/kuma-scout/config.yaml
 
-# Or with CLI arguments
+# Or with CLI arguments (comma-separated format: name,percent)
 kuma-scout zfspoolstatus \
-  --pool tank 10 \
-  --pool backup 20 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-zfs-token
+  --pool tank,10 \
+  --pool backup,20 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
 ```
 
 Multiple pools with different free space thresholds:
 ```bash
 kuma-scout zfspoolstatus \
-  --pool tank 10 \
-  --pool backup 20 \
-  --pool archive 30 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-zfs-token
+  --pool tank,10 \
+  --pool backup,20 \
+  --pool archive,30 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
 ```
 
 ## Use Cases
@@ -444,12 +469,13 @@ docker-compose up -d
 
 # Schedule with cron to run every 30 minutes
 */30 * * * * kuma-scout portscan \
-  --exclude 192.168.1.1,192.168.1.10 \
+  --ip-range 192.168.1.0/24 \
+  --exclude 192.168.1.1 \
+  --exclude 192.168.1.10 \
   --ports 22,3389,80,443 \
-  192.168.1.0/24 \
-  http://uptime-kuma-instance:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
+  --uptime-kuma-url http://uptime-kuma-instance:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 **Result**: 
@@ -860,7 +886,7 @@ Example log output:
 ## Requirements
 
 - Python 3.10+
-- click (installed automatically)
+- typer (installed automatically)
 
 **Per-Command Requirements:**
 - **portscan**: nmap (must be installed on system and in PATH)
@@ -932,4 +958,4 @@ Found a bug? Report it on [GitHub Issues](https://go.hugobatista.com/gh/kuma-sco
 
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma) - Self-hosted monitoring tool
 - [Nmap](https://nmap.org/) - Network mapper and security scanner
-- [Click](https://click.palletsprojects.com/) - Python CLI framework
+- [Typer](https://typer.tiangolo.com/) - Python CLI framework

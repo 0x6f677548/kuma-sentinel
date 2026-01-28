@@ -194,8 +194,8 @@ def test_snapshot_converter_list_of_dicts():
     assert result == input_list
 
 
-def test_snapshot_converter_click_tuples():
-    """Test _snapshot_converter with Click tuple format."""
+def test_snapshot_converter_typer_tuples():
+    """Test _snapshot_converter with Typer tuple format."""
     converter = KopiaSnapshotConfig._snapshot_converter
 
     input_tuples = (("/data", 24), ("/backups", 48))
@@ -351,3 +351,54 @@ def test_kopia_config_yaml_invalid_format():
         assert "Failed to parse config file" in str(exc_info.value)
     finally:
         os.unlink(config_file)
+
+
+def test_kopia_cli_snapshot_optional_format_without_hours():
+    """Test CLI snapshot parsing with optional hours (uses global max_age_hours)."""
+    from kuma_scout.cli.utils import parse_tuples_from_list
+
+    # Parse snapshots without hours - path-specific format
+    snapshots = parse_tuples_from_list(
+        ["/data", "root@fileserver:/mnt/shares", "/backups,48"], required=False
+    )
+
+    # Merge with global max_age_hours
+    global_max_age = 24
+    merged_snapshots = []
+    for path, hours in snapshots:
+        effective_hours = hours if hours is not None else global_max_age
+        merged_snapshots.append((path, effective_hours))
+
+    assert merged_snapshots == [
+        ("/data", 24),
+        ("root@fileserver:/mnt/shares", 24),
+        ("/backups", 48),
+    ]
+
+
+def test_kopia_cli_snapshot_optional_format_ssh_paths():
+    """Test CLI snapshot parsing with SSH paths without hours."""
+    from kuma_scout.cli.utils import parse_tuples_from_list
+
+    # Parse SSH snapshot paths without hours
+    snapshots = parse_tuples_from_list(
+        [
+            "root@fileserver:/mnt/shares",
+            "user@host:/path,48",
+            "backup.example.com:/remote",
+        ],
+        required=False,
+    )
+
+    # Merge with global max_age_hours
+    global_max_age = 24
+    merged_snapshots = []
+    for path, hours in snapshots:
+        effective_hours = hours if hours is not None else global_max_age
+        merged_snapshots.append((path, effective_hours))
+
+    assert merged_snapshots == [
+        ("root@fileserver:/mnt/shares", 24),
+        ("user@host:/path", 48),
+        ("backup.example.com:/remote", 24),
+    ]

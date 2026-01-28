@@ -82,7 +82,7 @@ class CmdCheckConfig(ConfigBase):
         Handles:
         - Single command string (wraps in list)
         - List of dicts from YAML
-        - Tuple from Click CLI
+        - Tuple from Typer CLI
         - Already converted lists
 
         Args:
@@ -114,7 +114,7 @@ class CmdCheckConfig(ConfigBase):
                     result.append(cmd_dict)
             return result
 
-        # Tuple from Click (repeatable argument)
+        # Tuple from Typer (repeatable argument)
         if isinstance(commands_input, tuple):
             return [{"command": str(item)} for item in commands_input]
 

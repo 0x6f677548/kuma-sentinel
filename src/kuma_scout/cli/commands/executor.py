@@ -4,9 +4,7 @@ import logging
 import sys
 import time
 from abc import abstractmethod
-from typing import Any, Dict
-
-import click
+from typing import Any, Callable, Dict
 
 from kuma_scout.cli.commands.base import Command
 from kuma_scout.core.config.base import ConfigBase
@@ -21,8 +19,8 @@ class CommandExecutor(Command):
     heartbeat management, and push notifications.
 
     Subclasses should implement:
-    - get_builtin_command(): Build and decorate Click command with arguments/options
-    - get_summary_fields(cfg: ConfigBase) -> Dict: Get fields for config summary logging
+    - get_builtin_command(): Build Typer-compatible command function with parameters
+    - get_summary_fields() -> Dict: Get fields for config summary logging
     - _checker_class: Class attribute for the checker to instantiate
     """
 
@@ -35,79 +33,15 @@ class CommandExecutor(Command):
         """Initialize the command executor with default logging."""
         setup_default_logging()
 
-    def _add_common_arguments(self, base_command: click.Command) -> click.Command:
-        """Add common positional arguments to a Click command.
+    def register_command(self) -> Callable:
+        """Register and return a Typer-compatible command function.
 
-        These arguments are common across all monitoring commands:
-        - uptime_kuma_url (shared)
-        - heartbeat_token (shared)
-        - token (command-specific, mapped by executor based on config class)
-
-        Returns:
-            The decorated command with common arguments added
-
-        Note:
-            Arguments are added in reverse order (Click decorators apply inside-out).
-            The generic 'token' argument is mapped to the command-specific token field
-            by the executor during config loading based on the config class type.
+        This method delegates to get_builtin_command() which subclasses override
+        to define command with Typer parameters.
         """
-        # Add in reverse order (Click applies decorators inside-out)
-        base_command = click.argument("token", required=False)(base_command)
-        base_command = click.argument("heartbeat_token", required=False)(base_command)
-        base_command = click.argument("uptime_kuma_url", required=False)(base_command)
-        return base_command
+        return self.get_builtin_command()
 
-    def _add_common_options(self, base_command: click.Command) -> click.Command:
-        """Add common options to a Click command.
-
-        These options are common across all monitoring commands:
-        - --config: Configuration file path (YAML or INI depending on command)
-        - --log-file: Log file path
-        - --ignore-file-permissions: Skip config file permission validation
-
-        Returns:
-            The decorated command with common options added
-
-        Note:
-            Options are added in reverse order (Click decorators apply inside-out).
-        """
-        # Add in reverse order (Click applies decorators inside-out)
-        base_command = click.option(
-            "--ignore-file-permissions",
-            is_flag=True,
-            help="Skip validation that config file has restricted permissions (0o600)",
-        )(base_command)
-        base_command = click.option(
-            "--log-file",
-            type=click.Path(),
-            help="Log file path",
-        )(base_command)
-        base_command = click.option(
-            "--config",
-            type=click.Path(exists=True),
-            help="Configuration file path",
-        )(base_command)
-        return base_command
-
-    def register_command(self) -> click.Command:
-        """Register and return a Click command using the executor pattern.
-
-        This method creates a Click command that delegates execution to execute_with_orchestration().
-        Subclasses should override get_builtin_command() to define full command with decorators.
-        """
-
-        @click.command(self._command_name, help=self._help_text)
-        @click.pass_context
-        def command(ctx: click.Context, **kwargs):
-            """Execute the monitoring command with unified orchestration."""
-            self.execute_with_orchestration(ctx, kwargs)
-
-        # Allow subclass to build and decorate the command
-        return self.get_builtin_command(command)
-
-    def execute_with_orchestration(
-        self, ctx: click.Context, args: Dict[str, Any]
-    ) -> None:
+    def execute_with_orchestration(self, args: Dict[str, Any]) -> None:
         """Execute the monitoring command with unified orchestration.
 
         Handles: config loading, validation, logging, execution, error handling.
@@ -267,14 +201,12 @@ class CommandExecutor(Command):
     # === Abstract Methods (Subclasses Must Implement) ===
 
     @abstractmethod
-    def get_builtin_command(self, base_command: click.Command) -> click.Command:
-        """Build and decorate the Click command with arguments and options.
-
-        Args:
-            base_command: Base Click command with name and help
+    def get_builtin_command(self) -> Callable:
+        """Build and return a Typer-compatible command function.
 
         Returns:
-            Fully decorated Click command with arguments and options applied
+            A callable function that Typer can register as a command.
+            The function should accept Typer parameters using type hints and default values.
         """
         pass
 

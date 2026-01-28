@@ -588,10 +588,10 @@ class TestPortRangeValidation:
 class TestConfigPrecedence:
     """Test configuration loading precedence: defaults -> env -> YAML -> args."""
 
-    def test_yaml_preserved_when_click_empty_tuple_provided(self):
-        """Test that YAML values are not overridden by Click's empty tuple from multiple=True.
+    def test_yaml_preserved_when_typer_empty_tuple_provided(self):
+        """Test that YAML values are not overridden by Typer's empty tuple from multiple=True.
 
-        This is a regression test for the bug where Click's multiple=True option
+        This is a regression test for the bug where Typer's multiple=True option
         returns an empty tuple () when no arguments are provided, which was
         overriding YAML configuration values.
 
@@ -607,22 +607,22 @@ class TestConfigPrecedence:
         assert config.portscan_ip_ranges == ["192.168.100.110-199"]
         assert config.portscan_exclude == []
 
-        # Simulate Click's behavior when multiple=True option not provided
-        # Click returns empty tuple () for unprovided multiple options
-        args_from_click = {
+        # Simulate Typer's behavior when multiple=True option not provided
+        # Typer returns empty tuple () for unprovided multiple options
+        args_from_typer = {
             "config": "example.config.yaml",
             "log_file": None,
             "uptime_kuma_url": None,
             "heartbeat_token": None,
             "token": None,
-            "ip_ranges": (),  # Empty tuple from Click's multiple=True
-            "exclude": (),  # Empty tuple from Click's multiple=True
+            "ip_ranges": (),  # Empty tuple from Typer's multiple=True
+            "exclude": (),  # Empty tuple from Typer's multiple=True
             "ports": None,
             "timing": None,
         }
 
         # Load from args - should NOT override YAML values with empty tuples
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # YAML values should be preserved
         assert config.portscan_ip_ranges == [
@@ -632,15 +632,15 @@ class TestConfigPrecedence:
             config.portscan_exclude == []
         ), "exclude from YAML should not be overridden by empty tuple from CLI"
 
-    def test_yaml_overridden_when_click_provided_values(self):
+    def test_yaml_overridden_when_typer_provided_values(self):
         """Test that CLI arguments DO override YAML when values are provided."""
         # Create config and load from YAML
         config = PortscanConfig()
         config.load_from_yaml("example.config.yaml")
         assert config.portscan_ip_ranges == ["192.168.100.110-199"]
 
-        # Simulate Click providing actual arguments (as tuples)
-        args_from_click = {
+        # Simulate Typer providing actual arguments (as tuples)
+        args_from_typer = {
             "config": "example.config.yaml",
             "log_file": None,
             "uptime_kuma_url": None,
@@ -653,7 +653,7 @@ class TestConfigPrecedence:
         }
 
         # Load from args - SHOULD override YAML values when provided
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # CLI values should override YAML
         assert config.portscan_ip_ranges == [
@@ -663,21 +663,21 @@ class TestConfigPrecedence:
             "10.0.0.1"
         ], "exclude should be overridden by CLI arguments when provided"
 
-    def test_timing_string_preserved_when_click_not_provided(self):
-        """Test that string values from YAML are preserved when Click provides None."""
+    def test_timing_string_preserved_when_typer_not_provided(self):
+        """Test that string values from YAML are preserved when Typer provides None."""
         config = PortscanConfig()
         config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_timing == "T5"
 
-        # Simulate Click not providing timing argument
-        args_from_click = {
+        # Simulate Typer not providing timing argument
+        args_from_typer = {
             "timing": None,
             "ports": None,
             "ip_ranges": (),
             "exclude": (),
         }
 
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # YAML timing should be preserved
         assert (
@@ -690,35 +690,35 @@ class TestConfigPrecedence:
         config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_timing == "T5"
 
-        # Simulate Click providing timing argument
-        args_from_click = {
+        # Simulate Typer providing timing argument
+        args_from_typer = {
             "timing": "T0",
             "ports": None,
             "ip_ranges": (),
             "exclude": (),
         }
 
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # CLI timing should override YAML
         assert (
             config.portscan_nmap_timing == "T0"
         ), "timing should be overridden by CLI arguments when provided"
 
-    def test_ports_string_preserved_when_click_not_provided(self):
+    def test_ports_string_preserved_when_typer_not_provided(self):
         """Test that comma-separated string ports from YAML are preserved."""
         config = PortscanConfig()
         config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_ports == "1-1000"
 
-        args_from_click = {
+        args_from_typer = {
             "ports": None,
             "timing": None,
             "ip_ranges": (),
             "exclude": (),
         }
 
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # YAML ports should be preserved
         assert (
@@ -731,14 +731,14 @@ class TestConfigPrecedence:
         config.load_from_yaml("example.config.yaml")
         assert config.portscan_nmap_ports == "1-1000"
 
-        args_from_click = {
+        args_from_typer = {
             "ports": "22,80,443",
             "timing": None,
             "ip_ranges": (),
             "exclude": (),
         }
 
-        config.load_from_args(args_from_click)
+        config.load_from_args(args_from_typer)
 
         # CLI ports should override YAML
         assert (
@@ -1018,7 +1018,7 @@ portscan:
         config.heartbeat_token = "hb_token"
         config.command_token = "cmd_token"
 
-        # Simulate Click's multiple=True which returns tuples
+        # Simulate Typer's multiple=True which returns tuples
         args = {
             "ip_ranges": ("192.168.1.0/24", "10.0.0.0/8"),
             "exclude": ("192.168.1.1", "192.168.1.2"),
@@ -1039,7 +1039,7 @@ portscan:
         config.command_token = "cmd_token"
         config.portscan_ip_ranges = ["192.168.1.0/24"]  # Pre-existing value
 
-        # Empty tuple from Click should not override
+        # Empty tuple from Typer should not override
         args = {
             "ip_ranges": (),
             "exclude": (),

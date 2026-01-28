@@ -1,5 +1,7 @@
 # Configuration Guide for Kuma Scout
 
+**Upgrading from a previous version?** See [MIGRATION.md](MIGRATION.md) for breaking changes and migration instructions between versions.
+
 ## Overview: How Configuration Works
 
 Kuma Scout supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
@@ -105,9 +107,9 @@ cmdcheck:
 ```bash
 kuma-scout cmdcheck \
   --command "systemctl is-active nginx" \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-cmdcheck-token
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-cmdcheck-token
 ```
 
 #### Multiple Commands - All Must Pass
@@ -160,7 +162,10 @@ cmdcheck:
 kuma-scout cmdcheck \
   --command "systemctl status myapp" \
   --failure-pattern "failed|error" \
-  --success-pattern "active.*running"
+  --success-pattern "active.*running" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-cmdcheck-token
 ```
 
 #### Authentication Token
@@ -1015,20 +1020,56 @@ KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ### CLI Arguments
 
 ```bash
-# Single snapshot
-kuma-scout kopiasnapshotstatus --snapshot /data 24
+# Single snapshot with hours (format: path,hours)
+kuma-scout kopiasnapshotstatus --snapshot /data,24
 
-# Multiple snapshots
+# Single snapshot without hours (uses hardcoded default of 24 hours)
+kuma-scout kopiasnapshotstatus --snapshot /data
+
+# Single snapshot without hours or --max-age-hours (uses hardcoded default of 24 hours)
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data 24 \
-  --snapshot /backups 48 \
-  --snapshot "user@host:/path" 72
+  --snapshot /data \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
+
+# Multiple snapshots mixed format (/data and /archive use default 24h, /backups uses 48h)
+kuma-scout kopiasnapshotstatus \
+  --snapshot /data \
+  --snapshot /backups,48 \
+  --snapshot "user@host:/path,72" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
+
+# Multiple snapshots with custom global default
+kuma-scout kopiasnapshotstatus \
+  --snapshot /data \
+  --snapshot /backups,48 \
+  --snapshot /archive \
+  --max-age-hours 24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
 
 # With config file and additional settings
 kuma-scout kopiasnapshotstatus \
   --config /etc/kuma-scout/config.yaml \
   --max-age-hours 24
+
+# With Uptime Kuma options
+kuma-scout kopiasnapshotstatus \
+  --snapshot /data \
+  --snapshot /backups,48 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token \
+  --max-age-hours 24
 ```
+
+**Note:** Snapshot format supports two options:
+- With hours: `--snapshot path,hours` (e.g., `/data,24`)
+- Without hours: `--snapshot path` (uses `--max-age-hours` value or hardcoded default 24)
 
 ### Path Validation & Security
 
@@ -1088,23 +1129,33 @@ max_age_hours: 24  # All use 24h
 
 ### Single snapshot
 ```bash
-kuma-scout kopiasnapshotstatus --snapshot /data 24
+kuma-scout kopiasnapshotstatus --snapshot /data,24
 ```
 
 ### Multiple snapshots
 ```bash
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data 24 \
-  --snapshot /backups 48 \
-  --snapshot "user@host:/path" 72
+  --snapshot /data,24 \
+  --snapshot /backups,48 \
+  --snapshot "user@host:/path,72"
 ```
 
 ### Override config file
 ```bash
 kuma-scout kopiasnapshotstatus \
   --config /etc/kuma-scout/config.yaml \
-  --snapshot /critical 12 \
-  --snapshot /archive 240
+  --snapshot /critical,12 \
+  --snapshot /archive,240
+```
+
+### With full Uptime Kuma integration
+```bash
+kuma-scout kopiasnapshotstatus \
+  --snapshot /data,24 \
+  --snapshot "root@fileserver:/mnt/shares,48" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-kopia-token
 ```
 
 ## Alert Messages
@@ -1143,14 +1194,17 @@ pytest tests/checkers/test_kopia_snapshot_checker.py::TestKopiaSnapshotChecker -
 
 ## Troubleshooting
 
-**Q: Can I omit max_age_hours for some paths?**
-A: Yes! They'll use the global `max_age_hours` value.
+**Q: Can I omit hours for some snapshot paths?**
+A: Yes! Use `--snapshot path` (without hours) to use the global `--max-age-hours` value. Example: `--snapshot /data` with `--max-age-hours 24`
+
+**Q: How do I mix paths with and without explicit hours?**
+A: Just provide them as separate arguments. Example: `--snapshot /data --snapshot /backups,48 --max-age-hours 24` (/data uses 24h, /backups uses 48h)
 
 **Q: Do CLI flags merge with YAML config?**
 A: No. CLI `--snapshot` flags **replace** the YAML config entirely.
 
 **Q: How does it handle SSH paths with multiple colons?**
-A: The parser splits on the **rightmost** space between PATH and MAX_AGE_HOURS, so `user@host:/path@24` works correctly.
+A: The parser splits on the **rightmost** space between PATH and MAX_AGE_HOURS, so `user@host:/path@24` works correctly. For paths without hours, use `user@host:/path` with `--max-age-hours`.
 
 **Q: Can I set max_age_hours to 0?**
 A: Yes, but snapshots must be fresher than 0 hours (essentially never allowed). Use with caution.
@@ -1179,9 +1233,12 @@ kuma-scout portscan 192.168.1.0/24
 
 # With custom ports and timing
 kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
   --ports 22,80,443,3389 \
   --timing T4 \
-  192.168.1.0/24
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 ### Authentication Token
@@ -1212,31 +1269,56 @@ portscan:
 
 ```bash
 # Single IP range
-kuma-scout portscan 192.168.1.0/24
+kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 
 # Multiple IP ranges
-kuma-scout portscan 192.168.1.0/24 10.0.0.0/8
+kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --ip-range 10.0.0.0/8 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 
 # With custom ports
-kuma-scout portscan --ports 22,80,443 192.168.1.0/24
+kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --ports 22,80,443 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 
 # With exclusions
 kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
   --exclude 192.168.1.1 \
   --exclude 192.168.1.254 \
-  192.168.1.0/24
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 
 # With nmap timing
-kuma-scout portscan --timing T4 192.168.1.0/24
+kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --timing T4 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 
 # All options combined
 kuma-scout portscan \
+  --ip-range 192.168.1.0/24 \
+  --ip-range 10.0.0.0/8 \
   --ports 1-10000 \
   --timing T4 \
   --exclude 192.168.1.1 \
   --exclude 192.168.1.254 \
-  192.168.1.0/24 \
-  10.0.0.0/8
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token
 ```
 
 ## Nmap Timing Profiles
@@ -1335,13 +1417,13 @@ zfspoolstatus:
 
 ### Command Line
 ```bash
-# Monitor multiple pools with thresholds
+# Monitor multiple pools with thresholds (comma-separated format: name,percent)
 kuma-scout zfspoolstatus \
-  --pool tank 10 \
-  --pool backup 20 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-zfs-token
+  --pool tank,10 \
+  --pool backup,20 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
 ```
 
 ### Authentication Token
@@ -1374,24 +1456,63 @@ zfspoolstatus:
 
 
 ```bash
-# Single pool
-kuma-scout zfspoolstatus --pool tank 10
-
-# Multiple pools
+# Single pool with percent (format: name,percent)
 kuma-scout zfspoolstatus \
-  --pool tank 10 \
-  --pool backup 20 \
-  --pool archive 15
+  --pool tank,10 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
+
+# Single pool without percent (uses global default of 10%)
+kuma-scout zfspoolstatus \
+  --pool tank \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
+
+# Single pool without percent or --min-free-percent (uses hardcoded default of 10%)
+kuma-scout zfspoolstatus \
+  --pool tank \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
+
+# Multiple pools mixed format (tank and archive use default 10%, backup uses 20%)
+kuma-scout zfspoolstatus \
+  --pool tank \
+  --pool backup,20 \
+  --pool archive \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
+
+# Multiple pools with custom global default
+kuma-scout zfspoolstatus \
+  --pool tank \
+  --pool backup,20 \
+  --pool archive,30 \
+  --min-free-percent 15 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
 
 # With config file
 kuma-scout zfspoolstatus \
   --config /etc/kuma-scout/config.yaml
 
-# Override global default
+# Override global default with CLI
 kuma-scout zfspoolstatus \
-  --pool tank 10 \
-  --free-space-percent 15
+  --pool tank,10 \
+  --pool backup,25 \
+  --min-free-percent 15 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token
 ```
+
+**Note:** Pool format supports two options:
+- With percent: `--pool name,percent` (e.g., `tank,10`)
+- Without percent: `--pool name` (uses `--min-free-percent` value or default 10)
 
 ## Pool Health Status
 
@@ -1484,8 +1605,11 @@ A: ZFS tools must be installed on the system. Install with: `apt install zfsutil
 **Q: How do I check pool status manually?**
 A: Use: `zpool list -H -o name,size,alloc,free,cap,health POOL_NAME`
 
-**Q: Can I omit free_space_percent_min for some pools?**
-A: Yes! They'll use the global `free_space_percent_default` value.
+**Q: Can I omit the percent threshold for some pools?**
+A: Yes! Use `--pool name` (without percent) to use the global `--min-free-percent` value. Example: `--pool tank` with `--min-free-percent 10`
+
+**Q: How do I mix pools with and without explicit thresholds?**
+A: Just provide them as separate arguments. Example: `--pool tank --pool backup,20 --min-free-percent 10` (tank uses 10%, backup uses 20%)
 
 **Q: Do CLI flags merge with YAML config?**
 A: No. CLI `--pool` flags **replace** the YAML config entirely.

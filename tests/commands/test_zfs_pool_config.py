@@ -159,8 +159,8 @@ def test_zfs_pool_config_pool_converter_env_string_no_threshold():
     ]
 
 
-def test_zfs_pool_config_pool_converter_click_tuples():
-    """Test _pool_converter with Click CLI tuples."""
+def test_zfs_pool_config_pool_converter_typer_tuples():
+    """Test _pool_converter with Typer CLI tuples."""
     result = ZfsPoolStatusConfig._pool_converter((("tank", 10), ("backup", 20)))
 
     assert result == [
@@ -301,4 +301,44 @@ def test_zfs_pool_config_env_threshold_parsing():
     assert result == [
         {"name": "tank", "free_space_percent_min": 10},
         {"name": "backup", "free_space_percent_min": 20},
+    ]
+
+
+def test_zfs_cli_pool_optional_format_without_percent():
+    """Test CLI pool parsing with optional percent (uses global min_free_percent)."""
+    from kuma_scout.cli.utils import parse_tuples_from_list
+
+    # Parse pools without percent
+    pools = parse_tuples_from_list(["tank", "backup", "archive,25"], required=False)
+
+    # Merge with global min_free_percent
+    global_min_free = 10
+    merged_pools = []
+    for name, percent in pools:
+        effective_percent = percent if percent is not None else global_min_free
+        merged_pools.append((name, effective_percent))
+
+    assert merged_pools == [
+        ("tank", 10),
+        ("backup", 10),
+        ("archive", 25),
+    ]
+
+
+def test_zfs_cli_pool_optional_format_with_custom_global_default():
+    """Test CLI pool parsing with optional percent and custom global default."""
+    from kuma_scout.cli.utils import parse_tuples_from_list
+
+    # Parse pools without percent, with custom global default
+    pools = parse_tuples_from_list(["tank", "backup,20"], required=False)
+
+    global_min_free = 15  # Custom default
+    merged_pools = []
+    for name, percent in pools:
+        effective_percent = percent if percent is not None else global_min_free
+        merged_pools.append((name, effective_percent))
+
+    assert merged_pools == [
+        ("tank", 15),
+        ("backup", 20),
     ]

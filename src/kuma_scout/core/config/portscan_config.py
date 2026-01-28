@@ -31,7 +31,7 @@ class PortscanConfig(ConfigBase):
         Returns:
             List of strings with whitespace trimmed
         """
-        # Handle lists and tuples (from Click's multiple=True)
+        # Handle lists and tuples (from Typer's List[] types)
         if isinstance(value, (list, tuple)):
             return list(value)
         if not value:

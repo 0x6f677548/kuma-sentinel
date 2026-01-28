@@ -1,21 +1,20 @@
 """Abstract base class for scout CLI commands."""
 
 from abc import ABC, abstractmethod
-
-import click
+from typing import Callable
 
 
 class Command(ABC):
     """Base class for scout CLI commands.
 
-    Subclasses should implement register_command() to return a Click command.
+    Subclasses should implement register_command() to return a Typer-compatible command function.
     """
 
     @abstractmethod
-    def register_command(self) -> click.Command:
-        """Register and return a Click command.
+    def register_command(self) -> Callable:
+        """Register and return a Typer-compatible command function.
 
         Returns:
-            A Click Command object
+            A callable function that Typer can register as a command
         """
         pass

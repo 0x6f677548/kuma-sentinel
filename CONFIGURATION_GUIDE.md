@@ -772,6 +772,47 @@ Then use host aliases in kuma-scout:
 kuma-scout kopiasnapshotstatus --ssh backup-server --snapshot /data,24
 ```
 
+#### SSH Password Authentication Security
+
+⚠️ **SSH password authentication carries security risks**:
+
+**Password Exposure Risk:**
+- Passwords are passed via command line to `sshpass`
+- Passwords may be visible in process lists (`ps`, `top`, `htop`)
+- Other users on the system can potentially see the password
+
+**Example of what's visible:**
+```bash
+# Process list may show:
+sshpass -p mypassword ssh user@host systemctl status nginx
+```
+
+**Security Warning:**
+When using password authentication, Kuma Scout logs a security warning:
+```
+⚠️  SECURITY WARNING: Using SSH password authentication. Password may be exposed in process list (ps/top). Consider using SSH key authentication instead.
+```
+
+**Recommendations:**
+- ✅ **Use SSH key authentication** - More secure and doesn't expose credentials
+- ✅ **Restrict SSH key access** - Use key-specific restrictions if possible
+- ✅ **Monitor for password usage** - Check logs for security warnings
+- ⚠️ **Avoid password auth in production** - Reserve for legacy systems only
+
+**SSH Key Setup (Recommended):**
+```bash
+# Generate SSH key pair
+ssh-keygen -t ed25519 -C "kuma-scout@yourhost"
+
+# Copy public key to remote host
+ssh-copy-id user@remote-host
+
+# Use in Kuma Scout config
+ssh:
+  connection: user@remote-host
+  key_file: ~/.ssh/id_ed25519
+```
+
 #### Deployment Best Practices
 
 1. **Run under dedicated user:**

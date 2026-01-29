@@ -250,7 +250,7 @@ def test_kopia_config_get_summary_with_snapshots():
     config.heartbeat_token = "hb_token"
     config.command_token = "cmd_token"
 
-    summary = config.get_summary(mask_tokens=True)
+    summary = config.get_summary()
 
     assert "/data@24h" in summary["kopiasnapshotstatus_snapshots"]
     assert "/backups@48h" in summary["kopiasnapshotstatus_snapshots"]

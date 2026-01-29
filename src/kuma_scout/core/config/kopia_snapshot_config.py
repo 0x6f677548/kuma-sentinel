@@ -125,7 +125,7 @@ class KopiaSnapshotConfig(ConfigBase):
                             f"Invalid snapshot path in configuration: {str(e)}"
                         ) from e
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get kopia snapshot configuration summary for logging."""
         # Build snapshot summary
         snapshot_summary = []
@@ -137,7 +137,7 @@ class KopiaSnapshotConfig(ConfigBase):
             snapshot_summary.append(f"{path}@{max_age}h")
 
         # Get base summary and add kopia-specific fields
-        summary = super().get_summary(mask_tokens)
+        summary = super().get_summary()
         summary.update(
             {
                 "kopiasnapshotstatus_snapshots": (

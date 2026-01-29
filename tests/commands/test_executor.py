@@ -476,7 +476,7 @@ class TestLogConfigSummary:
         assert mock_logger.info.call_count > 0
 
         # Verify get_summary was called with mask_tokens
-        mock_config.get_summary.assert_called_once_with(mask_tokens=True)
+        mock_config.get_summary.assert_called_once_with()
 
     def test_log_config_summary_section_formatting(self):
         """Test config summary sections are formatted correctly."""

@@ -221,7 +221,7 @@ def test_zfs_pool_config_get_summary():
     ]
     config.zfspoolstatus_free_space_percent_default = 15
 
-    summary = config.get_summary(mask_tokens=True)
+    summary = config.get_summary()
 
     assert summary["log_file"] == "/var/log/test.log"
     assert summary["log_level"] == "INFO"
@@ -241,7 +241,7 @@ def test_zfs_pool_config_get_summary_unmasked_tokens():
     config.zfspoolstatus_pools = [{"name": "tank", "free_space_percent_min": 10}]
     config.zfspoolstatus_free_space_percent_default = 10
 
-    summary = config.get_summary(mask_tokens=False)
+    summary = config.get_summary()
 
     # Tokens should never be in summary
     assert "heartbeat_token" not in summary
@@ -259,7 +259,7 @@ def test_zfs_pool_config_get_summary_no_pools():
     config.zfspoolstatus_pools = []
     config.zfspoolstatus_free_space_percent_default = 10
 
-    summary = config.get_summary(mask_tokens=True)
+    summary = config.get_summary()
 
     assert summary["zfspoolstatus_pools"] == "none"
 

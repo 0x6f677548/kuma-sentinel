@@ -252,11 +252,8 @@ class CmdCheckConfig(ConfigBase):
 
         return errors
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get command check configuration summary for logging.
-
-        Args:
-            mask_tokens: Whether to mask sensitive tokens in output
 
         Returns:
             Dictionary with configuration summary
@@ -271,7 +268,7 @@ class CmdCheckConfig(ConfigBase):
             f"{len(self.cmdcheck_commands)} commands configured"
 
         # Get base summary and add cmdcheck-specific fields
-        summary = super().get_summary(mask_tokens)
+        summary = super().get_summary()
         summary.update(
             {
                 "cmdcheck_total_commands": str(len(self.cmdcheck_commands)),

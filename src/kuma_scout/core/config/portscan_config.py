@@ -184,10 +184,10 @@ class PortscanConfig(ConfigBase):
                 "Configuration validation failed:\n  " + "\n  ".join(errors)
             )
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get portscan configuration summary for logging."""
         # Get base summary and add portscan-specific fields
-        summary = super().get_summary(mask_tokens)
+        summary = super().get_summary()
         summary.update(
             {
                 "portscan_nmap_ports": self.portscan_nmap_ports,

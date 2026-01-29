@@ -13,7 +13,7 @@ from kuma_scout.core.models import CheckResult
 class SimpleTestConfig(ConfigBase):
     """Simple test config class for testing base functionality."""
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get configuration summary."""
         return {
             "uptime_kuma_url": self.uptime_kuma_url,

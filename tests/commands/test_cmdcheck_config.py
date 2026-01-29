@@ -341,7 +341,7 @@ class TestGetSummary:
         config.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
         config.command_token = "secret-token"
 
-        summary = config.get_summary(mask_tokens=True)
+        summary = config.get_summary()
 
         assert "cmdcheck_total_commands" in summary
         assert summary["cmdcheck_total_commands"] == "1"
@@ -357,33 +357,24 @@ class TestGetSummary:
         ]
         config.command_token = "secret-token"
 
-        summary = config.get_summary(mask_tokens=True)
+        summary = config.get_summary()
 
         assert "cmdcheck_total_commands" in summary
         assert summary["cmdcheck_total_commands"] == "3"
 
-    def test_summary_masks_token(self, config):
-        """Test that tokens are never included in summary, even masked."""
+    def test_summary_excludes_sensitive_tokens(self, config):
+        """Test that sensitive tokens are never included in configuration summaries."""
         config.cmdcheck_commands = [{"command": "test"}]
         config.command_token = "secret-token"
 
-        summary = config.get_summary(mask_tokens=True)
+        summary = config.get_summary()
 
-        # Tokens should never be in summary
-        assert "***" not in str(summary)
+        # Sensitive tokens should never be exposed in summaries
         assert "secret-token" not in str(summary)
         assert "cmdcheck_token" not in summary
-
-    def test_summary_unmask_token(self, config):
-        """Test that tokens are never included in summary."""
-        config.cmdcheck_commands = [{"command": "test"}]
-        config.command_token = "secret-token"
-
-        summary = config.get_summary(mask_tokens=False)
-
-        # Tokens should never be in the summary
-        assert "secret-token" not in str(summary)
-        assert "cmdcheck_token" not in summary
+        # Verify the summary contains expected non-sensitive fields
+        assert "cmdcheck_total_commands" in summary
+        assert "execution_target" in summary
 
     def test_summary_with_patterns(self, config):
         """Test summary includes patterns."""

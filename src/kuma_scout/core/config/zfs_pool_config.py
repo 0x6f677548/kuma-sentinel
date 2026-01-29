@@ -152,11 +152,8 @@ class ZfsPoolStatusConfig(ConfigBase):
                 "Configuration validation failed:\n  " + "\n  ".join(errors)
             )
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get ZFS pool configuration summary for logging.
-
-        Args:
-            mask_tokens: Whether to mask sensitive tokens in output
 
         Returns:
             Dictionary with configuration summary
@@ -171,7 +168,7 @@ class ZfsPoolStatusConfig(ConfigBase):
                 pools_summary.append(pool_name)
 
         # Get base summary and add zfs-specific fields
-        summary = super().get_summary(mask_tokens)
+        summary = super().get_summary()
         summary.update(
             {
                 "zfspoolstatus_pools": (

@@ -107,12 +107,12 @@ def test_portscan_config_get_summary():
     config.command_token = "token"
     config.uptime_kuma_url = "http://localhost"
 
-    summary = config.get_summary(mask_tokens=True)
+    summary = config.get_summary()
     # Tokens should never be in summary
     assert "heartbeat_token" not in summary
     assert "portscan_token" not in summary
 
-    summary = config.get_summary(mask_tokens=False)
+    summary = config.get_summary()
     # Tokens should never be in summary, even when mask_tokens=False
     assert "heartbeat_token" not in summary
     assert "portscan_token" not in summary
@@ -236,7 +236,7 @@ def test_portscan_config_get_summary_with_exclusions():
     config.heartbeat_token = "hb_token"
     config.command_token = "cmd_token"
 
-    summary = config.get_summary(mask_tokens=False)
+    summary = config.get_summary()
 
     assert summary["portscan_exclude"] == "192.168.1.1, 192.168.1.2"
     assert summary["portscan_nmap_keep_xmloutput"] is False
@@ -277,7 +277,7 @@ def test_portscan_config_get_summary_with_nmap_arguments():
     config.heartbeat_token = "hb_token"
     config.command_token = "cmd_token"
 
-    summary = config.get_summary(mask_tokens=False)
+    summary = config.get_summary()
 
     assert summary["portscan_nmap_arguments"] == ["-A", "-v"]
 
@@ -957,27 +957,6 @@ class TestConfigBaseFieldMappings:
         mapping = FieldMapping(converter=int)
         result = ConfigBase._convert_value("42", mapping)
         assert result == 42
-
-    def test_mask_token_with_masking(self):
-        """Test _mask_token with masking enabled."""
-        from kuma_scout.core.config.base import ConfigBase
-
-        result = ConfigBase._mask_token("secret_token", mask=True)
-        assert result == "***"
-
-    def test_mask_token_without_masking(self):
-        """Test _mask_token with masking disabled."""
-        from kuma_scout.core.config.base import ConfigBase
-
-        result = ConfigBase._mask_token("secret_token", mask=False)
-        assert result == "secret_token"
-
-    def test_mask_token_none(self):
-        """Test _mask_token with None token."""
-        from kuma_scout.core.config.base import ConfigBase
-
-        result = ConfigBase._mask_token(None, mask=True)
-        assert result is None
 
     def test_load_from_env_with_heartbeat_token(self, monkeypatch):
         """Test load_from_env applies heartbeat token from environment."""

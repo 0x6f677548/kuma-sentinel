@@ -590,11 +590,8 @@ class ConfigBase:
         except Exception as e:
             raise ValueError(f"Invalid URL format: {str(e)}") from e
 
-    def get_summary(self, mask_tokens: bool = True) -> dict:
+    def get_summary(self) -> dict:
         """Get configuration summary for logging.
-
-        Args:
-            mask_tokens: If True, mask security tokens in output
 
         Returns:
             Dictionary with configuration summary
@@ -615,11 +612,6 @@ class ConfigBase:
             "heartbeat_interval": f"{self.heartbeat_interval}s",
             "uptime_kuma_url": self.uptime_kuma_url,
         }
-
-    @staticmethod
-    def _mask_token(token: Optional[str], mask: bool) -> Optional[str]:
-        """Mask token if requested."""
-        return "***" if mask and token else token
 
     @staticmethod
     def validate_ssh_key_permissions(

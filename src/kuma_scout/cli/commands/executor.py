@@ -304,7 +304,7 @@ class CommandExecutor(Command):
         logger.info(f"🔍 KUMA SCOUT - {command_name.upper()} CONFIGURATION")
         logger.info("=" * 70)
 
-        config_summary = cfg.get_summary(mask_tokens=True)
+        config_summary = cfg.get_summary()
         summary_fields = self.get_summary_fields()
 
         for section_name, section_fields in summary_fields.items():

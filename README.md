@@ -9,15 +9,15 @@
 
 # Kuma-Scout 🧭
 
-**Uptime Kuma's system scout.** Deploy to your servers, run checks, report back.
+**Uptime Kuma's agent-less monitoring with SSH remote execution.** Deploy locally or centrally—monitor servers, firewalls, switches, and appliances without installing agents.
 
-**The system scout for Uptime Kuma. Deploy to your infrastructure, execute checks, relay findings back to your Uptime Kuma instance.** It acts as an uptime-kuma monitoring agent to scout internal system conditions that Uptime Kuma cannot natively monitor.
+**The flexible monitoring agent for Uptime Kuma.** Deploy on individual servers for traditional local checks, or use SSH to monitor your entire infrastructure from a central host. Scouts internal system conditions that Uptime Kuma cannot natively monitor.
 
-While [Uptime Kuma](https://github.com/louislam/uptime-kuma) is excellent for external monitoring (HTTP, Ping, TCP), it lacks a native agent to monitor internal system states, processes, or run custom checking scripts.
+While [Uptime Kuma](https://github.com/louislam/uptime-kuma) excels at external monitoring (HTTP, Ping, TCP), it lacks native agents for internal system states, processes, or custom checking scripts.
 
-**Kuma-Scout deploys across your infrastructure.** Designed as a CLI utility, it becomes a powerful system scout when deployed via cron, systemd, or Docker. It runs on your servers to execute arbitrary shell commands, check backups, monitor storage, and scan ports—then relays intelligence back to Uptime Kuma.
+**Kuma-Scout adapts to your deployment strategy.** A CLI utility that becomes a powerful system scout when deployed via cron, systemd, or Docker. Execute arbitrary commands, check backups, monitor storage, and scan ports—locally or remotely via SSH—all reported back to Uptime Kuma.
 
-**Scout ANY system condition**: If you can check it with a shell command, Kuma-Scout can scout it.
+**Scout ANY condition**: If you can check it with a shell command, Kuma-Scout can monitor it. Execute status commands on firewalls, switches, and appliances to ensure network health.
 
 ## Quick Example
 

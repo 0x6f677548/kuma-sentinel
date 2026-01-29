@@ -31,6 +31,13 @@ kuma-scout cmdcheck \
   --uptime-kuma-url http://uptime-kuma:3001/api/push \
   --heartbeat-token heartbeat-token \
   --token cmdcheck-token
+
+# Or monitor remotely via SSH
+kuma-scout cmdcheck \
+  --ssh root@remote-server \
+  --command "systemctl is-active nginx" \
+  --uptime-kuma-url http://uptime-kuma:3001/api/push \
+  --token cmdcheck-token
 ```
 
 If all checks pass → Uptime Kuma shows **UP**. If any fail → shows **DOWN** and triggers alerts.
@@ -41,13 +48,13 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
 
 ## Features
 
-- **Command Execution**: Execute arbitrary shell commands on remote systems and push results to Uptime Kuma (cmdcheck)
+- **Command Execution**: Execute arbitrary shell commands on local or remote systems and push results to Uptime Kuma (cmdcheck)
+- **SSH Remote Execution**: Run any check remotely via SSH - execute commands, port scans, backup checks, and storage monitoring on remote servers (all commands support `--ssh` option)
 - **Pattern Matching**: Use regex patterns for flexible success/failure detection in command output
 - **Multi-Command Support**: Run multiple independent checks and aggregate results
 - **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
-- **SSH Remote Execution**: Run any check remotely via SSH (all commands support `--ssh` option)
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
 - **Flexible Configuration**: Support for YAML config files, environment variables for tokens only, and CLI arguments with clear priority
@@ -63,15 +70,15 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
 ## Diagram
 
 ```plaintext
-┌─────────────────────────────┐
-│   Remote Servers            │
-│   (Kuma-Scout Deployed)     │
-│                             │
-│  • Command Execution        │
-│  • Port Scanning (nmap)     │
-│  • Backup Monitoring (Kopia)│
-│  • Storage Monitoring (ZFS) │
-└────────────┬────────────────┘
+┌─────────────────────────────┐       ┌─────────────────────────────┐
+│   Local Monitoring Host     │       │   Remote Target Servers     │
+│   (Kuma-Scout Deployed)     │       │   (Commands executed via    │
+│                             │       │    SSH from monitoring host) │
+│  • Command Execution        │◄──────┼───• Command Execution        │
+│  • Port Scanning (nmap)     │       │  • Port Scanning (nmap)     │
+│  • Backup Monitoring (Kopia)│       │  • Backup Monitoring (Kopia)│
+│  • Storage Monitoring (ZFS) │       │  • Storage Monitoring (ZFS) │
+└────────────┬────────────────┘       └─────────────────────────────┘
              │ Scout reports
              │ findings via HTTP
              ▼
@@ -369,7 +376,7 @@ kuma-scout kopiasnapshotstatus \
 
 **Security Notes:**
 - Strict host key checking is enabled by default for security
-- Use `--ignore-file-permissions` to bypass SSH key file permission validation
+- SSH key files must have proper permissions (600) for security - fix permissions instead of bypassing validation
 - SSH passwords are supported but discouraged; use key-based authentication
 - SSH key agents (e.g., KeePassXC) are supported for client-side authentication when no key file is specified
 - All SSH settings can be configured via YAML config file
@@ -628,6 +635,176 @@ zfspoolstatus:
 - ⚠️ If any pool has insufficient free space → Uptime Kuma shows DOWN and triggers alerts
 - 📊 Details include health status and free space for each pool
 
+### Remote Infrastructure Monitoring
+
+Monitor distributed infrastructure from a central location without deploying agents everywhere. Use SSH to execute checks on remote servers, databases, and network devices from a single monitoring host.
+
+**Scenario**: You have a heterogeneous infrastructure with servers, databases, and network devices spread across different locations. You want centralized monitoring without installing monitoring agents on every system.
+
+**Traditional approach**: Deploy monitoring agents on each server or rely on external monitoring that can't access internal system states.
+
+**With Kuma Scout SSH**: Deploy Kuma Scout on one central monitoring server and use SSH to execute checks on all your remote infrastructure.
+
+**Example setup on a central monitoring server**:
+```bash
+# Monitor web server health remotely
+kuma-scout cmdcheck \
+  --ssh monitoring@web-server \
+  --command "systemctl is-active nginx" \
+  --success-pattern "active" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token web-server-token
+
+# Monitor database server remotely
+kuma-scout cmdcheck \
+  --ssh monitoring@db-server \
+  --command "pg_isready -h localhost" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token db-server-token
+
+# Monitor backup server remotely
+kuma-scout kopiasnapshotstatus \
+  --ssh root@backup-server \
+  --config /etc/kuma-scout/remote-backup-config.yaml
+```
+
+**Benefits**:
+- ✅ **Single monitoring host** - Deploy once, monitor everywhere
+- ✅ **No remote agent installation** - Use existing SSH access
+- ✅ **Leverage existing infrastructure** - No additional software on target servers
+- ✅ **Secure access** - Use SSH keys with restricted permissions
+- ✅ **Flexible authentication** - SSH keys, passwords, or agent forwarding
+
+### Cross-Platform Monitoring
+
+Monitor Windows, Linux, macOS, and network devices from a single monitoring platform. Execute platform-specific commands remotely via SSH.
+
+**Scenario**: Your infrastructure includes Windows servers, Linux systems, and network devices. You need to monitor all of them but prefer a single monitoring solution.
+
+**Traditional approach**: Use platform-specific monitoring tools or external monitoring that can't execute internal commands.
+
+**With Kuma Scout SSH**: Use SSH to execute platform-appropriate commands on each system type.
+
+**Example monitoring different platforms**:
+```bash
+# Linux server monitoring
+kuma-scout cmdcheck \
+  --ssh monitoring@linux-server \
+  --command "systemctl is-active apache2" \
+  --success-pattern "active" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token linux-server-token
+
+# Windows server monitoring (using OpenSSH for Windows)
+kuma-scout cmdcheck \
+  --ssh administrator@windows-server \
+  --command "sc query w3svc" \
+  --success-pattern "RUNNING" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token windows-server-token
+
+# Network device monitoring (if SSH enabled)
+kuma-scout cmdcheck \
+  --ssh admin@network-switch \
+  --command "show interface status" \
+  --success-pattern "up" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token network-switch-token
+```
+
+**Benefits**:
+- ✅ **Unified monitoring** - Single tool for all platforms
+- ✅ **Platform-appropriate checks** - Use native commands for each system
+- ✅ **No platform-specific agents** - SSH works across all platforms
+- ✅ **Network device support** - Monitor switches, routers, and appliances
+- ✅ **Flexible command execution** - Any command that works via SSH
+
+### Secure Remote Backup Monitoring
+
+Monitor backup systems in secure environments where direct access is restricted. Use SSH to check backup status without exposing backup systems to the network.
+
+**Scenario**: Your backup servers are in a secure network segment with limited access. You need to monitor backup freshness but can't deploy monitoring agents in the secure zone.
+
+**Traditional approach**: Limited monitoring options or complex VPN setups for each check.
+
+**With Kuma Scout SSH**: Deploy monitoring on a jump host or DMZ server and use SSH to check backup status remotely.
+
+**Example secure backup monitoring**:
+```bash
+# Monitor from jump host to secure backup server
+kuma-scout kopiasnapshotstatus \
+  --ssh backup-user@jump-host \
+  --snapshot /secure/backup/path,24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token secure-backup-token
+
+# Multi-hop SSH for complex network topologies
+kuma-scout zfspoolstatus \
+  --ssh admin@jump-host \
+  --pool secure-backup-pool,15 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token secure-storage-token
+```
+
+**Benefits**:
+- ✅ **Secure access** - Monitor without exposing secure systems
+- ✅ **Jump host support** - Work with existing network security
+- ✅ **Multi-hop connections** - Navigate complex network topologies
+- ✅ **Restricted permissions** - Use dedicated SSH keys with minimal access
+- ✅ **Network isolation** - Monitor secure systems without direct network access
+
+### Network Device and Appliance Monitoring
+
+Monitor network infrastructure where traditional agents cannot be installed. Use SSH to check router status, switch configurations, and appliance health on devices that only provide SSH access.
+
+**Scenario**: Your network infrastructure includes ISP routers, managed switches, firewalls, and other appliances where you cannot install monitoring agents. These devices only provide SSH access for management.
+
+**Traditional approach**: Limited to external monitoring (ping, TCP port checks) or vendor-specific monitoring tools that may not integrate with your central monitoring system.
+
+**With Kuma Scout SSH**: Deploy monitoring on a management server and use SSH to execute status checks on network devices.
+
+**Example monitoring network infrastructure**:
+```bash
+# Monitor ISP router connectivity and interface status
+kuma-scout cmdcheck \
+  --ssh admin@isp-router \
+  --command "show ip interface brief" \
+  --success-pattern "up.*up" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token isp-router-token
+
+# Monitor firewall policy status
+kuma-scout cmdcheck \
+  --ssh fw-admin@firewall \
+  --command "show firewall policy" \
+  --success-pattern "enabled" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token firewall-token
+
+# Monitor switch port utilization
+kuma-scout cmdcheck \
+  --ssh switch-admin@core-switch \
+  --command "show interfaces status" \
+  --success-pattern "connected|up" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token switch-token
+
+# Monitor UPS battery health (if SSH enabled)
+kuma-scout cmdcheck \
+  --ssh admin@ups-appliance \
+  --command "battery.test.result" \
+  --success-pattern "PASSED" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token ups-token
+```
+
+**Benefits**:
+- ✅ **Agent-less monitoring** - No software installation on network devices
+- ✅ **Vendor agnostic** - Works with any device that supports SSH
+- ✅ **Management integration** - Use existing administrative SSH access
+- ✅ **Centralized visibility** - Monitor all network devices from one dashboard
+- ✅ **Custom checks** - Execute device-specific commands for detailed monitoring
+
 ### Help
 
 ```bash
@@ -660,6 +837,24 @@ heartbeat:
 
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+
+# SSH configuration for remote execution (optional)
+ssh:
+  # Default SSH settings for all remote checks
+  connection: "monitoring@remote-server"        # SSH connection string (user@host format)
+  key_file: ~/.ssh/id_rsa                        # SSH private key file path
+  password: null                                 # SSH password (discouraged, use keys)
+  strict_host_key_checking: true                 # Verify host keys (default: true)
+
+# Command-specific SSH overrides (optional)
+cmdcheck:
+  ssh:
+    connection: "web-admin@web-server"           # Override SSH connection for cmdcheck
+    key_file: ~/.ssh/web_server_key             # Different key for web server
+
+portscan:
+  ssh:
+    connection: "scan-user@jump-host"            # Use jump host for port scanning
 
 portscan:
   uptime_kuma:
@@ -833,6 +1028,72 @@ commands:
 
 For comprehensive security guidance, see [CONFIGURATION_GUIDE.md - Security Considerations](CONFIGURATION_GUIDE.md#security-considerations)
 
+## Remote Execution Requirements
+
+When using SSH for remote execution (`--ssh` option), keep these important requirements in mind:
+
+### Commands Must Exist on Target Machines
+
+**Kuma Scout does NOT copy, install, or transfer commands to remote systems.** All commands you specify must already be installed and available on the target machine.
+
+**Example - What works:**
+```bash
+# ✅ systemctl exists on most Linux systems
+kuma-scout cmdcheck --ssh user@remote-server --command "systemctl is-active nginx"
+
+# ✅ zpool exists on systems with ZFS
+kuma-scout zfspoolstatus --ssh user@remote-server --pool tank
+
+# ✅ nmap exists on systems with nmap installed
+kuma-scout portscan --ssh user@remote-server --ip-range 10.0.0.0/24
+```
+
+**Example - What doesn't work:**
+```bash
+# ❌ kubectl not installed on target
+kuma-scout cmdcheck --ssh user@web-server --command "kubectl get pods"
+
+# ❌ Custom script not present on target
+kuma-scout cmdcheck --ssh user@remote-server --command "/opt/custom/check.sh"
+```
+
+**Solution**: Ensure required commands are pre-installed on target systems, or use commands that are universally available (like `systemctl`, `df`, `ps`, etc.).
+
+### SSH Access Requirements
+
+- ✅ **SSH service running** on target machine (default port 22, or custom port)
+- ✅ **Valid authentication** - SSH key, password, or SSH agent
+- ✅ **Network connectivity** - SSH port accessible from monitoring host
+- ✅ **User permissions** - SSH user must have permission to execute the specified commands
+
+### Authentication Methods
+
+**SSH Key Authentication (Recommended):**
+```bash
+# Generate key pair
+ssh-keygen -t ed25519 -f ~/.ssh/kuma_scout_key
+
+# Copy public key to target
+ssh-copy-id -i ~/.ssh/kuma_scout_key.pub user@target-server
+
+# Use in Kuma Scout
+kuma-scout cmdcheck --ssh user@target-server --ssh-key ~/.ssh/kuma_scout_key --command "uptime"
+```
+
+**Password Authentication (Less Secure):**
+```bash
+kuma-scout cmdcheck --ssh user@target-server --ssh-password "your-password" --command "uptime"
+```
+
+**SSH Agent Forwarding:**
+```bash
+# Start SSH agent and add key
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/kuma_scout_key
+
+# Kuma Scout will use agent automatically
+kuma-scout cmdcheck --ssh user@target-server --command "uptime"
+```
 
 ### Authentication Tokens (Environment Variables Only)
 

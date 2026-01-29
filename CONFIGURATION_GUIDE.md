@@ -729,17 +729,15 @@ Note: The `--ignore-file-permissions` flag applies to both config files and SSH 
 1. **SSH Key (Recommended)** - Most secure, no passwords in config:
    ```yaml
    ssh:
-     host: backup-server
-     user: root
-     key_file: /root/.ssh/id_rsa
+     connection: "root@backup-server"        # SSH connection string
+     key_file: /root/.ssh/id_rsa             # Path to SSH private key
    ```
 
 2. **SSH Password (Discouraged)** - Use only when keys are not possible:
    ```yaml
    ssh:
-     host: legacy-server
-     user: admin
-     password: "${SSH_PASSWORD}"  # Use env var for password
+     connection: "admin@legacy-server"       # SSH connection string
+     password: "${SSH_PASSWORD}"             # SSH password (use env var)
    ```
    ⚠️ Passwords are less secure than keys and may appear in process lists.
 

@@ -141,16 +141,39 @@ class SSHRunner:
 
         # If password is provided, use sshpass (if available)
         if self.password:
-            # Try to use sshpass for password authentication
-            # This is discouraged but supported for legacy systems
+            # SECURITY: Use environment variable instead of command line argument
+            # to prevent password exposure in process lists (ps/top)
+            import os
+            
             logger = get_logger()
             logger.warning(
                 "⚠️  SECURITY WARNING: Using SSH password authentication. "
-                "Password may be exposed in process list (ps/top). "
-                "Consider using SSH key authentication instead."
+                "Password may be exposed in process list (ps/top) even with environment variable method. "
+                "Please use SSH key authentication instead."
             )
-            ssh_cmd = ["sshpass", "-p", self.password] + ssh_cmd
-
+            
+            # Try to use sshpass with environment variable (more secure than -p flag)
+            # Set password in environment variable for sshpass
+            env = os.environ.copy()
+            env['SSHPASS'] = self.password
+            
+            ssh_cmd = ["sshpass", "-e"] + ssh_cmd
+            
+            try:
+                result = subprocess.run(
+                    ssh_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                    env=env,  # Pass modified environment
+                )
+                return result.returncode == 0, result.stdout, result.stderr
+            except subprocess.TimeoutExpired:
+                return False, "", f"Command timed out after {self.timeout}s"
+            except Exception as e:
+                return False, "", str(e)
+        
+        # No password - use standard SSH
         try:
             result = subprocess.run(
                 ssh_cmd,

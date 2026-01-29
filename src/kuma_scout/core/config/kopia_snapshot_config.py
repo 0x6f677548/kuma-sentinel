@@ -1,6 +1,6 @@
 """Kopia snapshot status command configuration."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .base import ConfigBase, FieldMapping
 
@@ -17,6 +17,12 @@ class KopiaSnapshotConfig(ConfigBase):
         self.kopiasnapshotstatus_snapshots: List[Dict[str, Any]] = []
         # Global default for any path without explicit max_age_hours
         self.kopiasnapshotstatus_max_age_hours = 24
+
+        # Command-specific SSH overrides (initialized to None to use global defaults)
+        self.kopiasnapshotstatus_ssh_connection_string: Optional[str] = None
+        self.kopiasnapshotstatus_ssh_key_file: Optional[str] = None
+        self.kopiasnapshotstatus_ssh_password: Optional[str] = None
+        self.kopiasnapshotstatus_ssh_strict_host_key_checking: Optional[bool] = None
 
     def _get_command_name(self) -> str:
         """Get the command name for command-specific configuration."""

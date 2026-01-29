@@ -417,3 +417,47 @@ def test_kopia_cli_snapshot_optional_format_ssh_paths():
         ("user@host:/path", 48),
         ("backup.example.com:/remote", 24),
     ]
+
+
+def test_kopia_config_load_command_specific_ssh_settings():
+    """Test loading command-specific SSH settings from YAML."""
+    yaml_content = {
+        "ssh": {
+            "connection": "global-user@global-server.example.com",
+            "strict_host_key_checking": True,
+            "key_file": "/global/key",
+        },
+        "kopiasnapshotstatus": {
+            "ssh": {
+                "connection": "kopia-user@kopia-server.example.com",
+                "strict_host_key_checking": False,
+                "key_file": "/kopia/key",
+                "password": "kopia_pass",
+            },
+        },
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(yaml_content, f)
+        f.flush()
+        config_file = f.name
+
+    try:
+        config = KopiaSnapshotConfig()
+        config.load_from_yaml(config_file)
+
+        # Global SSH settings overridden by command-specific
+        assert config.ssh_host == "kopia-server.example.com"
+        assert config.ssh_user == "kopia-user"  # From command-specific connection
+
+        # Global strict_host_key_checking remains default since not overridden by connection
+        assert config.ssh_strict_host_key_checking is True
+
+        # Command-specific SSH attributes should be set
+        assert hasattr(config, "kopiasnapshotstatus_ssh_strict_host_key_checking")
+        assert config.kopiasnapshotstatus_ssh_strict_host_key_checking is False
+        assert hasattr(config, "kopiasnapshotstatus_ssh_key_file")
+        assert config.kopiasnapshotstatus_ssh_key_file == "/kopia/key"
+        assert hasattr(config, "kopiasnapshotstatus_ssh_password")
+        assert config.kopiasnapshotstatus_ssh_password == "kopia_pass"
+    finally:
+        os.unlink(config_file)

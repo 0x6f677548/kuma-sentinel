@@ -520,6 +520,25 @@ class TestKopiaSnapshotChecker:
         assert result.duration_seconds >= 0
         assert result.details is not None
 
+    def test_ssh_runner_initialization_with_command_specific_settings(self):
+        """Test that SSH runner is initialized with command-specific SSH settings."""
+        config = KopiaSnapshotConfig()
+        config.ssh_host = "test-server.example.com"
+        config.ssh_user = "testuser"
+        config.ssh_strict_host_key_checking = True  # Global default
+        # Simulate command-specific setting loaded from YAML
+        config.kopiasnapshotstatus_ssh_strict_host_key_checking = False  # noqa
+
+        logger = MagicMock()
+        checker = KopiaSnapshotChecker(config=config, logger=logger)
+
+        # Check that SSH runner was initialized
+        assert checker._ssh_runner is not None
+        assert checker._ssh_runner.host == "test-server.example.com"
+        assert checker._ssh_runner.user == "testuser"
+        # Should use command-specific setting (False) instead of global (True)
+        assert checker._ssh_runner.strict_host_key_checking is False
+
 
 # Tests for _validate_snapshot_path function
 class TestValidateSnapshotPath:

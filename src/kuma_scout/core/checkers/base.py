@@ -48,13 +48,24 @@ class Checker(ABC):
     def _initialize_ssh(self) -> None:
         """Initialize SSH runner if SSH is configured."""
         if self.config.ssh_host:
+            # Get effective SSH settings, preferring command-specific over global
+            command_name = self.config._get_command_name()
+
+            def get_ssh_attr(attr_name: str):
+                """Get SSH attribute, checking command-specific first."""
+                if command_name:
+                    cmd_attr = f"{command_name}_{attr_name}"
+                    if hasattr(self.config, cmd_attr):
+                        return getattr(self.config, cmd_attr)
+                return getattr(self.config, attr_name)
+
             self._ssh_runner = SSHRunner(
                 host=self.config.ssh_host,
                 user=self.config.ssh_user,
                 port=self.config.ssh_port or 22,
-                key_file=self.config.ssh_key_file,
-                password=self.config.ssh_password,
-                strict_host_key_checking=self.config.ssh_strict_host_key_checking,
+                key_file=get_ssh_attr("ssh_key_file"),
+                password=get_ssh_attr("ssh_password"),
+                strict_host_key_checking=get_ssh_attr("ssh_strict_host_key_checking"),
             )
             self.logger.debug(
                 f"🔌 SSH runner initialized for {self.name}: "

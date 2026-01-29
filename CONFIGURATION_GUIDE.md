@@ -82,9 +82,10 @@ logging:
 ```yaml
 # Global SSH settings for all commands
 ssh:
-  host: backup-server.example.com    # SSH hostname or IP
-  user: root                          # SSH username
-  port: 22                            # SSH port (default: 22)
+  # SSH connection string (recommended approach)
+  # Supported formats: ssh://user@host:port, user@host:port, user@host, host:port, host
+  connection: backup-server.example.com
+  
   key_file: /root/.ssh/id_rsa         # Path to SSH private key
   password: "${SSH_PASSWORD}"         # SSH password (discouraged, use keys)
   strict_host_key_checking: true      # Verify host keys (default: true)
@@ -92,15 +93,16 @@ ssh:
 # Command-specific SSH override
 kopiasnapshotstatus:
   ssh:
-    host: kopia-server.local          # Override global SSH host
-    user: kopia                       # Override global SSH user
+    # Command-specific connection string overrides global settings
+    connection: kopia-server.local
+    key_file: /etc/kopia/ssh_key      # Command-specific key
   snapshots:
     - path: /data
       max_age_hours: 24
 ```
 
 **SSH Configuration Priority:**
-1. CLI arguments (`--ssh`, `--ssh-host`, `--ssh-user`, etc.) - highest priority
+1. CLI arguments (`--ssh`, `--ssh-key-file`, `--ssh-password`) - highest priority
 2. YAML config (command-specific `ssh:` section)
 3. YAML config (global `ssh:` section)
 4. SSH config file (`~/.ssh/config`)

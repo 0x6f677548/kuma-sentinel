@@ -4,12 +4,45 @@ import logging
 import sys
 import time
 from abc import abstractmethod
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
+
+import typer
 
 from kuma_scout.cli.commands.base import Command
 from kuma_scout.core.config.base import ConfigBase
 from kuma_scout.core.logger import setup_default_logging, setup_logging
 from kuma_scout.core.uptime_kuma import PUSH_TIMEOUT_ALERT, send_push
+
+
+def ssh_config_callback(
+    ctx: typer.Context, param: typer.CallbackParam, value: Optional[str]
+) -> Optional[str]:
+    """Parse SSH connection string and validate format.
+
+    This callback processes the --ssh option and validates the connection string format.
+    The actual parsing is handled by the config loading system.
+
+    Supported formats:
+    - ssh://user@host:port
+    - user@host:port
+    - user@host
+    - host:port
+    - host
+    """
+    if not value:
+        return value
+
+    from kuma_scout.core.utils.ssh_runner import parse_ssh_connection_string
+
+    # Validate the connection string by attempting to parse it
+    try:
+        host, user, port = parse_ssh_connection_string(value)
+        if not host:
+            raise ValueError("Connection string must include a host")
+    except Exception as e:
+        raise typer.BadParameter(f"Invalid SSH connection string '{value}': {e}") from e
+
+    return value
 
 
 class CommandExecutor(Command):
@@ -32,6 +65,68 @@ class CommandExecutor(Command):
     def __init__(self):
         """Initialize the command executor with default logging."""
         setup_default_logging()
+
+    def get_common_options(self) -> Dict[str, Any]:
+        """Get common CLI options that should be available for all commands."""
+        return {
+            "config": typer.Option(
+                None,
+                "--config",
+                help="Configuration file path (e.g., /etc/kuma-scout/config.yaml)",
+            ),
+            "uptime_kuma_url": typer.Option(
+                None,
+                "--uptime-kuma-url",
+                help="Uptime Kuma API URL (e.g., http://uptimekuma:3001/api/push)",
+            ),
+            "heartbeat_token": typer.Option(
+                None,
+                "--heartbeat-token",
+                help="Heartbeat token (env: KUMA_SCOUT_HEARTBEAT_TOKEN). Example: abc123xyz789",
+            ),
+            "token": typer.Option(
+                None,
+                "--token",
+                help="Command token (varies by command, check --help)",
+            ),
+            "ignore_file_permissions": typer.Option(
+                False,
+                "--ignore-file-permissions",
+                help="Skip config file permission validation (use only in development)",
+            ),
+            "ssh": typer.Option(
+                None,
+                "--ssh",
+                help="SSH connection string. Formats: ssh://user@host:port, user@host:port, user@host, host:port, or host",
+                callback=ssh_config_callback,
+            ),
+            "ssh_key_file": typer.Option(
+                None,
+                "--ssh-key-file",
+                help="Path to SSH private key",
+            ),
+            "ssh_password": typer.Option(
+                None,
+                "--ssh-password",
+                help="SSH password (discouraged, use keys instead)",
+            ),
+            "ssh_strict_host_key_checking": typer.Option(
+                True,
+                "--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking",
+                help="Enable/disable SSH strict host key checking (default: enabled)",
+            ),
+            "log_file": typer.Option(
+                None,
+                "--log-file",
+                help="Log file path (default: /var/log/kuma-scout.log)",
+            ),
+            "log_level": typer.Option(
+                None,
+                "--log-level",
+                help="Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) (default: INFO)",
+                case_sensitive=False,
+            ),
+        }
 
     def register_command(self) -> Callable:
         """Register and return a Typer-compatible command function.
@@ -164,16 +259,18 @@ class CommandExecutor(Command):
         if token_cli and hasattr(self.config, "command_token"):
             self.config.command_token = token_cli
 
-        # Handle --ssh shorthand (user@host format)
-        ssh_shorthand = args.get("ssh")
-        if ssh_shorthand:
-            from kuma_scout.core.utils.ssh_runner import parse_ssh_shorthand
+        # Map SSH arguments to config (set by callback or individual options)
+        ssh_host = args.get("ssh_host")
+        if ssh_host:
+            self.config.ssh_host = ssh_host
 
-            host, user = parse_ssh_shorthand(ssh_shorthand)
-            if host:
-                self.config.ssh_host = host
-            if user:
-                self.config.ssh_user = user
+        ssh_user = args.get("ssh_user")
+        if ssh_user:
+            self.config.ssh_user = ssh_user
+
+        ssh_port = args.get("ssh_port")
+        if ssh_port is not None:
+            self.config.ssh_port = ssh_port
 
     def _validate_config(self, command_name: str) -> None:
         """Validate SSH and overall configuration."""

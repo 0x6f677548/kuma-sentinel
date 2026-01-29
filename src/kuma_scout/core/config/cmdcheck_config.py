@@ -28,6 +28,10 @@ class CmdCheckConfig(ConfigBase):
         self.cmdcheck_failure_pattern: Optional[str] = None
         self.cmdcheck_sanitize_output = True  # Mask sensitive data by default
 
+    def _get_command_name(self) -> str:
+        """Get the command name for command-specific configuration."""
+        return "cmdcheck"
+
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for command check configuration."""
         mappings = super()._get_field_mappings()

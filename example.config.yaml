@@ -32,6 +32,25 @@ heartbeat:
     # Push token for heartbeat monitor
     token: your_heartbeat_token_here
 
+# === SSH REMOTE EXECUTION CONFIGURATION ===
+# Configure SSH settings for remote command execution
+# All commands support SSH remote execution
+
+ssh:
+  # SSH connection string
+  # Supported formats: ssh://user@host:port, user@host:port, user@host, host:port, host
+  # Examples: "backup-server", "user@nas:22", "ssh://admin@remote-host:2222"
+  connection: backup-server.example.com
+  
+  # Path to SSH private key (recommended over password)
+  key_file: /etc/kuma-scout/ssh_key
+  
+  # SSH password (discouraged, use key_file instead)
+  # password: "${SSH_PASSWORD}"
+  
+  # Verify SSH host keys (default: true, recommended for security)
+  strict_host_key_checking: true
+
 # === COMMAND CHECK CONFIGURATION ===
 # Execute arbitrary shell commands and monitor the results
 # Commands are always stored as a list, even for single commands.
@@ -45,6 +64,11 @@ cmdcheck:
   uptime_kuma:
     # Push token for cmdcheck command
     token: your_cmdcheck_token_here
+  
+  # Command-specific SSH override (optional)
+  # If not specified, uses global SSH configuration
+  ssh:
+    connection: web-server.local
   
   # Commands list (required) - always a list, even for single command
   commands:
@@ -100,6 +124,10 @@ portscan:
     # Push token for port scan alert monitor
     token: your_portscan_token_here
   
+  # Command-specific SSH override (optional)
+  ssh:
+    connection: nas-server.local
+  
   nmap:
     # Nmap timing level: T0-T5 (default: T3)
     # T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane
@@ -133,6 +161,10 @@ kopiasnapshotstatus:
     # Push token for kopia snapshot status alerts
     token: your_kopiasnapshotstatus_token_here
   
+  # Command-specific SSH override (optional)
+  ssh:
+    connection: kopia-server.local
+  
   # List of snapshots with per-path maximum age thresholds
   # Format: each snapshot has 'path' and optional 'max_age_hours'
   # If 'max_age_hours' is omitted, uses the default value below
@@ -153,6 +185,10 @@ zfspoolstatus:
   uptime_kuma:
     # Push token for ZFS pool status alerts
     token: your_zfspoolstatus_token_here
+  
+  # Command-specific SSH override (optional)
+  ssh:
+    connection: zfs-server.local
   
   # List of pools to monitor
   # Each pool can have its own free space threshold

@@ -18,6 +18,10 @@ class KopiaSnapshotConfig(ConfigBase):
         # Global default for any path without explicit max_age_hours
         self.kopiasnapshotstatus_max_age_hours = 24
 
+    def _get_command_name(self) -> str:
+        """Get the command name for command-specific configuration."""
+        return "kopiasnapshotstatus"
+
     @staticmethod
     def _snapshot_converter(snapshots_input: Any) -> List[Dict[str, Any]]:
         """Convert snapshot input to dict list.

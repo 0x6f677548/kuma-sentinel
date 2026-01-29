@@ -2,7 +2,50 @@
 
 import shlex
 import subprocess
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
+
+
+@dataclass
+class SSHConfig:
+    """SSH configuration with parsing capabilities."""
+
+    host: Optional[str] = None
+    user: Optional[str] = None
+    port: Optional[int] = None
+    key_file: Optional[str] = None
+    password: Optional[str] = None
+    strict_host_key_checking: bool = True
+
+    @classmethod
+    def from_connection_string(cls, connection_string: str) -> "SSHConfig":
+        """Create SSHConfig from connection string.
+
+        Args:
+            connection_string: SSH connection string in supported formats
+
+        Returns:
+            SSHConfig instance with parsed values
+        """
+        host, user, port = parse_ssh_connection_string(connection_string)
+        return cls(host=host, user=user, port=port)
+
+    def update_from_connection_string(self, connection_string: str) -> None:
+        """Update this config from a connection string.
+
+        Only sets values that are not already set (None).
+        """
+        host, user, port = parse_ssh_connection_string(connection_string)
+        if host and self.host is None:
+            self.host = host
+        if user and self.user is None:
+            self.user = user
+        if port and self.port is None:
+            self.port = port
+
+    def is_complete(self) -> bool:
+        """Check if config has minimum required fields for SSH connection."""
+        return self.host is not None
 
 
 class SSHRunner:
@@ -129,3 +172,65 @@ def parse_ssh_shorthand(ssh: Optional[str]) -> Tuple[Optional[str], Optional[str
         user, host = ssh.rsplit("@", 1)
         return host, user
     return ssh, None
+
+
+def parse_ssh_connection_string(
+    conn_str: str,
+) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+    """Parse various SSH connection string formats.
+
+    Supported formats:
+    - ssh://user@host:port
+    - user@host:port
+    - user@host
+    - host:port
+    - host
+
+    Args:
+        conn_str: SSH connection string
+
+    Returns:
+        Tuple of (host, user, port) where any may be None
+    """
+    if not conn_str:
+        return None, None, None
+
+    # Handle ssh:// URL format
+    if conn_str.startswith("ssh://"):
+        conn_str = conn_str[6:]  # Remove ssh:// prefix
+
+    # Handle user@host:port format
+    if ":" in conn_str and "@" in conn_str:
+        # Split on last colon to handle IPv6 addresses correctly
+        user_host, port_str = conn_str.rsplit(":", 1)
+        try:
+            port = int(port_str)
+        except ValueError:
+            # Not a valid port, treat the whole thing as host
+            return conn_str, None, None
+
+        if "@" in user_host:
+            user, host = user_host.rsplit("@", 1)
+            return host, user, port
+        else:
+            # host:port format
+            return user_host, None, port
+
+    # Handle user@host format
+    elif "@" in conn_str:
+        user, host = conn_str.rsplit("@", 1)
+        return host, user, None
+
+    # Handle host:port format
+    elif ":" in conn_str:
+        host, port_str = conn_str.rsplit(":", 1)
+        try:
+            port = int(port_str)
+            return host, None, port
+        except ValueError:
+            # Not a valid port, treat as just host
+            return conn_str, None, None
+
+    # Handle just host
+    else:
+        return conn_str, None, None

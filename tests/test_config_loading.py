@@ -164,3 +164,148 @@ class TestConfigPrecedence:
         assert (
             config.portscan_nmap_ports == "22,80,443"
         ), "ports should be overridden by CLI arguments when provided"
+
+
+class TestSSHConfig:
+    """Test SSH configuration parsing from YAML and CLI."""
+
+    def test_yaml_ssh_connection_string_parsing(self):
+        """Test that YAML SSH connection strings are parsed correctly."""
+        import os
+        import tempfile
+
+        yaml_content = """
+ssh:
+  connection: user@host:2222
+  key_file: /path/to/key
+portscan:
+  ip_ranges: ['192.168.1.0/24']
+uptime_kuma:
+  url: http://test.com
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            config_file = f.name
+
+        try:
+            config = PortscanConfig()
+            config.load_from_yaml(config_file)
+
+            assert config.ssh_host == "host"
+            assert config.ssh_user == "user"
+            assert config.ssh_port == 2222
+            assert config.ssh_key_file == "/path/to/key"
+        finally:
+            os.unlink(config_file)
+
+    def test_yaml_command_specific_ssh_override(self):
+        """Test that command-specific SSH connection strings override global ones."""
+        import os
+        import tempfile
+
+        yaml_content = """
+ssh:
+  connection: global@globalhost:22
+portscan:
+  ssh:
+    connection: command@commandhost:3333
+  ip_ranges: ['192.168.1.0/24']
+uptime_kuma:
+  url: http://test.com
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            config_file = f.name
+
+        try:
+            config = PortscanConfig()
+            config.load_from_yaml(config_file)
+
+            # Command-specific should override global
+            assert config.ssh_host == "commandhost"
+            assert config.ssh_user == "command"
+            assert config.ssh_port == 3333
+        finally:
+            os.unlink(config_file)
+
+    def test_cli_ssh_connection_string_parsing(self):
+        """Test that CLI SSH connection strings are parsed correctly."""
+        config = PortscanConfig()
+
+        # Simulate CLI args with SSH connection string
+        args = {
+            "ssh": "admin@server:2222",
+            "ssh_key_file": "/etc/ssh/key",
+            "ssh_password": None,
+            "ssh_strict_host_key_checking": True,
+        }
+
+        config.load_from_args(args)
+
+        assert config.ssh_host == "server"
+        assert config.ssh_user == "admin"
+        assert config.ssh_port == 2222
+        assert config.ssh_key_file == "/etc/ssh/key"
+
+    def test_cli_ssh_connection_string_with_defaults(self):
+        """Test CLI SSH parsing with default port."""
+        config = PortscanConfig()
+
+        args = {
+            "ssh": "user@host",  # No port specified
+            "ssh_key_file": None,
+            "ssh_password": None,
+            "ssh_strict_host_key_checking": True,
+        }
+
+        config.load_from_args(args)
+
+        assert config.ssh_host == "host"
+        assert config.ssh_user == "user"
+        assert config.ssh_port == 22  # Default port
+
+    def test_ssh_config_precedence_cli_overrides_yaml(self):
+        """Test that CLI SSH args override YAML configuration."""
+        import os
+        import tempfile
+
+        yaml_content = """
+ssh:
+  connection: yaml@yamlhost:22
+  key_file: /yaml/key
+portscan:
+  ip_ranges: ['192.168.1.0/24']
+uptime_kuma:
+  url: http://test.com
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            config_file = f.name
+
+        try:
+            config = PortscanConfig()
+            config.load_from_yaml(config_file)
+
+            # YAML should be loaded
+            assert config.ssh_host == "yamlhost"
+            assert config.ssh_key_file == "/yaml/key"
+
+            # CLI should override
+            args = {
+                "ssh": "cli@clihost:3333",
+                "ssh_key_file": "/cli/key",
+                "ssh_password": None,
+                "ssh_strict_host_key_checking": True,
+            }
+
+            config.load_from_args(args)
+
+            assert config.ssh_host == "clihost"
+            assert config.ssh_user == "cli"
+            assert config.ssh_port == 3333
+            assert config.ssh_key_file == "/cli/key"
+        finally:
+            os.unlink(config_file)

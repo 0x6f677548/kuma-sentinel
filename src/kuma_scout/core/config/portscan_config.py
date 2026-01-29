@@ -21,6 +21,10 @@ class PortscanConfig(ConfigBase):
         self.portscan_ip_ranges: List[str] = []
         self.portscan_nmap_keep_xmloutput = False
 
+    def _get_command_name(self) -> str:
+        """Get the command name for command-specific configuration."""
+        return "portscan"
+
     @staticmethod
     def _parse_comma_separated_list(value: str) -> List[str]:
         """Parse comma-separated string into list, handling both strings and lists.

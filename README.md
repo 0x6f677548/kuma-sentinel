@@ -354,8 +354,7 @@ kuma-scout portscan \
 **With SSH key:**
 ```bash
 kuma-scout kopiasnapshotstatus \
-  --ssh-host backup-server \
-  --ssh-user root \
+  --ssh root@backup-server \
   --ssh-key-file /etc/kuma-scout/ssh_key \
   --snapshot /data,24 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
@@ -363,10 +362,7 @@ kuma-scout kopiasnapshotstatus \
 ```
 
 **SSH Options:**
-- `--ssh user@host` - Shorthand for user and host
-- `--ssh-host host` - SSH hostname or IP
-- `--ssh-user user` - SSH username
-- `--ssh-port port` - SSH port (default: 22)
+- `--ssh connection-string` - SSH connection string (formats: `ssh://user@host:port`, `user@host:port`, `user@host`, `host:port`, or `host`)
 - `--ssh-key-file path` - Path to SSH private key
 - `--ssh-password password` - SSH password (discouraged, use keys)
 - `--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking` - Host key verification (default: enabled)

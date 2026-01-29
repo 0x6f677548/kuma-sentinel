@@ -68,6 +68,65 @@ class ConfigBase:
         self.ssh_password: Optional[str] = None
         self.ssh_strict_host_key_checking: bool = True
 
+    def _get_command_name(self) -> str:
+        """Get the command name for command-specific configuration.
+
+        Subclasses should override this to return their command name
+        for command-specific SSH and other overrides.
+
+        Returns:
+            Command name (e.g., 'portscan', 'cmdcheck')
+        """
+        return ""
+
+    def _get_ssh_field_mappings(self) -> Dict[str, FieldMapping]:
+        """Get SSH field mappings including command-specific overrides.
+
+        Returns:
+            Dictionary of SSH field mappings
+        """
+        command_name = self._get_command_name()
+        mappings = {
+            # Global SSH configuration
+            "ssh_connection_string": FieldMapping(
+                yaml_path="ssh.connection",
+            ),
+            "ssh_key_file": FieldMapping(
+                arg_key="ssh_key_file",
+                yaml_path="ssh.key_file",
+            ),
+            "ssh_password": FieldMapping(
+                arg_key="ssh_password",
+                yaml_path="ssh.password",
+            ),
+            "ssh_strict_host_key_checking": FieldMapping(
+                arg_key="ssh_strict_host_key_checking",
+                yaml_path="ssh.strict_host_key_checking",
+                converter=self._parse_bool,
+            ),
+        }
+
+        # Add command-specific SSH overrides if command name is available
+        if command_name:
+            command_ssh_mappings = {
+                f"{command_name}_ssh_connection_string": FieldMapping(
+                    yaml_path=f"{command_name}.ssh.connection",
+                ),
+                f"{command_name}_ssh_key_file": FieldMapping(
+                    yaml_path=f"{command_name}.ssh.key_file",
+                ),
+                f"{command_name}_ssh_password": FieldMapping(
+                    yaml_path=f"{command_name}.ssh.password",
+                ),
+                f"{command_name}_ssh_strict_host_key_checking": FieldMapping(
+                    yaml_path=f"{command_name}.ssh.strict_host_key_checking",
+                    converter=self._parse_bool,
+                ),
+            }
+            mappings.update(command_ssh_mappings)
+
+        return mappings
+
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for configuration.
 
@@ -77,7 +136,7 @@ class ConfigBase:
         Returns:
             Dictionary mapping field names to FieldMapping definitions
         """
-        return {
+        mappings = {
             "log_file": FieldMapping(
                 arg_key="log_file",
                 yaml_path="logging.log_file",
@@ -108,34 +167,12 @@ class ConfigBase:
                 yaml_path="logging.ignore_file_permissions",
                 converter=self._parse_bool,
             ),
-            # SSH configuration (YAML and CLI only, no env vars)
-            "ssh_host": FieldMapping(
-                arg_key="ssh_host",
-                yaml_path="ssh.host",
-            ),
-            "ssh_user": FieldMapping(
-                arg_key="ssh_user",
-                yaml_path="ssh.user",
-            ),
-            "ssh_port": FieldMapping(
-                arg_key="ssh_port",
-                yaml_path="ssh.port",
-                converter=int,
-            ),
-            "ssh_key_file": FieldMapping(
-                arg_key="ssh_key_file",
-                yaml_path="ssh.key_file",
-            ),
-            "ssh_password": FieldMapping(
-                arg_key="ssh_password",
-                yaml_path="ssh.password",
-            ),
-            "ssh_strict_host_key_checking": FieldMapping(
-                arg_key="ssh_strict_host_key_checking",
-                yaml_path="ssh.strict_host_key_checking",
-                converter=self._parse_bool,
-            ),
         }
+
+        # Add SSH field mappings (global and command-specific)
+        mappings.update(self._get_ssh_field_mappings())
+
+        return mappings
 
     def load_from_yaml(self, config_file: str) -> None:
         """Load configuration from YAML file.
@@ -158,6 +195,8 @@ class ConfigBase:
                 self.logger.debug("Successfully parsed YAML configuration file")
 
             self._apply_field_mappings_from_yaml(data)
+            # Process SSH connection strings after loading
+            self._process_ssh_config_from_yaml(data)
         except FileNotFoundError as e:
             error_msg = f"Configuration file not found: {config_file}"
             if self.logger:
@@ -169,9 +208,72 @@ class ConfigBase:
                 self.logger.error(f"❌ {error_msg}")
             raise RuntimeError(error_msg) from e
 
+    def _process_ssh_config_from_yaml(self, data: Dict[str, Any]) -> None:
+        """Process SSH connection strings from YAML configuration.
+
+        Handles both global and command-specific SSH connection strings.
+        Connection strings are parsed and individual SSH fields are set
+        only if they haven't been set by explicit YAML fields.
+
+        Args:
+            data: Parsed YAML data
+        """
+        from kuma_scout.core.utils.ssh_runner import SSHConfig
+
+        # Process global SSH connection string
+        global_connection = self._get_nested_value(data, "ssh.connection")
+        if global_connection:
+            ssh_config = SSHConfig.from_connection_string(global_connection)
+            if ssh_config.host and self.ssh_host is None:
+                self.ssh_host = ssh_config.host
+            if ssh_config.user and self.ssh_user is None:
+                self.ssh_user = ssh_config.user
+            if ssh_config.port and self.ssh_port == 22:  # Only override default
+                self.ssh_port = ssh_config.port
+
+        # Process command-specific SSH connection string
+        command_name = self._get_command_name()
+        if command_name:
+            command_connection = self._get_nested_value(
+                data, f"{command_name}.ssh.connection"
+            )
+            if command_connection:
+                ssh_config = SSHConfig.from_connection_string(command_connection)
+                # Command-specific overrides global settings
+                if ssh_config.host:
+                    self.ssh_host = ssh_config.host
+                if ssh_config.user:
+                    self.ssh_user = ssh_config.user
+                if ssh_config.port:
+                    self.ssh_port = ssh_config.port
+
+    def _process_ssh_config_from_args(self, args: Dict[str, Any]) -> None:
+        """Process SSH connection string from CLI arguments.
+
+        CLI arguments always take precedence over YAML configuration.
+
+        Args:
+            args: CLI arguments dictionary
+        """
+        from kuma_scout.core.utils.ssh_runner import SSHConfig
+
+        # Process SSH connection string from CLI - this always overrides YAML
+        connection_string = args.get("ssh")
+        if connection_string:
+            ssh_config = SSHConfig.from_connection_string(connection_string)
+            # CLI always overrides any previous values
+            if ssh_config.host:
+                self.ssh_host = ssh_config.host
+            if ssh_config.user:
+                self.ssh_user = ssh_config.user
+            if ssh_config.port:
+                self.ssh_port = ssh_config.port
+
     def load_from_args(self, args) -> None:
         """Load configuration from command-line arguments."""
         self._apply_field_mappings_from_args(args)
+        # Process SSH connection string from CLI args
+        self._process_ssh_config_from_args(args)
 
     def load_from_env(self) -> None:
         """Load configuration from environment variables.

@@ -16,6 +16,10 @@ class ZfsPoolStatusConfig(ConfigBase):
         self.zfspoolstatus_pools: List[Dict[str, Any]] = []
         self.zfspoolstatus_free_space_percent_default = 10
 
+    def _get_command_name(self) -> str:
+        """Get the command name for command-specific configuration."""
+        return "zfspoolstatus"
+
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for ZFS pool configuration."""
         mappings = super()._get_field_mappings()

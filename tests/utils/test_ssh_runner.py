@@ -175,13 +175,15 @@ class TestSSHRunner:
 
         runner = SSHRunner(host="host", password="secret")
         runner.run(["echo", "test"])
-        # Check that sshpass is prepended
+        # Check that sshpass is prepended with -e flag
         args, kwargs = mock_run.call_args
         cmd = args[0]
+        env = kwargs.get("env", {})
         assert cmd[0] == "sshpass"
-        assert cmd[1] == "-p"
-        assert cmd[2] == "secret"
-        assert cmd[3] == "ssh"
+        assert cmd[1] == "-e"
+        assert cmd[2] == "ssh"
+        # Password should be set in environment variable, not command line
+        assert env.get("SSHPASS") == "secret"
 
 
 class TestParseSSHShorthand:

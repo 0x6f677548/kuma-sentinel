@@ -297,10 +297,7 @@ class DataSanitizer:
 
     @classmethod
     def sanitize_with_circuit_breaker(
-        cls,
-        text: Optional[str],
-        max_processing_time: float = 1.0,
-        **kwargs
+        cls, text: Optional[str], max_processing_time: float = 1.0, **kwargs
     ) -> str:
         """Sanitize with circuit breaker protection against DoS.
 
@@ -322,21 +319,26 @@ class DataSanitizer:
 
             # Log slow sanitizations for monitoring
             if processing_time > 0.1:  # More than 100ms
-                print(f"Performance: Slow sanitization ({processing_time:.3f}s) for input length {len(text)}",
-                      file=sys.stderr)
+                print(
+                    f"Performance: Slow sanitization ({processing_time:.3f}s) for input length {len(text)}",
+                    file=sys.stderr,
+                )
 
             return result
 
         except Exception as e:
             processing_time = time.time() - start_time
-            print(f"Warning: Sanitization failed after {processing_time:.3f}s: {e}", file=sys.stderr)
+            print(
+                f"Warning: Sanitization failed after {processing_time:.3f}s: {e}",
+                file=sys.stderr,
+            )
 
             # Circuit breaker: if taking too long, fail fast
             if processing_time > max_processing_time:
                 return "[SANITIZATION_TIMEOUT]"
 
             # Fallback: return heavily redacted version
-            return re.sub(r'[^\s]', '*', text or "")
+            return re.sub(r"[^\s]", "*", text or "")
 
 
 class SanitizerMonitor:
@@ -349,7 +351,9 @@ class SanitizerMonitor:
         self.slow_sanitizations = 0
         self.timeouts = 0
 
-    def record_sanitization(self, input_length: int, duration: float, success: bool, timeout: bool = False):
+    def record_sanitization(
+        self, input_length: int, duration: float, success: bool, timeout: bool = False
+    ):
         """Record sanitization metrics.
 
         Args:
@@ -366,8 +370,10 @@ class SanitizerMonitor:
             self.failed_sanitizations += 1
         elif duration > 0.1:  # Slow operation
             self.slow_sanitizations += 1
-            print(f"Performance: Slow sanitization ({duration:.3f}s) for {input_length} chars",
-                  file=sys.stderr)
+            print(
+                f"Performance: Slow sanitization ({duration:.3f}s) for {input_length} chars",
+                file=sys.stderr,
+            )
 
     def get_stats(self) -> dict:
         """Get monitoring statistics.
@@ -380,13 +386,15 @@ class SanitizerMonitor:
             "failed": self.failed_sanitizations,
             "slow": self.slow_sanitizations,
             "timeouts": self.timeouts,
-            "failure_rate": self.failed_sanitizations / max(1, self.total_sanitizations),
+            "failure_rate": self.failed_sanitizations
+            / max(1, self.total_sanitizations),
             "timeout_rate": self.timeouts / max(1, self.total_sanitizations),
         }
 
 
 # Global monitor instance (optional, can be None if not needed)
 _sanitizer_monitor = None
+
 
 def get_sanitizer_monitor() -> Optional[SanitizerMonitor]:
     """Get the global sanitizer monitor instance."""

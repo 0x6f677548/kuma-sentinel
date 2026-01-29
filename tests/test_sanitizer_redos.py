@@ -1,8 +1,12 @@
 """Tests for ReDoS protection in sanitizer."""
 
 import time
-import pytest
-from src.kuma_scout.core.utils.sanitizer import DataSanitizer, SanitizerMonitor, get_sanitizer_monitor
+
+from src.kuma_scout.core.utils.sanitizer import (
+    DataSanitizer,
+    SanitizerMonitor,
+    get_sanitizer_monitor,
+)
 
 
 class TestReDoSProtection:
@@ -39,8 +43,8 @@ class TestReDoSProtection:
         malicious_parts = []
         for i in range(50):
             malicious_parts.append(f'password="value{i}"')
-            malicious_parts.append(f'secret:token{i}')
-            malicious_parts.append(f'api_key=value{i}')
+            malicious_parts.append(f"secret:token{i}")
+            malicious_parts.append(f"api_key=value{i}")
         malicious = " ".join(malicious_parts)
 
         start_time = time.time()
@@ -69,6 +73,7 @@ class TestReDoSProtection:
     def test_safe_sub_replacement_limits(self):
         """Test that _safe_sub respects replacement limits."""
         import re
+
         pattern = DataSanitizer._compile_pattern(r"a", re.IGNORECASE)
         input_str = "a" * 200  # 200 'a's
 
@@ -85,7 +90,7 @@ class TestReDoSProtection:
         monitor.record_sanitization(100, 0.05, True, False)  # Normal
         monitor.record_sanitization(1000, 0.2, True, False)  # Slow
         monitor.record_sanitization(500, 0.1, False, False)  # Failed
-        monitor.record_sanitization(200, 1.5, False, True)   # Timeout
+        monitor.record_sanitization(200, 1.5, False, True)  # Timeout
 
         stats = monitor.get_stats()
 
@@ -138,6 +143,7 @@ class TestReDoSProtection:
     def test_safe_sub_excessive_growth_protection(self):
         """Test that _safe_sub prevents excessive result growth."""
         import re
+
         # Create a pattern that would cause massive growth if not limited
         pattern = DataSanitizer._compile_pattern(r"a", re.IGNORECASE)
         # Input that would grow massively if all replacements happen
@@ -156,6 +162,7 @@ class TestReDoSProtection:
     def test_safe_sub_fallback_on_exception(self):
         """Test _safe_sub fallback when regex operations fail."""
         import re
+
         # Create a valid pattern
         pattern = DataSanitizer._compile_pattern(r"test", re.IGNORECASE)
 
@@ -185,7 +192,7 @@ class TestReDoSProtection:
         # a different kind of exception. Let's mock the _safe_sub method to raise an exception
         import unittest.mock
 
-        with unittest.mock.patch.object(DataSanitizer, '_safe_sub') as mock_safe_sub:
+        with unittest.mock.patch.object(DataSanitizer, "_safe_sub") as mock_safe_sub:
             mock_safe_sub.side_effect = RuntimeError("Mocked exception")
 
             result = DataSanitizer.sanitize("password=secret")
@@ -210,7 +217,7 @@ class TestReDoSProtection:
         # Mock the sanitize method to raise an exception
         import unittest.mock
 
-        with unittest.mock.patch.object(DataSanitizer, 'sanitize') as mock_sanitize:
+        with unittest.mock.patch.object(DataSanitizer, "sanitize") as mock_sanitize:
             mock_sanitize.side_effect = RuntimeError("Mocked sanitize exception")
 
             result = DataSanitizer.sanitize_with_circuit_breaker(
@@ -238,6 +245,7 @@ class TestReDoSProtection:
 
         try:
             import re
+
             pattern = DataSanitizer._compile_pattern(r"a", re.IGNORECASE)
             input_str = "a" * 200  # Many 'a's
 
@@ -253,7 +261,9 @@ class TestReDoSProtection:
         # Mock _compile_pattern to raise an exception
         import unittest.mock
 
-        with unittest.mock.patch.object(DataSanitizer, '_compile_pattern') as mock_compile:
+        with unittest.mock.patch.object(
+            DataSanitizer, "_compile_pattern"
+        ) as mock_compile:
             mock_compile.side_effect = RuntimeError("Mocked compile error")
 
             result = DataSanitizer._sanitize_ssh_uri_safe("ssh://user@host.com")
@@ -312,14 +322,16 @@ class TestReDoSProtection:
     def test_sanitize_with_circuit_breaker_timeout_return(self):
         """Test the timeout return path in sanitize_with_circuit_breaker."""
         # Mock sanitize to raise an exception after taking longer than max_processing_time
-        import unittest.mock
         import time
+        import unittest.mock
 
         def slow_sanitize(*args, **kwargs):
             time.sleep(0.01)  # Sleep for 10ms
             raise RuntimeError("Mocked timeout")
 
-        with unittest.mock.patch.object(DataSanitizer, 'sanitize', side_effect=slow_sanitize):
+        with unittest.mock.patch.object(
+            DataSanitizer, "sanitize", side_effect=slow_sanitize
+        ):
             result = DataSanitizer.sanitize_with_circuit_breaker(
                 "test", max_processing_time=0.005  # 5ms timeout
             )

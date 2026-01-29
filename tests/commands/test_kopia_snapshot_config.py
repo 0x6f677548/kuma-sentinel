@@ -254,8 +254,9 @@ def test_kopia_config_get_summary_with_snapshots():
 
     assert "/data@24h" in summary["kopiasnapshotstatus_snapshots"]
     assert "/backups@48h" in summary["kopiasnapshotstatus_snapshots"]
-    assert summary["heartbeat_token"] == "***"
-    assert summary["kopiasnapshotstatus_token"] == "***"
+    # Tokens should never be in summary
+    assert "heartbeat_token" not in summary
+    assert "kopiasnapshotstatus_token" not in summary
 
 
 def test_kopia_config_get_summary_without_snapshots():

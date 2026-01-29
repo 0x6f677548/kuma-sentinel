@@ -364,9 +364,6 @@ class CmdCheckChecker(Checker):
         failure_pattern = cmd_config.get(
             "failure_pattern", self.config.cmdcheck_failure_pattern
         )
-        capture_output = cmd_config.get(
-            "capture_output", self.config.cmdcheck_capture_output
-        )
 
         self.logger.debug(f"Running command {idx + 1}: {name}")
 
@@ -391,15 +388,26 @@ class CmdCheckChecker(Checker):
                     f"{name}[{command}] (Invalid command syntax)",
                 )
 
-            result = subprocess.run(
-                args,
-                shell=False,
-                capture_output=capture_output,
-                text=True,
-                timeout=timeout,
-            )
-
-            output = (result.stdout or "") + (result.stderr or "")
+            # Use the checker's run_command method to support SSH
+            try:
+                success, stdout, stderr, returncode = self.run_command(
+                    args, timeout=timeout
+                )
+            except subprocess.TimeoutExpired:
+                # Handle timeout at this level for proper error reporting
+                duration = time.time() - cmd_start
+                return (
+                    {
+                        "name": name,
+                        "command": command,
+                        "status": "down",
+                        "exit_code": None,
+                        "output": f"Timeout after {timeout}s",
+                        "duration_seconds": duration,
+                    },
+                    f"{name}[{command}] (timeout)",
+                )
+            output = (stdout or "") + (stderr or "")
             output_truncated = output[-500:] if len(output) > 500 else output
 
             # Sanitize output if configured
@@ -407,7 +415,7 @@ class CmdCheckChecker(Checker):
                 output_truncated = DataSanitizer.sanitize_output(output_truncated)
 
             status, message = self._evaluate_result(
-                exit_code=result.returncode,
+                exit_code=returncode,
                 output=output_truncated,
                 expect_exit_code=expect_exit_code,
                 success_pattern=success_pattern,
@@ -420,7 +428,7 @@ class CmdCheckChecker(Checker):
                 "name": name,
                 "command": command,
                 "status": status,
-                "exit_code": result.returncode,
+                "exit_code": returncode,
                 "output": (
                     output_truncated[:200] if output_truncated else "(no output)"
                 ),
@@ -432,20 +440,6 @@ class CmdCheckChecker(Checker):
                 failure_msg = f"{name}[{command}] ({message})"
 
             return cmd_result, failure_msg
-
-        except subprocess.TimeoutExpired:
-            duration = time.time() - cmd_start
-            return (
-                {
-                    "name": name,
-                    "command": command,
-                    "status": "down",
-                    "exit_code": None,
-                    "output": f"Timeout after {timeout}s",
-                    "duration_seconds": duration,
-                },
-                f"{name}[{command}] (timeout)",
-            )
 
         except Exception as e:
             duration = time.time() - cmd_start

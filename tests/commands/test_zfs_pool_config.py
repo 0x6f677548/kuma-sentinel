@@ -227,12 +227,13 @@ def test_zfs_pool_config_get_summary():
     assert summary["log_level"] == "INFO"
     assert summary["zfspoolstatus_pools"] == "tank:10%, backup:20%"
     assert summary["zfspoolstatus_free_space_percent_default"] == "15%"
-    assert "***" in summary["heartbeat_token"]
-    assert "***" in summary["zfspoolstatus_token"]
+    # Tokens should never be in summary
+    assert "heartbeat_token" not in summary
+    assert "zfspoolstatus_token" not in summary
 
 
 def test_zfs_pool_config_get_summary_unmasked_tokens():
-    """Test get_summary with tokens unmasked."""
+    """Test that tokens are never included in summary, even when unmasked."""
     config = ZfsPoolStatusConfig()
     config.uptime_kuma_url = "http://localhost:3001"
     config.heartbeat_token = "secret_heartbeat"
@@ -242,8 +243,11 @@ def test_zfs_pool_config_get_summary_unmasked_tokens():
 
     summary = config.get_summary(mask_tokens=False)
 
-    assert summary["heartbeat_token"] == "secret_heartbeat"
-    assert summary["zfspoolstatus_token"] == "secret_zfs"
+    # Tokens should never be in summary
+    assert "heartbeat_token" not in summary
+    assert "zfspoolstatus_token" not in summary
+    assert "secret_heartbeat" not in str(summary)
+    assert "secret_zfs" not in str(summary)
 
 
 def test_zfs_pool_config_get_summary_no_pools():

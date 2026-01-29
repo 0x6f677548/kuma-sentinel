@@ -13,11 +13,15 @@ from .base import Checker
 
 
 def _get_pool_status(
-    logger: Logger, pool_name: str
+    checker_instance, pool_name: str
 ) -> Tuple[Optional[str], Optional[float]]:
     """Get ZFS pool health and free space percentage.
 
     Runs: zpool list -H -o name,size,alloc,free,cap,health <pool_name>
+
+    Args:
+        checker_instance: The checker instance (for SSH runner access)
+        pool_name: Name of the ZFS pool to check
 
     Returns:
         Tuple of (health_status, free_space_percent) or (None, None) if pool not found
@@ -27,18 +31,21 @@ def _get_pool_status(
     Raises:
         subprocess.CalledProcessError: If zpool command fails
     """
+    logger = checker_instance.logger
+    cmd = ["zpool", "list", "-H", "-o", "name,size,alloc,free,cap,health", pool_name]
+
     try:
-        result = subprocess.run(
-            ["zpool", "list", "-H", "-o", "name,size,alloc,free,cap,health", pool_name],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=True,
-        )
+        # Use the checker's run_command method to support SSH
+        # run_command returns (success, stdout, stderr, returncode)
+        success, stdout, stderr, _ = checker_instance.run_command(cmd, timeout=30)
+
+        if not success:
+            logger.error(f"❌ zpool list failed for pool '{pool_name}': {stderr}")
+            return None, None
 
         # Output format: name\tsize\talloc\tfree\tcap\thealth
         # Example: tank\t1.81T\t1.00T\t828G\t55%\tONLINE
-        output = result.stdout.strip()
+        output = stdout.strip()
 
         if not output:
             logger.warning(
@@ -73,9 +80,6 @@ def _get_pool_status(
 
     except subprocess.TimeoutExpired:
         logger.error(f"❌ zpool list timeout for pool '{pool_name}'")
-        return None, None
-    except subprocess.CalledProcessError as e:
-        logger.error(f"❌ zpool list failed for pool '{pool_name}': {e.stderr.strip()}")
         return None, None
     except FileNotFoundError:
         logger.error("❌ zpool command not found - is ZFS installed?")
@@ -144,7 +148,7 @@ class ZfsPoolStatusChecker(Checker):
                     f"📋 Checking pool '{pool_name}' " f"(min free space: {threshold}%)"
                 )
 
-                health, free_percent = _get_pool_status(self.logger, pool_name)
+                health, free_percent = _get_pool_status(self, pool_name)
 
                 if health is None or free_percent is None:
                     failed_pools.append((pool_name, "Could not retrieve pool status"))

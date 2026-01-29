@@ -182,24 +182,25 @@ class PortscanConfig(ConfigBase):
 
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get portscan configuration summary for logging."""
-        return {
-            "log_file": self.log_file,
-            "portscan_nmap_ports": self.portscan_nmap_ports,
-            "portscan_nmap_timing": self.portscan_nmap_timing,
-            "portscan_nmap_timeout": f"{self.portscan_nmap_timeout}s",
-            "portscan_nmap_arguments": (
-                self.portscan_nmap_arguments
-                if self.portscan_nmap_arguments
-                else "(none)"
-            ),
-            "portscan_exclude": (
-                ", ".join(self.portscan_exclude) if self.portscan_exclude else "(none)"
-            ),
-            "portscan_ip_ranges": ", ".join(self.portscan_ip_ranges),
-            "heartbeat_enabled": self.heartbeat_enabled,
-            "heartbeat_interval": f"{self.heartbeat_interval}s",
-            "uptime_kuma_url": self.uptime_kuma_url,
-            "heartbeat_token": self._mask_token(self.heartbeat_token, mask_tokens),
-            "portscan_token": self._mask_token(self.command_token, mask_tokens),
-            "portscan_nmap_keep_xmloutput": self.portscan_nmap_keep_xmloutput,
-        }
+        # Get base summary and add portscan-specific fields
+        summary = super().get_summary(mask_tokens)
+        summary.update(
+            {
+                "portscan_nmap_ports": self.portscan_nmap_ports,
+                "portscan_nmap_timing": self.portscan_nmap_timing,
+                "portscan_nmap_timeout": f"{self.portscan_nmap_timeout}s",
+                "portscan_nmap_arguments": (
+                    self.portscan_nmap_arguments
+                    if self.portscan_nmap_arguments
+                    else "(none)"
+                ),
+                "portscan_exclude": (
+                    ", ".join(self.portscan_exclude)
+                    if self.portscan_exclude
+                    else "(none)"
+                ),
+                "portscan_ip_ranges": ", ".join(self.portscan_ip_ranges),
+                "portscan_nmap_keep_xmloutput": self.portscan_nmap_keep_xmloutput,
+            }
+        )
+        return summary

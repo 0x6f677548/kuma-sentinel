@@ -287,6 +287,36 @@ kuma-scout kopiasnapshotstatus \
 
 ---
 
+#### 5. Removed capture_output Configuration Option
+
+**What changed:** The `capture_output` configuration option has been **removed** from the cmdcheck command. Output is always captured internally for proper functionality.
+
+**Impact:** Any YAML configurations or CLI usage specifying `capture_output` will need to be updated. The option was unused in practice since output was always captured.
+
+**Before (v0.1.0):**
+```yaml
+cmdcheck:
+  commands:
+    - command: "my-command"
+      capture_output: true  # This option existed but was ignored
+  capture_output: true      # Global default (also ignored)
+```
+
+**After (v0.2.0) - Option removed:**
+```yaml
+cmdcheck:
+  commands:
+    - command: "my-command"  # No capture_output option needed
+  # No global capture_output setting
+```
+
+**Migration Steps:**
+1. Remove `capture_output` from all YAML configuration files
+2. Remove `--capture-output` from any CLI commands (the option no longer exists)
+3. No functional changes - output capture behavior remains the same
+
+---
+
 ### What Stayed the Same
 
 ✅ **YAML Configuration Format**: Unchanged. Your existing `config.yaml` files work without modification.

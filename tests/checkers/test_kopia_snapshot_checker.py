@@ -114,44 +114,39 @@ class TestParseIsoTimestamp:
 class TestRunKopiaCommand:
     """Test kopia command execution."""
 
-    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
-    def test_successful_command(self, mock_run):
+    def test_successful_command(self):
         """Test successful command execution."""
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="output",
-            stderr="",
-        )
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "output", "", 0)
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "version"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "version"]
+        )
 
         assert success is True
         assert stdout == "output"
         assert stderr == ""
 
-    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
-    def test_failed_command(self, mock_run):
+    def test_failed_command(self):
         """Test failed command execution."""
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="",
-            stderr="error message",
-        )
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (False, "", "error message", 1)
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "bad"])
+        success, stdout, stderr = _run_kopia_command(checker_instance, ["kopia", "bad"])
 
         assert success is False
 
-    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
-    def test_command_timeout(self, mock_run):
+    def test_command_timeout(self):
         """Test command timeout."""
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.side_effect = subprocess.TimeoutExpired("cmd", 30)
 
-        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 30)
-
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "slow"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "slow"]
+        )
 
         assert success is False
         assert stderr == "Command timed out"
@@ -194,7 +189,8 @@ class TestGetLatestSnapshotAge:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
 
         with patch(
             "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
@@ -202,7 +198,7 @@ class TestGetLatestSnapshotAge:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
 
-            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+            age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is not None
         assert 1.9 < age < 2.1  # Should be approximately 2 hours
@@ -217,8 +213,9 @@ class TestGetLatestSnapshotAge:
         output = json.dumps([])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is None
         assert metadata is None
@@ -228,8 +225,9 @@ class TestGetLatestSnapshotAge:
         """Test when kopia command fails."""
         mock_run.return_value = (False, None, "Connection refused")
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is None
         assert metadata is None
@@ -239,8 +237,9 @@ class TestGetLatestSnapshotAge:
         """Test when JSON is malformed."""
         mock_run.return_value = (True, "not valid json", None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is None
         assert metadata is None
@@ -253,8 +252,9 @@ class TestGetLatestSnapshotAge:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is None
         assert metadata is None
@@ -270,7 +270,8 @@ class TestGetLatestSnapshotAge:
         output = json.dumps(snapshot)  # Single object, not array
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
 
         with patch(
             "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
@@ -278,7 +279,7 @@ class TestGetLatestSnapshotAge:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
 
-            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+            age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is not None
         assert 0.9 < age < 1.1  # Should be approximately 1 hour
@@ -297,14 +298,15 @@ class TestGetLatestSnapshotAge:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should treat snapshot with errors as failed
         assert age is None
         assert metadata is None
         # Verify error was logged
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_command_includes_all_flag(self, mock_run):
@@ -317,8 +319,9 @@ class TestGetLatestSnapshotAge:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Verify the command includes --all flag
         mock_run.assert_called_once()
@@ -363,6 +366,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -390,6 +394,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -416,6 +421,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -444,6 +450,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -466,6 +473,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -481,6 +489,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -500,6 +509,7 @@ class TestKopiaSnapshotChecker:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -702,6 +712,7 @@ class TestValidateSnapshotPath:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -722,6 +733,7 @@ class TestValidateSnapshotPath:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -743,6 +755,7 @@ class TestValidateSnapshotPath:
         config.heartbeat_enabled = False
 
         logger = MagicMock()
+        MagicMock()
         checker = KopiaSnapshotChecker(config=config, logger=logger)
         result = checker.execute()
 
@@ -766,7 +779,8 @@ class TestValidateSnapshotPath:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
 
         with patch(
             "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
@@ -774,7 +788,7 @@ class TestValidateSnapshotPath:
             mock_datetime.now.return_value = now
             mock_datetime.fromisoformat = datetime.fromisoformat
 
-            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+            age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should still work with empty stats dict
         assert age is not None
@@ -785,8 +799,11 @@ class TestValidateSnapshotPath:
         """Test kopia command execution with general exception."""
         mock_run.side_effect = RuntimeError("General error")
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+        MagicMock()
+        checker_instance = MagicMock()
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "test"]
+        )
 
         assert success is False
         assert stderr is not None
@@ -801,12 +818,13 @@ class TestValidateSnapshotPath:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_with_timezone_aware_datetime(self, mock_run):
@@ -826,7 +844,8 @@ class TestValidateSnapshotPath:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
 
         with patch(
             "kuma_scout.core.checkers.kopia_snapshot_checker.datetime"
@@ -836,23 +855,21 @@ class TestValidateSnapshotPath:
             # For fromisoformat, use the real function
             mock_datetime.fromisoformat = datetime.fromisoformat
 
-            age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+            age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should still calculate approximate age correctly even with timezone
         assert age is not None
         assert metadata is not None
 
-    @patch("kuma_scout.core.checkers.kopia_snapshot_checker.subprocess.run")
-    def test_run_kopia_command_empty_stdout(self, mock_run):
+    def test_run_kopia_command_empty_stdout(self):
         """Test kopia command with empty stdout."""
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "", "", 0)
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "test"]
+        )
 
         assert success is True
         assert stdout == ""
@@ -873,15 +890,18 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None when timestamp parsing fails
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
         # Verify specific error about timestamp parsing
-        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        error_calls = [
+            call[0][0] for call in checker_instance.logger.error.call_args_list
+        ]
         assert any(
             "Failed to parse snapshot timestamp" in str(call) for call in error_calls
         )
@@ -897,15 +917,18 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None when endTime is None
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
         # Verify error about missing endTime
-        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        error_calls = [
+            call[0][0] for call in checker_instance.logger.error.call_args_list
+        ]
         assert any("Missing endTime" in str(call) for call in error_calls)
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
@@ -919,15 +942,18 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None when snapshot has errors
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
         # Verify error about snapshot errors
-        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        error_calls = [
+            call[0][0] for call in checker_instance.logger.error.call_args_list
+        ]
         assert any("error(s)" in str(call) for call in error_calls)
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
@@ -935,15 +961,18 @@ class TestGetLatestSnapshotAgeParsing:
         """Test snapshot age when JSON output is invalid."""
         mock_run.return_value = (True, "invalid json {{{", None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None on JSON parse error
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
         # Verify JSON error
-        error_calls = [call[0][0] for call in logger.error.call_args_list]
+        error_calls = [
+            call[0][0] for call in checker_instance.logger.error.call_args_list
+        ]
         assert any("Failed to parse JSON" in str(call) for call in error_calls)
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
@@ -952,26 +981,28 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None when no snapshots
         assert age is None
         assert metadata is None
-        logger.warning.assert_called()
+        checker_instance.logger.warning.assert_called()
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_run_command_failed(self, mock_run):
         """Test snapshot age when kopia command fails."""
         mock_run.return_value = (False, None, "Permission denied")
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return None when command fails
         assert age is None
         assert metadata is None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
     @patch("kuma_scout.core.checkers.kopia_snapshot_checker._run_kopia_command")
     def test_get_snapshot_age_successful_with_metadata(self, mock_run):
@@ -994,8 +1025,9 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([snapshot])
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should return age and metadata
         assert age is not None
@@ -1013,8 +1045,9 @@ class TestGetLatestSnapshotAgeParsing:
         output = json.dumps([{"id": "test"}])  # Missing critical fields
         mock_run.return_value = (True, output, None)
 
-        logger = MagicMock()
-        age, metadata = _get_latest_snapshot_age(logger, "/test/path")
+        MagicMock()
+        checker_instance = MagicMock()
+        age, metadata = _get_latest_snapshot_age(checker_instance, "/test/path")
 
         # Should handle gracefully
         assert age is None
@@ -1024,48 +1057,55 @@ class TestGetLatestSnapshotAgeParsing:
 class TestRunKopiaCommandExceptions:
     """Test _run_kopia_command exception handling."""
 
-    @patch("subprocess.run")
-    def test_run_kopia_command_subprocess_exception(self, mock_run):
+    def test_run_kopia_command_subprocess_exception(self):
         """Test kopia command when subprocess raises an unexpected exception."""
-        # Simulate an OSError being raised during subprocess.run
-        mock_run.side_effect = OSError("Process error")
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.side_effect = OSError("Process error")
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "test"]
+        )
 
         # Should handle exception and return False
         assert success is False
         assert stdout is None
         assert stderr is not None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
-    @patch("subprocess.run")
-    def test_run_kopia_command_attribute_error(self, mock_run):
+    def test_run_kopia_command_attribute_error(self):
         """Test kopia command when subprocess raises AttributeError."""
-        mock_run.side_effect = AttributeError("Unexpected attribute error")
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.side_effect = AttributeError(
+            "Unexpected attribute error"
+        )
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "test"]
+        )
 
         # Should handle exception gracefully
         assert success is False
         assert stdout is None
         assert stderr is not None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
-    @patch("subprocess.run")
-    def test_run_kopia_command_value_error(self, mock_run):
+    def test_run_kopia_command_value_error(self):
         """Test kopia command when subprocess raises ValueError."""
-        mock_run.side_effect = ValueError("Invalid argument")
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.side_effect = ValueError("Invalid argument")
 
-        logger = MagicMock()
-        success, stdout, stderr = _run_kopia_command(logger, ["kopia", "test"])
+        success, stdout, stderr = _run_kopia_command(
+            checker_instance, ["kopia", "test"]
+        )
 
         # Should handle exception
         assert success is False
         assert stdout is None
         assert stderr is not None
-        logger.error.assert_called()
+        checker_instance.logger.error.assert_called()
 
 
 class TestValidateSnapshotPathEdgeCases:

@@ -52,6 +52,42 @@ class ZfsPoolStatusCommand(CommandExecutor):
                 "--ignore-file-permissions",
                 help="Skip config file permission validation (use only in development)",
             ),
+            # SSH options
+            ssh: Optional[str] = typer.Option(
+                None,
+                "--ssh",
+                help="SSH shorthand (user@host or host). Examples: root@nas-server or nas-server",
+            ),
+            ssh_host: Optional[str] = typer.Option(
+                None,
+                "--ssh-host",
+                help="SSH host to run command on (e.g., fileserver or 192.168.1.10)",
+            ),
+            ssh_user: Optional[str] = typer.Option(
+                None,
+                "--ssh-user",
+                help="SSH username (default: current user)",
+            ),
+            ssh_port: int = typer.Option(
+                22,
+                "--ssh-port",
+                help="SSH port (default: 22)",
+            ),
+            ssh_key_file: Optional[str] = typer.Option(
+                None,
+                "--ssh-key-file",
+                help="Path to SSH private key",
+            ),
+            ssh_password: Optional[str] = typer.Option(
+                None,
+                "--ssh-password",
+                help="SSH password (discouraged, use keys instead)",
+            ),
+            ssh_strict_host_key_checking: bool = typer.Option(
+                True,
+                "--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking",
+                help="Enable/disable SSH strict host key checking (default: enabled)",
+            ),
             pool: Optional[List[str]] = typer.Option(
                 None,
                 "--pool",
@@ -121,6 +157,14 @@ If percent is omitted, uses --min-free-percent value or default 10%.
                 "config": config,
                 "log_file": log_file,
                 "ignore_file_permissions": ignore_file_permissions,
+                # SSH options
+                "ssh": ssh,
+                "ssh_host": ssh_host,
+                "ssh_user": ssh_user,
+                "ssh_port": ssh_port,
+                "ssh_key_file": ssh_key_file,
+                "ssh_password": ssh_password,
+                "ssh_strict_host_key_checking": ssh_strict_host_key_checking,
                 "pools": pools_with_defaults,
                 "min_free_percent": min_free_percent,
             }
@@ -131,11 +175,18 @@ If percent is omitted, uses --min-free-percent value or default 10%.
     def get_summary_fields(self) -> Dict[str, Dict[str, str]]:
         """Get fields to display in config summary logging."""
         return {
+            "🎯 Execution Target": {
+                "Target": "execution_target",
+            },
             "📋 ZFS Pool Configuration": {
                 "Pools": "zfspoolstatus_pools",
                 "Default Min Free Space": "zfspoolstatus_free_space_percent_default",
             },
-            "🔔 Uptime Kuma Integration": {
+            "� Logging Configuration": {
+                "Log File": "log_file",
+                "Log Level": "log_level",
+            },
+            "�🔔 Uptime Kuma Integration": {
                 "URL": "uptime_kuma_url",
                 "Heartbeat Enabled": "heartbeat_enabled",
             },

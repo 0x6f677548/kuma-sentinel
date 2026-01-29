@@ -78,6 +78,36 @@ logging:
   log_level: INFO                        # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
+**SSH Remote Execution:**
+```yaml
+# Global SSH settings for all commands
+ssh:
+  host: backup-server.example.com    # SSH hostname or IP
+  user: root                          # SSH username
+  port: 22                            # SSH port (default: 22)
+  key_file: /root/.ssh/id_rsa         # Path to SSH private key
+  password: "${SSH_PASSWORD}"         # SSH password (discouraged, use keys)
+  strict_host_key_checking: true      # Verify host keys (default: true)
+
+# Command-specific SSH override
+kopiasnapshotstatus:
+  ssh:
+    host: kopia-server.local          # Override global SSH host
+    user: kopia                       # Override global SSH user
+  snapshots:
+    - path: /data
+      max_age_hours: 24
+```
+
+**SSH Configuration Priority:**
+1. CLI arguments (`--ssh`, `--ssh-host`, `--ssh-user`, etc.) - highest priority
+2. YAML config (command-specific `ssh:` section)
+3. YAML config (global `ssh:` section)
+4. SSH config file (`~/.ssh/config`)
+5. Defaults (local execution) - lowest priority
+
+**Important:** SSH settings are NOT supported via environment variables. Use CLI args or YAML config. Environment variables are reserved for tokens and passwords only.
+
 ---
 
 ## Command Monitoring (cmdcheck)
@@ -152,7 +182,6 @@ cmdcheck:
   failure_pattern: "ERROR|CRITICAL|PANIC"  # Detected → DOWN
   success_pattern: "^healthy"              # Not detected (with failure) → DOWN
   timeout: 10
-  capture_output: true
   uptime_kuma:
     token: your-cmdcheck-token
 ```
@@ -337,12 +366,10 @@ cmdcheck:
       expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
       success_pattern: null                  # Optional: per-command success pattern
       failure_pattern: null                  # Optional: per-command failure pattern
-      capture_output: true                   # Optional: per-command output capture (inherits from defaults if omitted)
   
   # Default values (applied to all commands unless overridden)
   timeout: 30                                # Default timeout in seconds (1-300, default 30)
   expect_exit_code: 0                        # Default expected exit code (0-255, default 0)
-  capture_output: true                       # Default output capture (default true, last 500 chars)
   success_pattern: null                      # Default success pattern (optional)
   failure_pattern: null                      # Default failure pattern (optional, takes precedence)
   sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
@@ -652,6 +679,98 @@ logging:
 ```
 
 ⚠️ **Security Note**: Only bypass this check during development or testing. Always ensure production configurations have proper permissions (0o600). A config file with world-readable permissions exposes your Uptime Kuma authentication tokens.
+
+#### SSH Security
+
+When using SSH remote execution (`--ssh` option), Kuma Scout enforces security best practices:
+
+**Host Key Verification:**
+- Strict host key checking is **enabled by default** (`StrictHostKeyChecking=yes`)
+- This prevents MITM attacks by verifying the remote host's identity
+- Host keys must be in `~/.ssh/known_hosts` before connecting
+
+**To bypass host key checking** (development/testing only):
+```bash
+kuma-scout cmdcheck \
+  --ssh root@dev-server \
+  --ssh-no-strict-host-key-checking \
+  --command "uptime"
+```
+
+⚠️ **Warning**: Disabling host key checking makes you vulnerable to MITM attacks. Never use in production.
+
+**SSH Key File Permissions:**
+- SSH private key files must have **restricted permissions (0o600)**
+- Kuma Scout validates key file permissions before use
+- This prevents unauthorized users from reading your private keys
+
+**If validation fails**, execution **BLOCKS** with an error:
+```
+❌ Security check failed: SSH key file /root/.ssh/id_rsa has overly permissive mode 0o644.
+Recommended: 0o600. Run: chmod 600 /root/.ssh/id_rsa
+To bypass this check, use --ignore-file-permissions flag.
+```
+
+**To bypass SSH key permission validation** (development/testing only):
+```bash
+kuma-scout kopiasnapshotstatus \
+  --ssh root@backup-server \
+  --ssh-key-file /shared/key \
+  --ignore-file-permissions \
+  --snapshot /data,24
+```
+
+Note: The `--ignore-file-permissions` flag applies to both config files and SSH key files.
+
+**SSH Authentication Methods:**
+
+1. **SSH Key (Recommended)** - Most secure, no passwords in config:
+   ```yaml
+   ssh:
+     host: backup-server
+     user: root
+     key_file: /root/.ssh/id_rsa
+   ```
+
+2. **SSH Password (Discouraged)** - Use only when keys are not possible:
+   ```yaml
+   ssh:
+     host: legacy-server
+     user: admin
+     password: "${SSH_PASSWORD}"  # Use env var for password
+   ```
+   ⚠️ Passwords are less secure than keys and may appear in process lists.
+
+**SSH Best Practices:**
+- ✅ Use SSH keys instead of passwords
+- ✅ Keep private keys in `~/.ssh/` with 600 permissions
+- ✅ Use a dedicated SSH key pair for monitoring (not your personal key)
+- ✅ Add monitoring host keys to `~/.ssh/known_hosts` in advance
+- ✅ Use `~/.ssh/config` for host-specific settings (aliases, jump hosts)
+- ✅ Restrict SSH user permissions on remote hosts (read-only access)
+- ❌ Never disable host key checking in production
+- ❌ Never commit SSH private keys to version control
+- ❌ Never use root SSH keys for monitoring (create dedicated user)
+
+**Example SSH Config (`~/.ssh/config`):**
+```
+Host backup-server
+    HostName 192.168.1.10
+    User kuma-scout
+    IdentityFile ~/.ssh/kuma-scout_key
+    StrictHostKeyChecking yes
+
+Host nas-server
+    HostName 192.168.1.20
+    User monitoring
+    IdentityFile ~/.ssh/nas_monitoring_key
+    Port 2222
+```
+
+Then use host aliases in kuma-scout:
+```bash
+kuma-scout kopiasnapshotstatus --ssh backup-server --snapshot /data,24
+```
 
 #### Deployment Best Practices
 

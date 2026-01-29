@@ -1,7 +1,6 @@
 """Base configuration management for kuma scout."""
 
 import os
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, get_type_hints
@@ -27,8 +26,8 @@ class FieldMapping:
 # Hardcoded defaults are now inlined in field mappings and __init__ methods
 
 
-class ConfigBase(ABC):
-    """Abstract base class for command-specific configuration.
+class ConfigBase:
+    """Base class for command-specific configuration.
 
     Contains shared attributes for all commands:
     - log_file: Logging destination
@@ -60,6 +59,14 @@ class ConfigBase(ABC):
         self.command_token: Optional[str] = None
         self.ignore_file_permissions = False  # Skip file permission checks if True
         self.logger = logger or get_logger()
+
+        # SSH configuration for remote execution
+        self.ssh_host: Optional[str] = None
+        self.ssh_user: Optional[str] = None
+        self.ssh_port: int = 22
+        self.ssh_key_file: Optional[str] = None
+        self.ssh_password: Optional[str] = None
+        self.ssh_strict_host_key_checking: bool = True
 
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for configuration.
@@ -99,6 +106,33 @@ class ConfigBase(ABC):
             "ignore_file_permissions": FieldMapping(
                 arg_key="ignore_file_permissions",
                 yaml_path="logging.ignore_file_permissions",
+                converter=self._parse_bool,
+            ),
+            # SSH configuration (YAML and CLI only, no env vars)
+            "ssh_host": FieldMapping(
+                arg_key="ssh_host",
+                yaml_path="ssh.host",
+            ),
+            "ssh_user": FieldMapping(
+                arg_key="ssh_user",
+                yaml_path="ssh.user",
+            ),
+            "ssh_port": FieldMapping(
+                arg_key="ssh_port",
+                yaml_path="ssh.port",
+                converter=int,
+            ),
+            "ssh_key_file": FieldMapping(
+                arg_key="ssh_key_file",
+                yaml_path="ssh.key_file",
+            ),
+            "ssh_password": FieldMapping(
+                arg_key="ssh_password",
+                yaml_path="ssh.password",
+            ),
+            "ssh_strict_host_key_checking": FieldMapping(
+                arg_key="ssh_strict_host_key_checking",
+                yaml_path="ssh.strict_host_key_checking",
                 converter=self._parse_bool,
             ),
         }
@@ -454,7 +488,6 @@ class ConfigBase(ABC):
         except Exception as e:
             raise ValueError(f"Invalid URL format: {str(e)}") from e
 
-    @abstractmethod
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get configuration summary for logging.
 
@@ -464,8 +497,94 @@ class ConfigBase(ABC):
         Returns:
             Dictionary with configuration summary
         """
+        # Determine execution target
+        if self.ssh_host:
+            execution_target = f"SSH: {self.ssh_user or 'current_user'}@{self.ssh_host}"
+            if self.ssh_port != 22:
+                execution_target += f":{self.ssh_port}"
+        else:
+            execution_target = "Local execution"
+
+        return {
+            "log_file": self.log_file,
+            "log_level": self.log_level,
+            "execution_target": execution_target,
+            "heartbeat_enabled": self.heartbeat_enabled,
+            "heartbeat_interval": f"{self.heartbeat_interval}s",
+            "uptime_kuma_url": self.uptime_kuma_url,
+        }
 
     @staticmethod
     def _mask_token(token: Optional[str], mask: bool) -> Optional[str]:
         """Mask token if requested."""
         return "***" if mask and token else token
+
+    @staticmethod
+    def validate_ssh_key_permissions(
+        key_file: str, logger=None, ignore_warning: bool = False
+    ) -> bool:
+        """Validate that SSH key file has restricted permissions (0o600).
+
+        Args:
+            key_file: Path to SSH private key file
+            logger: Logger instance (optional, for warning messages)
+            ignore_warning: If True, warn but don't raise; if False, raise exception
+
+        Returns:
+            True if permissions are secure (0o600)
+
+        Raises:
+            RuntimeError: If permissions are not 0o600 and ignore_warning is False
+        """
+        try:
+            file_stat = os.stat(key_file)
+            mode = file_stat.st_mode & 0o777
+
+            if mode & (0o040 | 0o020 | 0o004 | 0o002 | 0o001):
+                # File has group or other permissions - insecure
+                error_msg = (
+                    f"SSH key file {key_file} has overly permissive mode {oct(mode)}. "
+                    f"Recommended: 0o600. Run: chmod 600 {key_file}"
+                )
+
+                if ignore_warning:
+                    if logger:
+                        from kuma_scout.core.logger import log_security_event
+
+                        logger.warning(f"⚠️  {error_msg}")
+                        log_security_event(
+                            logger,
+                            "ssh_key_permission_bypass",
+                            f"SSH key file permissions check bypassed for {key_file} (mode {oct(mode)})",
+                            level="warning",
+                        )
+                    return False
+                else:
+                    # Production mode: fail hard
+                    if logger:
+                        logger.error(f"❌ {error_msg}")
+                    raise RuntimeError(
+                        f"Security check failed: {error_msg} "
+                        f"To bypass this check, use --ignore-file-permissions flag."
+                    )
+            return True
+        except OSError as e:
+            error_msg = f"Failed to check SSH key file permissions: {str(e)}"
+            if logger:
+                logger.error(error_msg)
+            if not ignore_warning:
+                raise RuntimeError(error_msg) from e
+            return False
+
+    def validate_ssh_config(self) -> None:
+        """Validate SSH configuration if SSH is enabled.
+
+        Checks SSH key file permissions if a key file is specified.
+
+        Raises:
+            RuntimeError: If SSH key file has insecure permissions
+        """
+        if self.ssh_key_file and not self.ignore_file_permissions:
+            self.validate_ssh_key_permissions(
+                self.ssh_key_file, logger=self.logger, ignore_warning=False
+            )

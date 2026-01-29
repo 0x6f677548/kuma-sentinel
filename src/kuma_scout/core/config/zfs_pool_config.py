@@ -166,16 +166,14 @@ class ZfsPoolStatusConfig(ConfigBase):
             else:
                 pools_summary.append(pool_name)
 
-        return {
-            "log_file": self.log_file,
-            "log_level": self.log_level,
-            "zfspoolstatus_pools": (
-                ", ".join(pools_summary) if pools_summary else "none"
-            ),
-            "zfspoolstatus_free_space_percent_default": f"{self.zfspoolstatus_free_space_percent_default}%",
-            "uptime_kuma_url": self.uptime_kuma_url,
-            "heartbeat_enabled": self.heartbeat_enabled,
-            "heartbeat_interval": f"{self.heartbeat_interval}s",
-            "heartbeat_token": self._mask_token(self.heartbeat_token, mask_tokens),
-            "zfspoolstatus_token": self._mask_token(self.command_token, mask_tokens),
-        }
+        # Get base summary and add zfs-specific fields
+        summary = super().get_summary(mask_tokens)
+        summary.update(
+            {
+                "zfspoolstatus_pools": (
+                    ", ".join(pools_summary) if pools_summary else "none"
+                ),
+                "zfspoolstatus_free_space_percent_default": f"{self.zfspoolstatus_free_space_percent_default}%",
+            }
+        )
+        return summary

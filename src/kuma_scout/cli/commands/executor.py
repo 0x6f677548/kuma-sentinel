@@ -104,47 +104,91 @@ class CommandExecutor(Command):
         # Create config instance using class attribute set by decorator
         self.config = self._config_class()
 
-        # Load from environment variables
+        # Load configuration in precedence order
+        self._load_from_env()
+        self._load_from_config_file(args)
+        self._load_from_args(args)
+
+        # Handle special argument mappings
+        self._map_special_args(args)
+
+        # Validate configuration
+        self._validate_config(command_name)
+
+        return self.config
+
+    def _load_from_env(self) -> None:
+        """Load configuration from environment variables."""
         self.config.load_from_env()
 
-        # Step 3: Load from config file if provided or if default exists
+    def _load_from_config_file(self, args: Dict[str, Any]) -> None:
+        """Load configuration from YAML file if it exists."""
         config_file = args.get("config") or "/etc/kuma-scout/config.yaml"
-        if config_file and sys.modules.get("os"):
-            import os
+        if not config_file or not sys.modules.get("os"):
+            return
 
-            if os.path.exists(config_file):
-                # Check file permissions unless user explicitly ignores them
-                ignore_perms = args.get("ignore_file_permissions", False)
+        import os
+
+        if not os.path.exists(config_file):
+            return
+
+        # Check file permissions unless user explicitly ignores them
+        ignore_perms = args.get("ignore_file_permissions", False)
+        from kuma_scout.core.logger import get_logger
+
+        logger = get_logger()
+        try:
+            self.config.__class__.validate_config_file_permissions(
+                config_file, logger=logger, ignore_warning=ignore_perms
+            )
+        except RuntimeError as e:
+            logger.error(str(e))
+            sys.exit(1)
+
+        try:
+            logger.info(f"📂 Loading YAML config file: {config_file}")
+            self.config.load_from_yaml(config_file)
+            logger.info("✅ Config file loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading config file: {e}")
+            sys.exit(1)
+
+    def _load_from_args(self, args: Dict[str, Any]) -> None:
+        """Load configuration from command-line arguments."""
+        self.config.load_from_args(args)
+
+    def _map_special_args(self, args: Dict[str, Any]) -> None:
+        """Map special command-line arguments to config fields."""
+        # Map generic 'token' argument to command-specific token field
+        token_cli = args.get("token")
+        if token_cli and hasattr(self.config, "command_token"):
+            self.config.command_token = token_cli
+
+        # Handle --ssh shorthand (user@host format)
+        ssh_shorthand = args.get("ssh")
+        if ssh_shorthand:
+            from kuma_scout.core.utils.ssh_runner import parse_ssh_shorthand
+
+            host, user = parse_ssh_shorthand(ssh_shorthand)
+            if host:
+                self.config.ssh_host = host
+            if user:
+                self.config.ssh_user = user
+
+    def _validate_config(self, command_name: str) -> None:
+        """Validate SSH and overall configuration."""
+        # Validate SSH configuration if SSH is enabled
+        if self.config.ssh_host:
+            try:
+                self.config.validate_ssh_config()
+            except RuntimeError as e:
                 from kuma_scout.core.logger import get_logger
 
                 logger = get_logger()
-                try:
-                    self.config.__class__.validate_config_file_permissions(
-                        config_file, logger=logger, ignore_warning=ignore_perms
-                    )
-                except RuntimeError as e:
-                    logger.error(str(e))
-                    sys.exit(1)
+                logger.error(str(e))
+                sys.exit(1)
 
-                try:
-                    logger.info(f"📂 Loading YAML config file: {config_file}")
-                    self.config.load_from_yaml(config_file)
-                    logger.info("✅ Config file loaded successfully")
-                except Exception as e:
-                    logger.error(f"Error loading config file: {e}")
-                    sys.exit(1)
-
-        # Step 4: Load from command-line args (highest precedence)
-        self.config.load_from_args(args)
-
-        # Step 4a: Map generic 'token' argument to command-specific token field
-        # The generic token from CLI is mapped based on the config class type
-        token_cli = args.get("token")
-        if token_cli:
-            if hasattr(self.config, "command_token"):
-                self.config.command_token = token_cli
-
-        # Step 5: Validate configuration
+        # Validate overall configuration
         try:
             self.config.validate()
         except ValueError as e:
@@ -154,8 +198,6 @@ class CommandExecutor(Command):
             logger.error(f"Configuration error: {e}")
             logger.info(f"Use 'kuma-scout {command_name} --help' for usage information")
             sys.exit(1)
-
-        return self.config
 
     def _log_config_summary(
         self, logger: logging.Logger, cfg: ConfigBase, command_name: str

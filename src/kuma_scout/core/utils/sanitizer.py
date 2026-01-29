@@ -35,12 +35,44 @@ class DataSanitizer:
     # Pattern for database connection strings
     DB_CONNECTION_PATTERN = r"(?i)(?:mysql|postgres|mongodb|mssql)://[^\s]+"
 
+    # Pattern for SSH connection strings (URI format)
+    SSH_CONNECTION_PATTERN = r"(?i)ssh://([^@]+)@([^:/]+)(?::(\d+))?"
+
     # Pattern for common secret formats in various config/output styles
     SECRET_PATTERNS = [
         r'(?i)(?:secret|key|token|credential)\s*[:=]\s*["\']?([^\s"\'\n]+)["\']?',
         r"(?i)bearer\s+([^\s]+)",
         r"(?i)authorization:\s*(?:bearer|basic)\s+([^\s]+)",
     ]
+
+    @classmethod
+    def _sanitize_ssh_uri(cls, text: str) -> str:
+        """Sanitize SSH URIs while preserving host information for troubleshooting.
+
+        Replaces ssh://user:password@host:port with ssh://[REDACTED]@host:port
+        to keep host visible for debugging while masking credentials.
+
+        Args:
+            text: Text containing potential SSH URIs
+
+        Returns:
+            Text with SSH URIs sanitized
+        """
+
+        def replace_ssh_uri(match):
+            # user_pass = match.group(1)  # user:password part (not used)
+            host = match.group(2)  # host part
+            port = match.group(3)  # port part (optional)
+
+            # Build sanitized URI: ssh://[REDACTED]@host[:port]
+            result = f"ssh://[REDACTED]@{host}"
+            if port:
+                result += f":{port}"
+            return result
+
+        return re.sub(
+            cls.SSH_CONNECTION_PATTERN, replace_ssh_uri, text, flags=re.IGNORECASE
+        )
 
     @classmethod
     def sanitize(
@@ -50,6 +82,7 @@ class DataSanitizer:
         sanitize_emails: bool = True,
         sanitize_cards: bool = True,
         sanitize_db_strings: bool = True,
+        sanitize_ssh_strings: bool = True,
     ) -> str:
         """Sanitize sensitive data from text.
 
@@ -59,6 +92,7 @@ class DataSanitizer:
             sanitize_emails: Mask email addresses
             sanitize_cards: Mask credit card numbers
             sanitize_db_strings: Mask database connection strings
+            sanitize_ssh_strings: Mask SSH connection strings (preserve host)
 
         Returns:
             Sanitized text with sensitive data masked as [REDACTED]
@@ -71,6 +105,9 @@ class DataSanitizer:
         if sanitize_passwords:
             for pattern in cls.PASSWORD_PATTERNS + cls.SECRET_PATTERNS:
                 result = re.sub(pattern, "[REDACTED]", result, flags=re.IGNORECASE)
+
+        if sanitize_ssh_strings:
+            result = cls._sanitize_ssh_uri(result)
 
         if sanitize_emails:
             result = re.sub(cls.EMAIL_PATTERN, "[REDACTED_EMAIL]", result)
@@ -131,4 +168,5 @@ class DataSanitizer:
             sanitize_emails=True,
             sanitize_cards=True,
             sanitize_db_strings=True,
+            sanitize_ssh_strings=True,
         )

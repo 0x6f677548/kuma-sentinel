@@ -45,36 +45,35 @@ def _create_nmap_xml_file() -> str:
 
 
 def _run_nmap_process(
-    logger: Logger, cmd: List[str], timeout: int
+    checker_instance, cmd: List[str], timeout: int
 ) -> Tuple[bool, Optional[str]]:
-    """Run nmap subprocess.
+    """Run nmap subprocess (local or via SSH).
 
     Args:
-        logger: Logger instance
+        checker_instance: The checker instance (for SSH runner access)
         cmd: Nmap command list
         timeout: Timeout in seconds
 
     Returns:
         Tuple of (success: bool, stderr_msg: Optional[str])
     """
+    logger = checker_instance.logger
     try:
         logger.debug(f"🔧 Running nmap command: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if result.returncode == 0:
-            if result.stdout:
+        # Use the checker's run_command method to support SSH
+        # run_command returns (success, stdout, stderr, returncode)
+        success, stdout, stderr, _ = checker_instance.run_command(cmd, timeout=timeout)
+
+        if success:
+            if stdout:
                 logger.info("📊 Scan output:")
-                for line in result.stdout.split("\n"):
+                for line in stdout.split("\n"):
                     if line.strip():
                         logger.info(f"  {line}")
             return True, None
         else:
-            logger.error(f"❌ Nmap scan failed with exit code {result.returncode}")
-            return False, result.stderr
+            logger.error("❌ Nmap scan failed")
+            return False, stderr
 
     except subprocess.TimeoutExpired:
         logger.error("❌ Nmap scan timed out")
@@ -175,17 +174,18 @@ def _parse_nmap_xml(logger: Logger, xml_file: str) -> List[str]:
 
 
 def _run_nmap_scan(
-    logger: Logger, config: PortscanConfig
+    checker_instance, config: PortscanConfig
 ) -> Tuple[bool, Optional[str]]:
     """Run nmap scan with periodic heartbeat pings.
 
     Args:
-        logger: Logger instance
+        checker_instance: The checker instance (for SSH runner access)
         config: PortscanConfig object
 
     Returns:
         Tuple of (success: bool, nmap_xml_path: Optional[str])
     """
+    logger = checker_instance.logger
     nmap_xml = None
 
     try:
@@ -208,7 +208,9 @@ def _run_nmap_scan(
         logger.info(f"🔍 Running: {' '.join(cmd)}")
 
         # Run nmap scan
-        success, stderr = _run_nmap_process(logger, cmd, config.portscan_nmap_timeout)
+        success, stderr = _run_nmap_process(
+            checker_instance, cmd, config.portscan_nmap_timeout
+        )
 
         if success:
             logger.info("✅ Nmap scan completed successfully")
@@ -244,7 +246,7 @@ class PortChecker(Checker):
             self.logger.info("🔍 Starting port scan check")
 
             # Run nmap scan - cast config to PortscanConfig
-            scan_success, nmap_xml = _run_nmap_scan(self.logger, self.config)  # type: ignore
+            scan_success, nmap_xml = _run_nmap_scan(self, self.config)  # type: ignore
 
             # Parse XML results
             hosts_with_ports = []

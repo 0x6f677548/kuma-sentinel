@@ -5,7 +5,6 @@ import re
 import subprocess
 import time
 from datetime import datetime
-from logging import Logger
 from typing import Optional, Tuple
 
 from kuma_scout.core.checkers.base import Checker
@@ -69,27 +68,25 @@ def _validate_snapshot_path(path: str) -> None:
 
 
 def _run_kopia_command(
-    logger: Logger, cmd: list, timeout: int = 30
+    checker_instance, cmd: list, timeout: int = 30
 ) -> Tuple[bool, Optional[str], Optional[str]]:
-    """Run kopia snapshot list subprocess.
+    """Run kopia snapshot list subprocess (local or via SSH).
 
     Args:
-        logger: Logger instance
+        checker_instance: The checker instance (for SSH runner access)
         cmd: Kopia command list
         timeout: Timeout in seconds
 
     Returns:
         Tuple of (success: bool, stdout: Optional[str], stderr: Optional[str])
     """
+    logger = checker_instance.logger
     try:
         logger.debug(f"🔧 Running kopia command: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        return result.returncode == 0, result.stdout, result.stderr
+        # Use the checker's run_command method to support SSH
+        # run_command returns (success, stdout, stderr, returncode)
+        success, stdout, stderr, _ = checker_instance.run_command(cmd, timeout=timeout)
+        return success, stdout, stderr
 
     except subprocess.TimeoutExpired:
         logger.error("❌ Kopia command timed out")
@@ -145,12 +142,12 @@ def _parse_iso_timestamp(iso_timestamp: str) -> Optional[datetime]:
 
 
 def _get_latest_snapshot_age(
-    logger: Logger, snapshot_path: str
+    checker_instance, snapshot_path: str
 ) -> Tuple[Optional[float], Optional[dict]]:
     """Get age of latest snapshot in hours and its metadata.
 
     Args:
-        logger: Logger instance
+        checker_instance: The checker instance (for SSH runner access)
         snapshot_path: Path to snapshot in kopia
 
     Returns:
@@ -167,7 +164,9 @@ def _get_latest_snapshot_age(
         "--max-results=1",
     ]
 
-    success, stdout, stderr = _run_kopia_command(logger, cmd)
+    success, stdout, stderr = _run_kopia_command(checker_instance, cmd)
+
+    logger = checker_instance.logger
 
     if not success or not stdout:
         logger.error(f"❌ Failed to list snapshots for {snapshot_path}: {stderr}")
@@ -226,10 +225,14 @@ def _get_latest_snapshot_age(
         return age_hours, metadata
 
     except json.JSONDecodeError as e:
-        logger.error(f"❌ Failed to parse JSON output for {snapshot_path}: {str(e)}")
+        checker_instance.logger.error(
+            f"❌ Failed to parse JSON output for {snapshot_path}: {str(e)}"
+        )
         return None, None
     except KeyError as e:
-        logger.error(f"❌ Missing required field in snapshot data: {str(e)}")
+        checker_instance.logger.error(
+            f"❌ Missing required field in snapshot data: {str(e)}"
+        )
         return None, None
 
 
@@ -296,7 +299,7 @@ class KopiaSnapshotChecker(Checker):
                     f"📋 Checking snapshot path: {path} (max age: {max_age_hours}h)"
                 )
 
-                age_hours, metadata = _get_latest_snapshot_age(self.logger, path)
+                age_hours, metadata = _get_latest_snapshot_age(self, path)
 
                 if age_hours is None:
                     all_results[path] = (False, None, None)

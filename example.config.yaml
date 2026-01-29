@@ -53,7 +53,6 @@ cmdcheck:
       name: "nginx_status"
       timeout: 10
       expect_exit_code: 0
-      capture_output: true
     
     # ✅ SUPPORTED: Command with quoted arguments
     - command: "grep -i error /var/log/nginx/error.log"
@@ -85,9 +84,6 @@ cmdcheck:
   # Default expected exit code (used if not specified per-command)
   expect_exit_code: 0
   
-  # Default output capture (last 500 chars sent to Uptime Kuma)
-  capture_output: true
-  
   # Automatically sanitize sensitive data from output (default: true)
   # Masks passwords, API keys, tokens, emails, credit cards, DB strings
   sanitize_output: true
@@ -96,9 +92,6 @@ cmdcheck:
   # These are default patterns; can be overridden per-command
   success_pattern: null
   failure_pattern: null
-  
-  # Optional: Capture command output by default (default: true)
-  capture_output: true
 
 # === PORT SCAN COMMAND CONFIGURATION ===
 

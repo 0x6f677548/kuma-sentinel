@@ -11,7 +11,7 @@ class CmdCheckConfig(ConfigBase):
 
     Commands are always stored as a list, even for single commands.
     Each command can override defaults for timeout, expect_exit_code,
-    success_pattern, failure_pattern, and capture_output.
+    success_pattern, failure_pattern.
     """
 
     def __init__(self):
@@ -24,7 +24,6 @@ class CmdCheckConfig(ConfigBase):
         # Default values used when not specified in individual commands
         self.cmdcheck_timeout = 30
         self.cmdcheck_expect_exit_code = 0
-        self.cmdcheck_capture_output = True
         self.cmdcheck_success_pattern: Optional[str] = None
         self.cmdcheck_failure_pattern: Optional[str] = None
         self.cmdcheck_sanitize_output = True  # Mask sensitive data by default
@@ -48,11 +47,6 @@ class CmdCheckConfig(ConfigBase):
                     arg_key="expect_exit_code",
                     yaml_path="cmdcheck.expect_exit_code",
                     converter=int,
-                ),
-                "cmdcheck_capture_output": FieldMapping(
-                    arg_key="capture_output",
-                    yaml_path="cmdcheck.capture_output",
-                    converter=self._parse_bool,
                 ),
                 "cmdcheck_success_pattern": FieldMapping(
                     arg_key="success_pattern",
@@ -264,27 +258,23 @@ class CmdCheckConfig(ConfigBase):
             Dictionary with configuration summary
         """
         if not self.cmdcheck_commands:
-            cmd_summary = "No commands configured"
+            pass
         elif len(self.cmdcheck_commands) == 1:
             cmd_config = self.cmdcheck_commands[0]
             cmd_text = cmd_config.get("command", "")
-            cmd_display = cmd_text[:60] + "..." if len(cmd_text) > 60 else cmd_text
-            cmd_summary = f"1 command: '{cmd_display}'"
+            cmd_text[:60] + "..." if len(cmd_text) > 60 else cmd_text
         else:
-            cmd_summary = f"{len(self.cmdcheck_commands)} commands configured"
+            f"{len(self.cmdcheck_commands)} commands configured"
 
-        return {
-            "🔧 Command Configuration": {
-                "Command(s)": cmd_summary,
-                "Timeout": f"{self.cmdcheck_timeout}s",
-                "Expected Exit Code": str(self.cmdcheck_expect_exit_code),
-                "Capture Output": "Yes" if self.cmdcheck_capture_output else "No",
-                "Success Pattern": self.cmdcheck_success_pattern or "None",
-                "Failure Pattern": self.cmdcheck_failure_pattern or "None",
-            },
-            "🔔 Uptime Kuma Integration": {
-                "URL": self.uptime_kuma_url or "Not configured",
-                "Heartbeat Enabled": "Yes" if self.heartbeat_enabled else "No",
-                "Command Token": self._mask_token(self.command_token, mask_tokens),
-            },
-        }
+        # Get base summary and add cmdcheck-specific fields
+        summary = super().get_summary(mask_tokens)
+        summary.update(
+            {
+                "cmdcheck_total_commands": str(len(self.cmdcheck_commands)),
+                "cmdcheck_timeout": f"{self.cmdcheck_timeout}s",
+                "cmdcheck_expect_exit_code": str(self.cmdcheck_expect_exit_code),
+                "cmdcheck_success_pattern": self.cmdcheck_success_pattern or "None",
+                "cmdcheck_failure_pattern": self.cmdcheck_failure_pattern or "None",
+            }
+        )
+        return summary

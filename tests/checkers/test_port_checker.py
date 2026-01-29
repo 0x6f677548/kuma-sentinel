@@ -256,6 +256,7 @@ class TestPortCheckerExecute:
     def test_execute_success_no_open_ports(self):
         """Test execute() when scan succeeds and no open ports found."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -299,6 +300,7 @@ class TestPortCheckerExecute:
     def test_execute_success_open_ports_found(self):
         """Test execute() when scan succeeds and open ports are found."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -353,6 +355,7 @@ class TestPortCheckerExecute:
     def test_execute_scan_failure(self):
         """Test execute() when nmap scan fails."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -376,6 +379,7 @@ class TestPortCheckerExecute:
     def test_execute_empty_xml_file(self):
         """Test execute() when XML file is empty."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -408,6 +412,7 @@ class TestPortCheckerExecute:
     def test_execute_nonexistent_xml_file(self):
         """Test execute() when XML file doesn't exist."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -429,6 +434,7 @@ class TestPortCheckerExecute:
     def test_execute_xml_cleanup_when_keep_disabled(self):
         """Test that XML file is removed when keep_xmloutput is False."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -466,6 +472,7 @@ class TestPortCheckerExecute:
     def test_execute_xml_preserved_when_keep_enabled(self):
         """Test that XML file is preserved when keep_xmloutput is True."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -503,6 +510,7 @@ class TestPortCheckerExecute:
     def test_execute_exception_handling(self):
         """Test execute() handles exceptions gracefully."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -524,6 +532,7 @@ class TestPortCheckerExecute:
     def test_execute_multiple_hosts_with_ports(self):
         """Test execute() parsing multiple hosts with different open ports."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -589,6 +598,7 @@ class TestPortCheckerExecute:
     def test_execute_attributes(self):
         """Test PortChecker class attributes."""
         logger = MagicMock()
+        MagicMock()
         config = MagicMock()
         config.heartbeat_enabled = False
         config.heartbeat_interval = 60
@@ -695,86 +705,72 @@ class TestRunNmapProcess:
 
     def test_run_nmap_process_success(self):
         """Test successful nmap process execution."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "nmap output", "", 0)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="nmap output", stderr=""
-            )
+        success, stderr = _run_nmap_process(checker_instance, ["nmap", "-h"], 30)
 
-            success, stderr = _run_nmap_process(logger, ["nmap", "-h"], 30)
-
-            assert success is True
-            assert stderr is None
-            mock_run.assert_called_once()
+        assert success is True
+        assert stderr is None
 
     def test_run_nmap_process_failure(self):
         """Test failed nmap process execution."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (False, "", "Error message", 1)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="", stderr="Error message"
-            )
+        success, stderr = _run_nmap_process(checker_instance, ["nmap", "-h"], 30)
 
-            success, stderr = _run_nmap_process(logger, ["nmap", "-h"], 30)
-
-            assert success is False
-            assert stderr == "Error message"
-            logger.error.assert_called()
+        assert success is False
+        assert stderr == "Error message"
+        checker_instance.logger.error.assert_called()
 
     def test_run_nmap_process_timeout(self):
         """Test timeout during nmap process execution."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.side_effect = subprocess.TimeoutExpired("nmap", 30)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired("nmap", 30)
+        success, stderr = _run_nmap_process(checker_instance, ["nmap", "-h"], 30)
 
-            success, stderr = _run_nmap_process(logger, ["nmap", "-h"], 30)
-
-            assert success is False
-            assert stderr is None
-            logger.error.assert_called_with("❌ Nmap scan timed out")
+        assert success is False
+        assert stderr is None
+        checker_instance.logger.error.assert_called_with("❌ Nmap scan timed out")
 
     def test_run_nmap_process_logs_stdout(self):
         """Test that stdout is logged when nmap succeeds."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "line1\nline2\nline3", "", 0)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="line1\nline2\nline3", stderr=""
-            )
+        success, stderr = _run_nmap_process(checker_instance, ["nmap", "-h"], 30)
 
-            success, stderr = _run_nmap_process(logger, ["nmap", "-h"], 30)
-
-            assert success is True
-            # Verify info was logged for output
-            assert logger.info.called
+        assert success is True
+        # Verify info was logged for output
+        checker_instance.logger.info.assert_called()
 
     def test_run_nmap_process_handles_no_stdout(self):
         """Test handling of empty stdout."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "", "", 0)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        success, stderr = _run_nmap_process(checker_instance, ["nmap", "-h"], 30)
 
-            success, stderr = _run_nmap_process(logger, ["nmap", "-h"], 30)
-
-            assert success is True
-            assert stderr is None
+        assert success is True
+        assert stderr is None
 
     def test_run_nmap_process_timeout_value_used(self):
         """Test that timeout value is passed to subprocess.run."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
+        checker_instance.run_command.return_value = (True, "", "", 0)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        _run_nmap_process(checker_instance, ["nmap", "-h"], 60)
 
-            _run_nmap_process(logger, ["nmap", "-h"], 60)
-
-            # Verify timeout was passed
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["timeout"] == 60
+        # Verify timeout was passed
+        checker_instance.run_command.assert_called_with(["nmap", "-h"], timeout=60)
 
 
 # Tests for _run_nmap_scan function
@@ -783,7 +779,8 @@ class TestRunNmapScan:
 
     def test_run_nmap_scan_with_exclude_hosts(self):
         """Test nmap scan with excluded hosts."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = ["192.168.1.1", "192.168.1.2"]
         config.portscan_nmap_arguments = []
@@ -803,7 +800,7 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap", "-p", "80,443"]
                     mock_run.return_value = (True, None)
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is True
                     assert xml_path == "/tmp/nmap.xml"
@@ -813,7 +810,8 @@ class TestRunNmapScan:
 
     def test_run_nmap_scan_with_nmap_arguments(self):
         """Test nmap scan with additional nmap arguments."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = ["-sS", "-A"]
@@ -833,7 +831,7 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap", "-p", "22"]
                     mock_run.return_value = (True, None)
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is True
                     # Verify nmap arguments were added
@@ -843,7 +841,8 @@ class TestRunNmapScan:
 
     def test_run_nmap_scan_with_multiple_ip_ranges(self):
         """Test nmap scan with multiple IP ranges."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = []
@@ -863,7 +862,7 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap"]
                     mock_run.return_value = (True, None)
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is True
                     # Verify all IP ranges were added
@@ -874,7 +873,8 @@ class TestRunNmapScan:
 
     def test_run_nmap_scan_failure(self):
         """Test nmap scan failure."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = []
@@ -894,13 +894,14 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap"]
                     mock_run.return_value = (False, "Permission denied")
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is False
 
     def test_run_nmap_scan_exception_handling(self):
         """Test exception handling in nmap scan."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
 
         with patch(
@@ -908,15 +909,16 @@ class TestRunNmapScan:
         ) as mock_create:
             mock_create.side_effect = Exception("File creation error")
 
-            success, xml_path = _run_nmap_scan(logger, config)
+            success, xml_path = _run_nmap_scan(checker_instance, config)
 
             assert success is False
             assert xml_path is None
-            logger.error.assert_called()
+            checker_instance.logger.error.assert_called()
 
     def test_run_nmap_scan_none_arguments(self):
         """Test nmap scan when nmap_arguments is None."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = None  # None instead of list
@@ -936,13 +938,14 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap"]
                     mock_run.return_value = (True, None)
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is True
 
     def test_run_nmap_scan_none_ip_ranges(self):
         """Test nmap scan when ip_ranges is None."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = []
@@ -962,13 +965,14 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap"]
                     mock_run.return_value = (True, None)
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is True
 
     def test_run_nmap_scan_error_with_stderr(self):
         """Test nmap scan error logging with stderr message."""
-        logger = MagicMock()
+        MagicMock()
+        checker_instance = MagicMock()
         config = MagicMock(spec=PortscanConfig)
         config.portscan_exclude = []
         config.portscan_nmap_arguments = []
@@ -988,11 +992,11 @@ class TestRunNmapScan:
                     mock_build.return_value = ["nmap"]
                     mock_run.return_value = (False, "Nmap error details")
 
-                    success, xml_path = _run_nmap_scan(logger, config)
+                    success, xml_path = _run_nmap_scan(checker_instance, config)
 
                     assert success is False
                     # Verify error was logged
-                    logger.error.assert_called()
+                    checker_instance.logger.error.assert_called()
 
 
 # Tests for parse_nmap_xml edge cases
@@ -1002,6 +1006,7 @@ class TestParseNmapXmlEdgeCases:
     def test_parse_nmap_xml_host_without_ip(self):
         """Test parsing XML with host element missing IP."""
         logger = MagicMock()
+        MagicMock()
         xml_str = """<?xml version="1.0"?>
 <nmaprun>
     <host>
@@ -1028,6 +1033,7 @@ class TestParseNmapXmlEdgeCases:
     def test_parse_nmap_xml_ipv6_ignored(self):
         """Test that IPv6 addresses are not included (only IPv4)."""
         logger = MagicMock()
+        MagicMock()
         xml_str = """<?xml version="1.0"?>
 <nmaprun>
     <host>
@@ -1065,6 +1071,7 @@ class TestParseNmapXmlEdgeCases:
     def test_parse_nmap_xml_hostname_without_name_attribute(self):
         """Test hostname extraction when name attribute is empty."""
         logger = MagicMock()
+        MagicMock()
         xml_str = """<?xml version="1.0"?>
 <nmaprun>
     <host>
@@ -1108,6 +1115,7 @@ class TestCheckerBaseClass:
                 pass
 
         logger = MagicMock()
+        MagicMock()
         config = MagicMock(spec=ConfigBase)
 
         with patch.object(BrokenChecker, "name", ""):
@@ -1126,6 +1134,7 @@ class TestCheckerBaseClass:
                 pass
 
         logger = MagicMock()
+        MagicMock()
         config = MagicMock(spec=ConfigBase)
 
         with patch.object(BrokenChecker, "description", ""):
@@ -1135,6 +1144,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_disabled(self):
         """Test heartbeat initialization when heartbeat is disabled."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = False
         config.heartbeat_token = "token"
@@ -1146,6 +1156,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_missing_token(self):
         """Test heartbeat initialization when token is missing."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = None
@@ -1157,6 +1168,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_missing_url(self):
         """Test heartbeat initialization when URL is missing."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "token"
@@ -1168,6 +1180,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_string_enabled_true(self):
         """Test heartbeat initialization with string 'true' for enabled."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True  # Boolean value
         config.heartbeat_token = "token"
@@ -1183,6 +1196,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_string_enabled_false(self):
         """Test heartbeat initialization with string 'false' for enabled."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = False  # Boolean value
         config.heartbeat_token = "token"
@@ -1195,6 +1209,7 @@ class TestCheckerBaseClass:
     def test_initialize_heartbeat_all_configured(self):
         """Test successful heartbeat initialization with all required config."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "test_token"
@@ -1213,6 +1228,7 @@ class TestCheckerBaseClass:
     def test_execute_with_heartbeat_success(self):
         """Test execute_with_heartbeat on successful check execution."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "token"
@@ -1250,6 +1266,7 @@ class TestCheckerBaseClass:
     def test_execute_with_heartbeat_no_heartbeat(self):
         """Test execute_with_heartbeat when heartbeat is not configured."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = False
         config.portscan_ip_ranges = ["192.168.1.0/24"]
@@ -1273,6 +1290,7 @@ class TestCheckerBaseClass:
     def test_execute_with_heartbeat_timeout_error(self):
         """Test execute_with_heartbeat handles TimeoutError."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "token"
@@ -1303,6 +1321,7 @@ class TestCheckerBaseClass:
     def test_execute_with_heartbeat_general_exception(self):
         """Test execute_with_heartbeat handles general exceptions."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "token"
@@ -1333,6 +1352,7 @@ class TestCheckerBaseClass:
     def test_execute_with_heartbeat_down_status(self):
         """Test execute_with_heartbeat with DOWN status result."""
         logger = MagicMock()
+        MagicMock()
         config = PortscanConfig()
         config.heartbeat_enabled = True
         config.heartbeat_token = "token"

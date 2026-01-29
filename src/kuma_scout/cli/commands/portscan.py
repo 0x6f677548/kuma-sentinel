@@ -51,6 +51,42 @@ class PortscanCommand(CommandExecutor):
                 "--ignore-file-permissions",
                 help="Skip config file permission validation (use only in development)",
             ),
+            # SSH options
+            ssh: Optional[str] = typer.Option(
+                None,
+                "--ssh",
+                help="SSH shorthand (user@host or host). Examples: root@jump-host or jump-host",
+            ),
+            ssh_host: Optional[str] = typer.Option(
+                None,
+                "--ssh-host",
+                help="SSH host to run command on (e.g., fileserver or 192.168.1.10)",
+            ),
+            ssh_user: Optional[str] = typer.Option(
+                None,
+                "--ssh-user",
+                help="SSH username (default: current user)",
+            ),
+            ssh_port: int = typer.Option(
+                22,
+                "--ssh-port",
+                help="SSH port (default: 22)",
+            ),
+            ssh_key_file: Optional[str] = typer.Option(
+                None,
+                "--ssh-key-file",
+                help="Path to SSH private key",
+            ),
+            ssh_password: Optional[str] = typer.Option(
+                None,
+                "--ssh-password",
+                help="SSH password (discouraged, use keys instead)",
+            ),
+            ssh_strict_host_key_checking: bool = typer.Option(
+                True,
+                "--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking",
+                help="Enable/disable SSH strict host key checking (default: enabled)",
+            ),
             ip_ranges: Optional[List[str]] = typer.Option(
                 None,
                 "--ip-range",
@@ -117,6 +153,14 @@ Nmap Timing Profiles (--timing):
                 "config": config,
                 "log_file": log_file,
                 "ignore_file_permissions": ignore_file_permissions,
+                # SSH options
+                "ssh": ssh,
+                "ssh_host": ssh_host,
+                "ssh_user": ssh_user,
+                "ssh_port": ssh_port,
+                "ssh_key_file": ssh_key_file,
+                "ssh_password": ssh_password,
+                "ssh_strict_host_key_checking": ssh_strict_host_key_checking,
                 "ip_ranges": ip_ranges,
                 "exclude": exclude,
                 "ports": ports,
@@ -129,9 +173,13 @@ Nmap Timing Profiles (--timing):
     def get_summary_fields(self) -> Dict[str, Dict[str, str]]:
         """Get fields to display in config summary logging."""
         return {
+            "🎯 Execution Target": {
+                "Target": "execution_target",
+            },
             "📝 Nmap Configuration": {
                 "Ports": "portscan_nmap_ports",
                 "Timing": "portscan_nmap_timing",
+                "Timeout": "portscan_nmap_timeout",
                 "Arguments": "portscan_nmap_arguments",
                 "Exclude IPs": "portscan_exclude",
             },
@@ -141,12 +189,10 @@ Nmap Timing Profiles (--timing):
             "🔔 Uptime Kuma Integration": {
                 "URL": "uptime_kuma_url",
                 "Heartbeat Enabled": "heartbeat_enabled",
-                "Heartbeat Interval": "heartbeat_interval",
-                "Heartbeat Token": "heartbeat_token",
-                "Port-Scan Token": "portscan_token",
             },
             "📂 Logging": {
                 "Log File": "log_file",
+                "Log Level": "log_level",
                 "Keep XML Output": "portscan_nmap_keep_xmloutput",
             },
         }

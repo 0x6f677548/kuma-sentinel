@@ -37,6 +37,21 @@ class TestErrorSanitization(unittest.TestCase):
         # Verify that database connection was redacted (may use different marker)
         self.assertIn("REDACTED", sanitized)
 
+    def test_sanitizer_masks_ssh_connection_strings(self):
+        """Test that SSH connection strings are masked while preserving host."""
+        error_msg = "SSH Error: ssh://user:password@server.example.com:22 failed"
+        sanitized = DataSanitizer.sanitize_error_message(Exception(error_msg))
+        self.assertNotIn("user:password", sanitized)
+        self.assertIn("ssh://[REDACTED]@server.example.com:22", sanitized)
+        self.assertNotIn("ssh://user:password@server.example.com:22", sanitized)
+
+    def test_sanitizer_masks_ssh_connection_strings_no_port(self):
+        """Test SSH URIs without port are masked correctly."""
+        error_msg = "SSH Error: ssh://admin:secret@backup-server failed"
+        sanitized = DataSanitizer.sanitize_error_message(Exception(error_msg))
+        self.assertNotIn("admin:secret", sanitized)
+        self.assertIn("ssh://[REDACTED]@backup-server", sanitized)
+
     def test_empty_exception_handled_gracefully(self):
         """Test that empty exceptions are handled without crashing."""
         sanitized = DataSanitizer.sanitize_error_message(None)

@@ -47,6 +47,7 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
 - **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
+- **SSH Remote Execution**: Run any check remotely via SSH (all commands support `--ssh` option)
 - **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
 - **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
 - **Flexible Configuration**: Support for YAML config files, environment variables for tokens only, and CLI arguments with clear priority
@@ -56,7 +57,7 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
   3. Token environment variables only (authentication tokens only)
   4. Hardcoded defaults (lowest priority)
 - **Comprehensive Logging**: File, console, and syslog/journalctl output
-- **Security First**: Commands executed without shell interpretation to prevent injection attacks
+- **Security First**: Commands executed without shell interpretation to prevent injection attacks; SSH with strict host key checking
 - **Extensible Architecture**: Built to support additional monitoring checks
 
 ## Diagram
@@ -305,7 +306,7 @@ kuma-scout kopiasnapshotstatus \
   --token your-kopia-token
 ```
 
-Monitor SSH-based snapshot locations (comma separator handles colons in SSH paths):
+Monitor server/user specific snapshot locations:
 ```bash
 kuma-scout kopiasnapshotstatus \
   --snapshot "/data,24" \
@@ -314,6 +315,70 @@ kuma-scout kopiasnapshotstatus \
   --heartbeat-token your-heartbeat-token \
   --token your-kopia-token
 ```
+
+### SSH Remote Execution
+
+Execute any command remotely via SSH. All commands support the `--ssh` option for remote execution:
+
+**Basic SSH execution:**
+```bash
+# Check kopia snapshots on remote backup server
+kuma-scout kopiasnapshotstatus \
+  --ssh root@backup-server \
+  --snapshot /data,24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token
+
+# Monitor ZFS pool on remote NAS
+kuma-scout zfspoolstatus \
+  --ssh root@nas-server \
+  --pool tank,10 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-zfs-token
+
+# Run command check on remote server
+kuma-scout cmdcheck \
+  --ssh monitoring@web-server \
+  --command "systemctl is-active nginx" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-cmdcheck-token
+
+# Port scan from a jump host
+kuma-scout portscan \
+  --ssh root@jump-host \
+  --ip-range 192.168.1.0/24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-portscan-token
+```
+
+**With SSH key:**
+```bash
+kuma-scout kopiasnapshotstatus \
+  --ssh-host backup-server \
+  --ssh-user root \
+  --ssh-key-file /etc/kuma-scout/ssh_key \
+  --snapshot /data,24 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token
+```
+
+**SSH Options:**
+- `--ssh user@host` - Shorthand for user and host
+- `--ssh-host host` - SSH hostname or IP
+- `--ssh-user user` - SSH username
+- `--ssh-port port` - SSH port (default: 22)
+- `--ssh-key-file path` - Path to SSH private key
+- `--ssh-password password` - SSH password (discouraged, use keys)
+- `--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking` - Host key verification (default: enabled)
+
+**Security Notes:**
+- Strict host key checking is enabled by default for security
+- Use `--ignore-file-permissions` to bypass SSH key file permission validation
+- SSH passwords are supported but discouraged; use key-based authentication
+- SSH key agents (e.g., KeePassXC) are supported for client-side authentication when no key file is specified
+- All SSH settings can be configured via YAML config file
+
+See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for SSH configuration examples and security best practices.
 
 ### ZFS Pool Status
 

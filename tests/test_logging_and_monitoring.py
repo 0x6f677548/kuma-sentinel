@@ -16,9 +16,8 @@ class SimpleTestConfig(ConfigBase):
     def get_summary(self, mask_tokens: bool = True) -> dict:
         """Get configuration summary."""
         return {
-            "uptime_kuma_url": self._mask_token(self.uptime_kuma_url, mask_tokens),
-            "heartbeat_token": self._mask_token(self.heartbeat_token, mask_tokens),
-            "command_token": self._mask_token(self.command_token, mask_tokens),
+            "uptime_kuma_url": self.uptime_kuma_url,
+            "test_field": "test_value",
         }
 
 

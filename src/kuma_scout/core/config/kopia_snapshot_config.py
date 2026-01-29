@@ -132,17 +132,16 @@ class KopiaSnapshotConfig(ConfigBase):
             )
             snapshot_summary.append(f"{path}@{max_age}h")
 
-        return {
-            "log_file": self.log_file,
-            "kopiasnapshotstatus_snapshots": (
-                "; ".join(snapshot_summary) if snapshot_summary else "(using defaults)"
-            ),
-            "kopiasnapshotstatus_max_age_hours_default": self.kopiasnapshotstatus_max_age_hours,
-            "heartbeat_enabled": self.heartbeat_enabled,
-            "heartbeat_interval": f"{self.heartbeat_interval}s",
-            "uptime_kuma_url": self.uptime_kuma_url,
-            "heartbeat_token": self._mask_token(self.heartbeat_token, mask_tokens),
-            "kopiasnapshotstatus_token": self._mask_token(
-                self.command_token, mask_tokens
-            ),
-        }
+        # Get base summary and add kopia-specific fields
+        summary = super().get_summary(mask_tokens)
+        summary.update(
+            {
+                "kopiasnapshotstatus_snapshots": (
+                    "; ".join(snapshot_summary)
+                    if snapshot_summary
+                    else "(using defaults)"
+                ),
+                "kopiasnapshotstatus_max_age_hours_default": self.kopiasnapshotstatus_max_age_hours,
+            }
+        )
+        return summary

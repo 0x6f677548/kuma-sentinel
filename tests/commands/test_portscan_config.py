@@ -108,12 +108,16 @@ def test_portscan_config_get_summary():
     config.uptime_kuma_url = "http://localhost"
 
     summary = config.get_summary(mask_tokens=True)
-    assert summary["heartbeat_token"] == "***"
-    assert summary["portscan_token"] == "***"
+    # Tokens should never be in summary
+    assert "heartbeat_token" not in summary
+    assert "portscan_token" not in summary
 
     summary = config.get_summary(mask_tokens=False)
-    assert summary["heartbeat_token"] == "secret"
-    assert summary["portscan_token"] == "token"
+    # Tokens should never be in summary, even when mask_tokens=False
+    assert "heartbeat_token" not in summary
+    assert "portscan_token" not in summary
+    assert "secret" not in str(summary)
+    assert "token" not in str(summary)
 
 
 def test_portscan_config_load_heartbeat_token_from_env(monkeypatch):

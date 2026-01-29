@@ -19,7 +19,6 @@ class TestConfigBasicDefaults:
         assert config.cmdcheck_commands == []
         assert config.cmdcheck_timeout == 30
         assert config.cmdcheck_expect_exit_code == 0
-        assert config.cmdcheck_capture_output is True
         assert config.cmdcheck_success_pattern is None
         assert config.cmdcheck_failure_pattern is None
 
@@ -43,7 +42,6 @@ cmdcheck:
     - command: "test -f /tmp/file"
   timeout: 60
   expect_exit_code: 0
-  capture_output: true
   uptime_kuma:
     token: cmdcheck-token
 """)
@@ -54,7 +52,6 @@ cmdcheck:
         assert config.cmdcheck_commands[0]["command"] == "test -f /tmp/file"
         assert config.cmdcheck_timeout == 60
         assert config.cmdcheck_expect_exit_code == 0
-        assert config.cmdcheck_capture_output is True
         assert config.command_token == "cmdcheck-token"
 
     def test_load_multiple_commands_from_yaml(self, config, tmp_path):
@@ -346,9 +343,10 @@ class TestGetSummary:
 
         summary = config.get_summary(mask_tokens=True)
 
-        assert "🔧 Command Configuration" in summary
-        assert "1 command" in str(summary)
-        assert "test -f /tmp/file" in str(summary)
+        assert "cmdcheck_total_commands" in summary
+        assert summary["cmdcheck_total_commands"] == "1"
+        assert "execution_target" in summary
+        assert summary["execution_target"] == "Local execution"
 
     def test_summary_multiple_commands(self, config):
         """Test summary for multiple commands configuration."""
@@ -361,27 +359,31 @@ class TestGetSummary:
 
         summary = config.get_summary(mask_tokens=True)
 
-        assert "🔧 Command Configuration" in summary
-        assert "3 commands" in str(summary)
+        assert "cmdcheck_total_commands" in summary
+        assert summary["cmdcheck_total_commands"] == "3"
 
     def test_summary_masks_token(self, config):
-        """Test token masking in summary."""
+        """Test that tokens are never included in summary, even masked."""
         config.cmdcheck_commands = [{"command": "test"}]
         config.command_token = "secret-token"
 
         summary = config.get_summary(mask_tokens=True)
 
-        assert "***" in str(summary)
+        # Tokens should never be in summary
+        assert "***" not in str(summary)
         assert "secret-token" not in str(summary)
+        assert "cmdcheck_token" not in summary
 
     def test_summary_unmask_token(self, config):
-        """Test unmasked token in summary."""
+        """Test that tokens are never included in summary."""
         config.cmdcheck_commands = [{"command": "test"}]
         config.command_token = "secret-token"
 
         summary = config.get_summary(mask_tokens=False)
 
-        assert "secret-token" in str(summary)
+        # Tokens should never be in the summary
+        assert "secret-token" not in str(summary)
+        assert "cmdcheck_token" not in summary
 
     def test_summary_with_patterns(self, config):
         """Test summary includes patterns."""
@@ -395,16 +397,15 @@ class TestGetSummary:
         assert "ERROR|CRITICAL" in str(summary)
 
     def test_summary_truncates_long_command(self, config):
-        """Test long commands are truncated in summary."""
+        """Test long commands are handled in summary."""
         long_cmd = "x" * 100
         config.cmdcheck_commands = [{"command": long_cmd}]
 
         summary = config.get_summary()
 
-        # Should truncate to 60 chars + "..."
-        command_display = summary["🔧 Command Configuration"]["Command(s)"]
-        assert len(command_display) < len(long_cmd)
-        assert "..." in command_display
+        # Should have total count
+        assert "cmdcheck_total_commands" in summary
+        assert summary["cmdcheck_total_commands"] == "1"
 
 
 class TestCommandsNormalizer:

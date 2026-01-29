@@ -57,8 +57,16 @@ kuma-scout = "kuma_scout.cli.app:cli"
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuma_scout"]
 
-[tool.setuptools.package-data]
-kuma_scout = ["py.typed"]
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/doc",
+    "LICENSE",
+    "README.md",
+    "MANIFEST.in",
+]
+
+
 
 [tool.black]
 line-length = 88

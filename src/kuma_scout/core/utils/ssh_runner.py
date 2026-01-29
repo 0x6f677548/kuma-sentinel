@@ -5,6 +5,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+from kuma_scout.core.logger import get_logger
+
 
 @dataclass
 class SSHConfig:
@@ -141,6 +143,12 @@ class SSHRunner:
         if self.password:
             # Try to use sshpass for password authentication
             # This is discouraged but supported for legacy systems
+            logger = get_logger()
+            logger.warning(
+                "⚠️  SECURITY WARNING: Using SSH password authentication. "
+                "Password may be exposed in process list (ps/top). "
+                "Consider using SSH key authentication instead."
+            )
             ssh_cmd = ["sshpass", "-p", self.password] + ssh_cmd
 
         try:

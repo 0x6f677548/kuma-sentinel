@@ -749,3 +749,38 @@ class TestCommandInjectionSecurity:
             # Verify the command was split with $HOME as literal
             call_args = mock_run.call_args
             assert call_args[0][0] == ["echo", "$HOME"]
+
+
+class TestSSHExecution:
+    """Test SSH command execution path."""
+
+    def test_ssh_command_execution(self, logger):
+        """Test that SSH execution path is taken when _ssh_runner is set."""
+        config = CmdCheckConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "heartbeat-token"
+        config.command_token = "cmd-token"
+        config.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
+        config.ssh_host = "remote-host"
+        config.ssh_user = "remote-user"
+        config.ssh_port = 22
+
+        # Mock SSHRunner to return our mock
+        mock_ssh_runner = MagicMock()
+        mock_ssh_runner.run.return_value = (True, "output", "")
+
+        with patch(
+            "kuma_scout.core.checkers.base.SSHRunner", return_value=mock_ssh_runner
+        ):
+            checker = CmdCheckChecker(logger, config)
+
+            # Check that SSH runner was set
+            assert checker._ssh_runner is mock_ssh_runner
+
+            # run_command should call SSH runner
+            result = checker.execute()
+
+            # Verify SSH runner was called
+            mock_ssh_runner.run.assert_called_once_with(["test", "-f", "/tmp/file"])
+
+            assert result.status == "up"

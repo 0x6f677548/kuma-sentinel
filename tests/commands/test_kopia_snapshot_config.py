@@ -325,6 +325,20 @@ def test_kopia_config_validation_missing_command_token():
     assert "Command push token" in str(exc_info.value)
 
 
+def test_kopia_config_validation_invalid_snapshot_path():
+    """Test validation fails with invalid snapshot path."""
+    config = KopiaSnapshotConfig()
+    config.uptime_kuma_url = "http://kuma"
+    config.heartbeat_token = "token"
+    config.command_token = "token"
+    config.kopiasnapshotstatus_snapshots = [{"path": "invalid..path"}]  # Invalid path
+
+    with pytest.raises(ValueError) as exc_info:
+        config.validate()
+
+    assert "Invalid snapshot path" in str(exc_info.value)
+
+
 def test_kopia_config_yaml_file_not_found():
     """Test loading from non-existent YAML file raises FileNotFoundError."""
     config = KopiaSnapshotConfig()

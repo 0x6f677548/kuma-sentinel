@@ -2,6 +2,8 @@
 
 from typing import Any, Dict
 
+import pytest
+
 from kuma_scout.core.config.portscan_config import PortscanConfig
 
 
@@ -309,3 +311,67 @@ uptime_kuma:
             assert config.ssh_key_file == "/cli/key"
         finally:
             os.unlink(config_file)
+
+
+def test_base_config_get_nested_value():
+    """Test _get_nested_value method with various paths."""
+    from kuma_scout.core.config.base import ConfigBase
+
+    config = ConfigBase()
+    data = {"a": {"b": {"c": "value"}}, "list": [1, 2, 3], "empty": {}}
+
+    # Existing nested path
+    assert config._get_nested_value(data, "a.b.c") == "value"
+
+    # Non-existing path
+    assert config._get_nested_value(data, "a.b.d") is None
+
+    # Top-level key
+    assert config._get_nested_value(data, "list") == [1, 2, 3]
+
+    # Empty path
+    assert config._get_nested_value(data, "") is None
+
+    # Path to non-dict
+    assert config._get_nested_value(data, "list.0") is None
+
+
+def test_base_config_convert_value():
+    """Test _convert_value method with various converters."""
+    from kuma_scout.core.config.base import ConfigBase, FieldMapping
+
+    config = ConfigBase()
+
+    # Test int converter on string
+    mapping = FieldMapping(arg_key="test", yaml_path="test", converter=int)
+    assert config._convert_value("42", mapping) == 42
+
+    # Test str converter on string
+    mapping = FieldMapping(arg_key="test", yaml_path="test", converter=str)
+    assert config._convert_value("123", mapping) == "123"
+
+    # Test with non-string (should return as-is)
+    assert config._convert_value(123, mapping) == 123
+
+    # Test with invalid converter
+    def failing_converter(x):
+        raise ValueError("conversion failed")
+
+    mapping = FieldMapping(
+        arg_key="test", yaml_path="test", converter=failing_converter
+    )
+    with pytest.raises(ValueError, match="conversion failed"):
+        config._convert_value("input", mapping)
+
+
+def test_base_config_apply_field_mappings_from_yaml_missing_value():
+    """Test _apply_field_mappings_from_yaml when yaml value is None."""
+    from kuma_scout.core.config.base import ConfigBase
+
+    config = ConfigBase()
+
+    # Test with data that doesn't have the path
+    data = {"other": "value"}
+
+    # This should not raise and not set any field
+    config._apply_field_mappings_from_yaml(data)

@@ -38,9 +38,15 @@ def _create_nmap_xml_file() -> str:
     Returns:
         Path to temporary XML file
     """
-    f = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml")
-    path = f.name
-    f.close()
+    # Use mkstemp for atomic file creation to avoid race conditions
+    fd, path = tempfile.mkstemp(suffix=".xml", text=True)
+
+    # Set restrictive permissions (0o600) for security
+    os.chmod(path, 0o600)
+
+    # Close the file descriptor - nmap will write to the path
+    os.close(fd)
+
     return path
 
 
@@ -241,6 +247,7 @@ class PortChecker(Checker):
             CheckResult with scan outcome
         """
         scan_start = time.time()
+        nmap_xml = None
 
         try:
             self.logger.info("🔍 Starting port scan check")
@@ -256,12 +263,6 @@ class PortChecker(Checker):
             # Calculate scan duration
             scan_end = time.time()
             scan_duration = int(scan_end - scan_start)
-
-            # Cleanup
-            if nmap_xml and os.path.exists(nmap_xml):
-                self.logger.info(f"📋 XML output saved to: {nmap_xml}")
-                if not self.config.portscan_nmap_keep_xmloutput:  # type: ignore
-                    os.remove(nmap_xml)
 
             # Determine result
             if not scan_success:
@@ -308,6 +309,19 @@ class PortChecker(Checker):
                 duration_seconds=scan_duration,
                 details={"error": sanitized_error},
             )
+
+        finally:
+            # Ensure cleanup happens even if exceptions occur
+            if nmap_xml and os.path.exists(nmap_xml):
+                self.logger.info(f"📋 XML output saved to: {nmap_xml}")
+                if not self.config.portscan_nmap_keep_xmloutput:  # type: ignore
+                    try:
+                        os.remove(nmap_xml)
+                        self.logger.debug(f"🗑️  Cleaned up temporary file: {nmap_xml}")
+                    except OSError as e:
+                        self.logger.warning(
+                            f"⚠️  Failed to cleanup temporary file {nmap_xml}: {e}"
+                        )
 
 
 # Public API for testing and direct use

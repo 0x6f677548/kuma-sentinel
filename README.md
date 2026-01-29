@@ -219,11 +219,11 @@ kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml
 
 **Note**: CLI supports single commands only. For multiple commands, use YAML configuration with `cmdcheck.commands` list.
 
-See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
+See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
 
 ## Upgrading Between Versions
 
-When upgrading Kuma-Scout between major versions, please see [MIGRATION.md](MIGRATION.md) for any breaking changes and migration instructions.
+When upgrading Kuma-Scout between major versions, please see [doc/MIGRATION.md](doc/MIGRATION.md) for any breaking changes and migration instructions.
 
 ### Port Scan
 
@@ -381,7 +381,7 @@ kuma-scout kopiasnapshotstatus \
 - SSH key agents (e.g., KeePassXC) are supported for client-side authentication when no key file is specified
 - All SSH settings can be configured via YAML config file
 
-See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for SSH configuration examples and security best practices.
+See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for SSH configuration examples and security best practices.
 
 ### ZFS Pool Status
 
@@ -465,7 +465,7 @@ kuma-scout cmdcheck \
   --command "/usr/local/bin/custom-health-check.sh"
 ```
 
-**Note**: Commands are executed without shell interpretation for security. Simple commands work great. For complex logic (pipes, operators), wrap your commands in shell scripts. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#command-execution-limitations) for details.
+**Note**: Commands are executed without shell interpretation for security. Simple commands work great. For complex logic (pipes, operators), wrap your commands in shell scripts. See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md#command-execution-limitations) for details.
 
 **Result**:
 - ✅ If all checks pass (exit 0) → Uptime Kuma shows UP
@@ -479,7 +479,7 @@ kuma-scout cmdcheck \
 - Easy to test locally before deploying
 - Version control your monitoring logic
 
-See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#command-monitoring-cmdcheck) for comprehensive cmdcheck documentation including security considerations, multi-command scenarios, and pattern matching.
+See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md#command-monitoring-cmdcheck) for comprehensive cmdcheck documentation including security considerations, multi-command scenarios, and pattern matching.
 
 ### Per-Command Visibility in Uptime Kuma Dashboard
 
@@ -585,7 +585,7 @@ kopiasnapshotstatus:
   max_age_hours: 24          # Global default
 ```
 
-**See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration options**
+**See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration options**
 
 **Result**:
 - ✅ If all snapshots are fresh (within their thresholds) → Uptime Kuma shows UP
@@ -627,7 +627,7 @@ zfspoolstatus:
   free_space_percent_default: 10
 ```
 
-**See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced ZFS pool configuration options**
+**See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced ZFS pool configuration options**
 
 **Result**:
 - ✅ If all pools are ONLINE with sufficient free space → Uptime Kuma shows UP
@@ -820,7 +820,7 @@ kuma-scout zfspoolstatus --help
 
 Default location: `/etc/kuma-scout/config.yaml`
 
-**For detailed configuration options and examples, see [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)**
+**For detailed configuration options and examples, see [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md)**
 
 Basic structure:
 
@@ -895,7 +895,7 @@ zfspoolstatus:
   free_space_percent_default: 10
 ```
 
-See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
+See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
 
 ## Security
 
@@ -1026,7 +1026,7 @@ commands:
 
 ### Further Reading
 
-For comprehensive security guidance, see [CONFIGURATION_GUIDE.md - Security Considerations](CONFIGURATION_GUIDE.md#security-considerations)
+For comprehensive security guidance, see [doc/CONFIGURATION_GUIDE.md - Security Considerations](doc/CONFIGURATION_GUIDE.md#security-considerations)
 
 ## Remote Execution Requirements
 
@@ -1217,7 +1217,7 @@ Example log output:
 
 ## Development
 
-For detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md).
+For detailed development instructions, see [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md).
 
 ### Quick Setup
 
@@ -1231,9 +1231,9 @@ pip install -e ".[dev]"
 
 **Run tests:**
 ```bash
-pytest
-pytest --cov=src/kuma_scout
-pytest -v
+hatch run test
+hatch run test --cov=src/kuma_scout
+hatch run test -v
 ```
 
 **Code quality checks:**
@@ -1263,7 +1263,7 @@ Hugo Batista - [GitHub](https://go.hugobatista.com/gh)
 
 ## Contributing
 
-Contributions are welcome! See [DEVELOPMENT.md](DEVELOPMENT.md) for development setup and guidelines.
+Contributions are welcome! See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for development setup and guidelines.
 
 1. Fork the repository
 2. Create a feature branch
@@ -1279,5 +1279,3 @@ Found a bug? Report it on [GitHub Issues](https://go.hugobatista.com/gh/kuma-sco
 ## Related Projects
 
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma) - Self-hosted monitoring tool
-- [Nmap](https://nmap.org/) - Network mapper and security scanner
-- [Typer](https://typer.tiangolo.com/) - Python CLI framework

@@ -1348,8 +1348,8 @@ kuma-scout kopiasnapshotstatus \
 
 Run tests to verify configuration:
 ```bash
-pytest tests/test_config.py::test_kopia_config_load_from_yaml -v
-pytest tests/checkers/test_kopia_snapshot_checker.py::TestKopiaSnapshotChecker -v
+hatch run test tests/test_config_loading.py::test_yaml_preserved_when_typer_empty_list_provided -v
+hatch run test tests/checkers/test_kopia_snapshot_checker.py::TestKopiaSnapshotChecker -v
 ```
 
 ## Troubleshooting
@@ -2094,7 +2094,7 @@ kuma-scout portscan --log-level DEBUG --config config.yaml
 
 ### Run configuration tests
 ```bash
-pytest tests/test_config.py -v
-pytest tests/checkers/test_port_checker.py -v
-pytest tests/checkers/test_kopia_snapshot_checker.py -v
+hatch run test tests/test_config_loading.py -v
+hatch run test tests/checkers/test_port_checker.py -v
+hatch run test tests/checkers/test_kopia_snapshot_checker.py -v
 ```

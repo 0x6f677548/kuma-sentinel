@@ -9,7 +9,7 @@ from kuma_scout.core.config.base import ConfigBase
 from kuma_scout.core.heartbeat import HeartbeatService
 from kuma_scout.core.models import CheckResult
 from kuma_scout.core.utils.sanitizer import DataSanitizer
-from kuma_scout.core.utils.ssh_runner import SSHRunner
+from kuma_scout.core.utils.ssh_runner import SSHConnectionError, SSHRunner
 
 
 class Checker(ABC):
@@ -92,9 +92,13 @@ class Checker(ABC):
             if self.config.ssh_port != 22:
                 target += f":{self.config.ssh_port}"
             self.logger.debug(f"🔌 Running command on {target}: {' '.join(cmd)}")
-            success, stdout, stderr = self._ssh_runner.run(cmd)
-            # SSH returns success boolean, map to exit code
-            return success, stdout, stderr, 0 if success else 1
+            try:
+                success, stdout, stderr = self._ssh_runner.run(cmd)
+                # SSH returns success boolean, map to exit code
+                return success, stdout, stderr, 0 if success else 1
+            except SSHConnectionError as e:
+                self.logger.error(f"🔌 SSH connection failed: {e.message}")
+                return False, "", f"SSH connection failed: {e.message}", -1
 
         # Local execution
         self.logger.debug(f"🖥️  Running command locally: {' '.join(cmd)}")

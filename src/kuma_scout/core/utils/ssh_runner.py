@@ -8,6 +8,15 @@ from typing import List, Optional, Tuple
 from kuma_scout.core.logger import get_logger
 
 
+class SSHConnectionError(Exception):
+    """Exception raised when SSH connection fails (authentication, host unreachable, etc.)."""
+
+    def __init__(self, message: str, stderr: str = ""):
+        self.message = message
+        self.stderr = stderr
+        super().__init__(f"SSH connection failed: {message}")
+
+
 @dataclass
 class SSHConfig:
     """SSH configuration with parsing capabilities."""
@@ -128,6 +137,32 @@ class SSHRunner:
 
         return ssh_cmd
 
+    def _is_ssh_connection_error(self, stderr: str) -> bool:
+        """Check if stderr contains SSH connection error messages.
+
+        Args:
+            stderr: Standard error output from SSH command
+
+        Returns:
+            True if stderr contains SSH connection error patterns
+        """
+        connection_error_patterns = [
+            "connection closed by",
+            "permission denied",
+            "host key verification failed",
+            "ssh: connect to host",
+            "network is unreachable",
+            "no route to host",
+            "connection refused",
+            "connection timed out",
+            "authentication failed",
+            "publickey,password",  # Common when both auth methods fail
+            "tailnet policy does not permit",  # Tailscale specific
+        ]
+
+        stderr_lower = stderr.lower()
+        return any(pattern in stderr_lower for pattern in connection_error_patterns)
+
     def run(self, cmd: List[str]) -> Tuple[bool, str, str]:
         """Run command via SSH.
 
@@ -167,9 +202,18 @@ class SSHRunner:
                     timeout=self.timeout,
                     env=env,  # Pass modified environment
                 )
+                # Check for SSH connection errors
+                if result.returncode != 0 and self._is_ssh_connection_error(
+                    result.stderr
+                ):
+                    raise SSHConnectionError(
+                        result.stderr or "Connection failed", result.stderr
+                    )
                 return result.returncode == 0, result.stdout, result.stderr
             except subprocess.TimeoutExpired:
                 return False, "", f"Command timed out after {self.timeout}s"
+            except SSHConnectionError:
+                raise  # Re-raise SSH connection errors
             except Exception as e:
                 return False, "", str(e)
 
@@ -181,9 +225,16 @@ class SSHRunner:
                 text=True,
                 timeout=self.timeout,
             )
+            # Check for SSH connection errors
+            if result.returncode != 0 and self._is_ssh_connection_error(result.stderr):
+                raise SSHConnectionError(
+                    result.stderr or "Connection failed", result.stderr
+                )
             return result.returncode == 0, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
             return False, "", f"Command timed out after {self.timeout}s"
+        except SSHConnectionError:
+            raise  # Re-raise SSH connection errors
         except Exception as e:
             return False, "", str(e)
 

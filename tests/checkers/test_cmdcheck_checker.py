@@ -7,6 +7,7 @@ import pytest
 
 from kuma_scout.core.checkers.cmdcheck_checker import CmdCheckChecker
 from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.core.utils.ssh_runner import SSHConnectionError
 
 
 @pytest.fixture
@@ -816,3 +817,51 @@ class TestSSHExecution:
             mock_ssh_runner.run.assert_called_once_with(["test", "-f", "/tmp/file"])
 
             assert result.status == "up"
+
+    def test_ssh_connection_error_handling(self, logger):
+        """Test that SSH connection errors are handled properly."""
+        config = CmdCheckConfig()
+        config.uptime_kuma_url = "http://localhost:3001/api/push"
+        config.heartbeat_token = "heartbeat-token"
+        config.command_token = "cmd-token"
+        config.cmdcheck_commands = [{"command": "test -f /tmp/file"}]
+        config.ssh_host = "remote-host"
+        config.ssh_user = "remote-user"
+        config.ssh_port = 22
+
+        # Mock SSHRunner to raise SSHConnectionError
+        mock_ssh_runner = MagicMock()
+        mock_ssh_runner.run.side_effect = SSHConnectionError(
+            "Connection closed by remote-host port 22",
+            "Connection closed by 192.168.1.1 port 22",
+        )
+
+        with patch(
+            "kuma_scout.core.checkers.base.SSHRunner", return_value=mock_ssh_runner
+        ):
+            checker = CmdCheckChecker(logger, config)
+
+            # Execute the check
+            result = checker.execute()
+
+            # Should result in down status due to SSH connection failure
+            assert result.status == "down"
+            assert "✗ 0/1 passed, 1/1 failed" in result.message
+            # SSH connection failures should show the actual error, not pattern matching results
+            assert (
+                "SSH connection failed: Connection closed by remote-host port 22"
+                in result.message
+            )
+
+            # Check that the command details contain the SSH error
+            assert len(result.details["commands"]) == 1
+            cmd_detail = result.details["commands"][0]
+            assert cmd_detail["status"] == "down"
+            assert cmd_detail["exit_code"] == -1
+            assert (
+                "SSH connection failed: Connection closed by remote-host port 22"
+                in cmd_detail["output"]
+            )
+
+            # Verify SSH runner was called
+            mock_ssh_runner.run.assert_called_once_with(["test", "-f", "/tmp/file"])

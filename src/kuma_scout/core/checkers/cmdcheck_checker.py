@@ -414,9 +414,34 @@ class CmdCheckChecker(Checker):
                     f"{name}[{command}] (timeout)",
                 )
             output = (stdout or "") + (stderr or "")
-            
             # Log command output for troubleshooting
             self.logger.debug(f"Command {idx + 1} output: {output}")
+
+            # Check for SSH connection failures - bypass pattern matching for these
+            if output.startswith("SSH connection failed:"):
+                duration = time.time() - cmd_start
+
+                # Sanitize SSH error output if configured
+                sanitized_output = output
+                if self.config.cmdcheck_sanitize_output:
+                    sanitized_output = DataSanitizer.sanitize_output(output)
+
+                return (
+                    {
+                        "name": name,
+                        "command": command,
+                        "status": "down",
+                        "exit_code": returncode,
+                        "output": (
+                            sanitized_output[:200]
+                            if len(sanitized_output) > 200
+                            else sanitized_output
+                        ),
+                        "duration_seconds": duration,
+                        "token": command_token,
+                    },
+                    f"{name}[{command}] ({sanitized_output})",
+                )
 
             output_truncated = output[-500:] if len(output) > 500 else output
 

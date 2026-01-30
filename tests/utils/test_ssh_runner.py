@@ -6,6 +6,7 @@ import pytest
 
 from kuma_scout.core.utils.ssh_runner import (
     SSHConfig,
+    SSHConnectionError,
     SSHRunner,
     parse_ssh_connection_string,
     parse_ssh_shorthand,
@@ -184,6 +185,68 @@ class TestSSHRunner:
         assert cmd[2] == "ssh"
         # Password should be set in environment variable, not command line
         assert env.get("SSHPASS") == "secret"
+
+    def test_is_ssh_connection_error(self):
+        """Test SSH connection error detection."""
+        runner = SSHRunner(host="host")
+
+        # Test various connection error patterns
+        assert runner._is_ssh_connection_error(
+            "Connection closed by 192.168.1.1 port 22"
+        )
+        assert runner._is_ssh_connection_error("Permission denied (publickey,password)")
+        assert runner._is_ssh_connection_error("Host key verification failed")
+        assert runner._is_ssh_connection_error(
+            "ssh: connect to host example.com port 22: Connection refused"
+        )
+        assert runner._is_ssh_connection_error("Network is unreachable")
+        assert runner._is_ssh_connection_error("No route to host")
+        assert runner._is_ssh_connection_error("Connection timed out")
+        assert runner._is_ssh_connection_error("Authentication failed")
+        assert runner._is_ssh_connection_error(
+            "tailnet policy does not permit you to SSH as user"
+        )
+
+        # Test case insensitive
+        assert runner._is_ssh_connection_error("CONNECTION CLOSED BY host")
+        assert runner._is_ssh_connection_error("permission denied")
+
+        # Test non-connection errors
+        assert not runner._is_ssh_connection_error("command not found")
+        assert not runner._is_ssh_connection_error("syntax error")
+        assert not runner._is_ssh_connection_error("")
+
+    @patch("subprocess.run")
+    def test_run_ssh_connection_error(self, mock_run):
+        """Test that SSH connection errors raise SSHConnectionError."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = "Connection closed by 192.168.1.1 port 22"
+        mock_run.return_value = mock_result
+
+        runner = SSHRunner(host="host")
+        with pytest.raises(SSHConnectionError) as exc_info:
+            runner.run(["echo", "test"])
+
+        assert "SSH connection failed" in str(exc_info.value)
+        assert exc_info.value.stderr == "Connection closed by 192.168.1.1 port 22"
+
+    @patch("subprocess.run")
+    def test_run_ssh_connection_error_with_password(self, mock_run):
+        """Test that SSH connection errors raise SSHConnectionError with password auth."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = "Permission denied (publickey,password)"
+        mock_run.return_value = mock_result
+
+        runner = SSHRunner(host="host", password="secret")
+        with pytest.raises(SSHConnectionError) as exc_info:
+            runner.run(["echo", "test"])
+
+        assert "SSH connection failed" in str(exc_info.value)
+        assert exc_info.value.stderr == "Permission denied (publickey,password)"
 
 
 class TestParseSSHShorthand:

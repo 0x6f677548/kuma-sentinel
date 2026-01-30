@@ -1924,6 +1924,57 @@ zfspoolstatus:
     token: your-zfs-token
 ```
 
+### Environment Variable Expansion in YAML
+
+Kuma Scout supports environment variable expansion directly in YAML configuration files using `${VAR_NAME}` syntax. This allows you to reference environment variables for tokens without hardcoding sensitive information.
+
+**Supported Syntax:**
+- `${VAR_NAME}` - Expands to the value of environment variable `VAR_NAME`
+- `$VAR_NAME` - Alternative syntax (without braces)
+
+**Examples:**
+```yaml
+# Global tokens
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+heartbeat:
+  uptime_kuma:
+    token: "${HEARTBEAT_TOKEN}"  # Expands to env var HEARTBEAT_TOKEN
+
+cmdcheck:
+  uptime_kuma:
+    token: "${CMDCHECK_TOKEN}"   # Expands to env var CMDCHECK_TOKEN
+  commands:
+    - command: "systemctl is-active nginx"
+      name: "web_server"
+      uptime_kuma:
+        token: "${WEB_TOKEN}"    # Per-command token expansion
+    - command: "systemctl is-active postgresql"
+      name: "database"
+      uptime_kuma:
+        token: "${DB_TOKEN}"     # Different token for database
+```
+
+**Environment Setup:**
+```bash
+export HEARTBEAT_TOKEN=abc123def456
+export CMDCHECK_TOKEN=xyz789
+export WEB_TOKEN=web_monitor_token
+export DB_TOKEN=db_monitor_token
+```
+
+**Error Handling:**
+- If a referenced environment variable is not set, configuration loading will fail with a clear error message
+- This prevents silent failures where tokens would be undefined
+
+**Security Benefits:**
+- Avoid storing sensitive tokens in configuration files
+- Tokens can be managed via environment variables, secret managers, or CI/CD systems
+- Configuration files can be committed to version control without exposing secrets
+
+**Note:** Environment variable expansion is only supported for token fields. Other configuration values must still use YAML literals or CLI arguments.
+
 ### Logging (YAML Only)
 ```yaml
 logging:

@@ -21,6 +21,7 @@ class FieldMapping:
     converter: Callable[[Any], Any] = (
         str  # Type converter function (can take any type, returns Any)
     )
+    expand_env_vars: bool = False  # Enable ${VAR} expansion in YAML values
 
 
 # Hardcoded defaults are now inlined in field mappings and __init__ methods
@@ -161,6 +162,7 @@ class ConfigBase:
                 env_var="KUMA_SCOUT_HEARTBEAT_TOKEN",
                 arg_key="heartbeat_token",
                 yaml_path="heartbeat.uptime_kuma.token",
+                expand_env_vars=True,
             ),
             "ignore_file_permissions": FieldMapping(
                 arg_key="ignore_file_permissions",
@@ -465,20 +467,106 @@ class ConfigBase:
         """Convert a value using the mapping's converter.
 
         Handles type conversion appropriately based on YAML native types.
+        Supports environment variable expansion for string values when enabled.
         """
-        # If value is already the right type (from YAML parsing), return as-is
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, int):
-            return value
-        if isinstance(value, list):
+        # Handle environment variable expansion first
+        if mapping.expand_env_vars:
+            value = ConfigBase._expand_env_vars_in_value(value)
+
+        # Return native YAML types as-is
+        if ConfigBase._is_native_yaml_type(value):
             return value
 
-        # Convert strings using the mapping converter
+        # Apply converter only to strings
         if isinstance(value, str):
             return mapping.converter(value)
-
         return value
+
+    @staticmethod
+    def _expand_env_vars_in_value(value: Any) -> Any:
+        """Expand environment variables in a value, handling nested structures."""
+        if isinstance(value, dict):
+            return ConfigBase._expand_env_vars_in_dict(value)
+        elif isinstance(value, list):
+            return ConfigBase._expand_env_vars_in_list(value)
+        elif isinstance(value, str):
+            return ConfigBase._expand_env_vars_in_string(value)
+        return value
+
+    @staticmethod
+    def _expand_env_vars_in_string(value: str) -> str:
+        """Expand environment variables in a string with error checking."""
+        expanded_value = os.path.expandvars(value)
+        # Check if there are still unexpanded variables (missing env vars)
+        if "${" in expanded_value or "$" in expanded_value and expanded_value != value:
+            # Find any remaining ${VAR} patterns
+            import re
+
+            remaining_vars = re.findall(r"\$\{([^}]+)\}", expanded_value)
+            if remaining_vars:
+                raise ValueError(
+                    f"Environment variable expansion failed: variables {remaining_vars} are not set"
+                )
+        return expanded_value
+
+    @staticmethod
+    def _is_native_yaml_type(value: Any) -> bool:
+        """Check if value is a native YAML type that doesn't need conversion."""
+        return isinstance(value, (bool, int, list))
+
+    @staticmethod
+    def _expand_env_vars_in_dict(data: dict) -> dict:
+        """Recursively expand environment variables in a dictionary."""
+        result: Dict[str, Any] = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                # Skip expansion for command fields (security)
+                if k == "command":
+                    result[k] = v
+                else:
+                    expanded_v = os.path.expandvars(v)
+                    # Check if there are still unexpanded variables (missing env vars)
+                    if "${" in expanded_v:
+                        import re
+
+                        remaining_vars = re.findall(r"\$\{([^}]+)\}", expanded_v)
+                        if remaining_vars:
+                            raise ValueError(
+                                f"Environment variable expansion failed: variables {remaining_vars} are not set"
+                            )
+                    result[k] = expanded_v
+            elif isinstance(v, dict):
+                result[k] = ConfigBase._expand_env_vars_in_dict(v)
+            elif isinstance(v, list):
+                result[k] = ConfigBase._expand_env_vars_in_list(v)
+            else:
+                result[k] = v
+        return result
+
+    @staticmethod
+    def _expand_env_vars_in_list(data: list) -> list:
+        """Recursively expand environment variables in a list."""
+        result: List[Any] = []
+        for item in data:
+            if isinstance(item, str):
+                expanded_item = os.path.expandvars(item)
+                # Check if there are still unexpanded variables (missing env vars)
+                if "${" in expanded_item:
+                    import re
+
+                    remaining_vars = re.findall(r"\$\{([^}]+)\}", expanded_item)
+                    if remaining_vars:
+                        raise ValueError(
+                            f"Environment variable expansion failed: variables {remaining_vars} are not set"
+                        )
+                result.append(expanded_item)
+            elif isinstance(item, dict):
+                result.append(ConfigBase._expand_env_vars_in_dict(item))
+            elif isinstance(item, list):
+                result.append(ConfigBase._expand_env_vars_in_list(item))
+            else:
+                result.append(item)
+        return result
 
     @staticmethod
     def _parse_bool(value: Any) -> bool:

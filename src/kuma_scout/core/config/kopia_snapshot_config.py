@@ -104,6 +104,7 @@ class KopiaSnapshotConfig(ConfigBase):
                     env_var="KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN",
                     arg_key="kopiasnapshotstatus_token",
                     yaml_path="kopiasnapshotstatus.uptime_kuma.token",
+                    expand_env_vars=True,
                 ),
             }
         )

@@ -62,7 +62,8 @@ ssh:
 
 cmdcheck:
   uptime_kuma:
-    # Push token for cmdcheck command
+    # Push token for cmdcheck command (aggregated results for commands without per-token)
+    # Can reference environment variables: token: "${CMDCHECK_TOKEN}"
     token: your_cmdcheck_token_here
   
   # Command-specific SSH override (optional)
@@ -92,6 +93,7 @@ cmdcheck:
     # ✅ SUPPORTED: Per-command token (sends individual notification to specific monitor)
     # Commands without per-token participate only in aggregated notification (no individual alerts)
     # This allows separate monitors for critical commands while avoiding alert spam for routine checks
+    # Can reference environment variables: token: "${POSTGRESQL_TOKEN}"
     - command: "systemctl is-active postgresql"
       name: "database_status"
       timeout: 10
@@ -135,6 +137,7 @@ cmdcheck:
 cmdcheck_advanced:
   uptime_kuma:
     # Global token for aggregated results (commands without per-token)
+    # Can reference environment variables: token: "${INFRA_TOKEN}"
     token: your_infrastructure_monitor_token_here
 
   # Global SSH config (used by commands without per-command SSH override)
@@ -147,12 +150,14 @@ cmdcheck_advanced:
       name: "local_web_server"
       timeout: 10
       uptime_kuma:
+        # Can reference environment variables: token: "${WEB_TOKEN}"
         token: your_web_monitor_token_here
 
     - command: "systemctl is-active postgresql"
       name: "local_database"
       timeout: 15
       uptime_kuma:
+        # Can reference environment variables: token: "${DB_TOKEN}"
         token: your_database_monitor_token_here
 
     # Remote services (per-command SSH override)
@@ -162,6 +167,7 @@ cmdcheck_advanced:
       ssh:
         connection: web-server.prod.example.com
       uptime_kuma:
+        # Can reference environment variables: token: "${REMOTE_WEB_TOKEN}"
         token: your_remote_web_monitor_token_here
 
     - command: "systemctl is-active mysql"
@@ -171,6 +177,7 @@ cmdcheck_advanced:
         connection: db-server.prod.example.com
         key_file: /etc/kuma-scout/prod_db_key
       uptime_kuma:
+        # Can reference environment variables: token: "${REMOTE_DB_TOKEN}"
         token: your_remote_db_monitor_token_here
 
     # Backup server (different SSH user/key)

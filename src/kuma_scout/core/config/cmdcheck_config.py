@@ -41,6 +41,7 @@ class CmdCheckConfig(ConfigBase):
                     arg_key="command",
                     yaml_path="cmdcheck.commands",
                     converter=self._normalize_commands,
+                    expand_env_vars=True,
                 ),
                 "cmdcheck_timeout": FieldMapping(
                     arg_key="timeout",
@@ -68,6 +69,7 @@ class CmdCheckConfig(ConfigBase):
                 "command_token": FieldMapping(
                     env_var="KUMA_SCOUT_CMDCHECK_TOKEN",
                     yaml_path="cmdcheck.uptime_kuma.token",
+                    expand_env_vars=True,
                 ),
             }
         )

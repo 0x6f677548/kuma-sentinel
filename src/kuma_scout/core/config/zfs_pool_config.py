@@ -39,6 +39,7 @@ class ZfsPoolStatusConfig(ConfigBase):
                     env_var="KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN",
                     arg_key="zfspoolstatus_token",
                     yaml_path="zfspoolstatus.uptime_kuma.token",
+                    expand_env_vars=True,
                 ),
             }
         )

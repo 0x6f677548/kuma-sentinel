@@ -76,6 +76,7 @@ class PortscanConfig(ConfigBase):
                     env_var="KUMA_SCOUT_PORTSCAN_TOKEN",
                     arg_key="portscan_token",
                     yaml_path="portscan.uptime_kuma.token",
+                    expand_env_vars=True,
                 ),
                 "portscan_ip_ranges": FieldMapping(
                     arg_key="ip_ranges",

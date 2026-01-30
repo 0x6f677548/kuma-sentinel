@@ -105,6 +105,8 @@ All commands support `--ssh user@host` for remote execution. SSH settings config
 - follow the established project structure and conventions
 - do not introduce any new dependencies without approval
 - when introducing new features or making considerable refactors, ensure that code quality tools (ruff, black, mypy) report no issues. You may use auto fix where applicable, including hatch run lint --fix and hatch run format
+## security
+- always use DataSanitizer to sanitize any output sent to Uptime Kuma
 ## documentation
 - always update readme.md if there are macro changes
 - update doc/CONFIGURATION_GUIDE.md for any config changes

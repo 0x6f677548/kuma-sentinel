@@ -51,7 +51,7 @@ For multiple commands, use YAML config with `cmdcheck.commands` list.
 - **Command Execution**: Execute arbitrary shell commands on local or remote systems and push results to Uptime Kuma (cmdcheck)
 - **SSH Remote Execution**: Run any check remotely via SSH - execute commands, port scans, backup checks, and storage monitoring on remote servers (all commands support `--ssh` option)
 - **Pattern Matching**: Use regex patterns for flexible success/failure detection in command output
-- **Multi-Command Support**: Run multiple independent checks and aggregate results
+- **Multi-Command Support**: Run multiple independent checks and aggregate results, with per-command Uptime Kuma tokens for individual monitoring
 - **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
 - **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
@@ -181,23 +181,26 @@ kuma-scout cmdcheck \
   --token your-cmdcheck-token
 ```
 
-**Multiple independent checks (YAML config only - all must pass for UP):**
+**Multiple independent checks with per-command tokens (YAML config only):**
 ```yaml
 # In config file: /etc/kuma-scout/config.yaml
 cmdcheck:
   commands:
     - command: "systemctl is-active nginx"
       name: "web_server"
+      token: "web-server-token"  # Individual monitor for this command
       timeout: 10
     - command: "test -f /var/run/app.pid"
       name: "app_pid"
       timeout: 5
+      # No token - participates in aggregated result only
     - command: "df /"
       name: "disk_space"
+      token: "disk-space-token"  # Individual monitor for this command
       success_pattern: "(\\d{2,}|[1-9]\\d{5,})"  # Match if available space exists
       timeout: 10
   uptime_kuma:
-    token: your-cmdcheck-token
+    token: your-cmdcheck-token  # Aggregated result for all commands
 ```
 
 **With regex pattern matching (CLI):**

@@ -214,6 +214,7 @@ class CmdCheckConfig(ConfigBase):
         errors.extend(
             self._validate_command_pattern(idx, "failure_pattern", cmd_config)
         )
+        errors.extend(self._validate_command_token(idx, cmd_config))
 
         return errors
 
@@ -249,6 +250,29 @@ class CmdCheckConfig(ConfigBase):
             re.compile(cmd_config[field])
         except re.error as e:
             errors.append(f"Command {idx} invalid {field}: {e}")
+
+        return errors
+
+    def _validate_command_token(
+        self, idx: int, cmd_config: Dict[str, Any]
+    ) -> List[str]:
+        """Validate per-command token field."""
+        errors: List[str] = []
+
+        if "uptime_kuma" not in cmd_config:
+            return errors
+
+        uptime_kuma = cmd_config["uptime_kuma"]
+        if not isinstance(uptime_kuma, dict):
+            errors.append(f"Command {idx} uptime_kuma must be a dictionary")
+            return errors
+
+        if "token" not in uptime_kuma:
+            return errors
+
+        token = uptime_kuma["token"]
+        if not isinstance(token, str) or not token.strip():
+            errors.append(f"Command {idx} uptime_kuma.token must be a non-empty string")
 
         return errors
 

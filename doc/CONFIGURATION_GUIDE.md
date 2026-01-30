@@ -162,6 +162,8 @@ cmdcheck:
     - command: "systemctl is-active postgresql"
       name: database
       timeout: 10
+      uptime_kuma:
+        token: specific-token-for-postgresql
     
     - command: "test -f /var/run/app.pid"
       name: app_running
@@ -170,7 +172,7 @@ cmdcheck:
     token: your-cmdcheck-token
 ```
 
-**Result**: DOWN if ANY command fails, UP only if ALL succeed
+**Result**: DOWN if ANY command fails, UP only if ALL succeed. Individual commands with per-token configuration send separate push notifications to their respective Uptime Kuma monitors, plus an aggregated push to the global monitor if configured.
 
 **CLI Limitation**: CLI only supports single commands. For multiple commands, use YAML configuration as shown above.
 
@@ -368,6 +370,8 @@ cmdcheck:
       expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
       success_pattern: null                  # Optional: per-command success pattern
       failure_pattern: null                  # Optional: per-command failure pattern
+      uptime_kuma:
+        token: "per-command-token"           # Optional: per-command token (overrides global token)
   
   # Default values (applied to all commands unless overridden)
   timeout: 30                                # Default timeout in seconds (1-300, default 30)
@@ -377,7 +381,7 @@ cmdcheck:
   sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
   
   uptime_kuma:
-    token: "your-cmdcheck-token"             # Required: push token for this command
+    token: "your-cmdcheck-token"             # Optional: global push token (used when per-command token not specified)
 ```
 
 #### Pattern Matching Logic
@@ -432,6 +436,97 @@ cmdcheck:
       name: app_health
       timeout: 5
       success_pattern: "OK"
+
+# Example 6: Per-command tokens (separate Uptime Kuma monitors)
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: web_server
+      timeout: 10
+    - command: "systemctl is-active postgresql"
+      name: database
+      timeout: 10
+      uptime_kuma:
+        token: "postgres-monitor-token"
+    - command: "test -f /var/run/app.pid"
+      name: app_process
+      timeout: 5
+      uptime_kuma:
+        token: "app-monitor-token"
+  uptime_kuma:
+    token: "global-cmdcheck-token"  # Used for commands without per-token, and aggregated results
+
+# Notification Behavior:
+# - Commands WITH per-command tokens send individual notifications to their specific monitors
+# - Commands WITHOUT per-command tokens do NOT send individual notifications (avoid alert spam)
+# - All commands participate in the aggregated notification sent to the global monitor
+# - Result: web_server → no individual alert, database → alert to postgres-monitor, 
+#   app_process → alert to app-monitor, plus aggregated alert to global-cmdcheck-token
+```
+
+# Example 7: Mixed Local + SSH Commands with Per-Command Tokens
+# Monitor services across multiple servers with individual monitors for critical services
+cmdcheck:
+  uptime_kuma:
+    token: "infrastructure-aggregate-token"  # For aggregated results
+
+  # Global SSH config (used by local commands)
+  ssh:
+    connection: infrastructure-server.local
+
+  commands:
+    # Local critical services (individual monitors)
+    - command: "systemctl is-active nginx"
+      name: "local_web"
+      timeout: 10
+      uptime_kuma:
+        token: "web-monitor-token"
+
+    - command: "systemctl is-active postgresql"
+      name: "local_db"
+      timeout: 15
+      uptime_kuma:
+        token: "database-monitor-token"
+
+    # Remote critical services (per-command SSH + individual monitors)
+    - command: "systemctl is-active apache2"
+      name: "remote_web"
+      timeout: 10
+      ssh:
+        connection: web-server.prod.example.com
+      uptime_kuma:
+        token: "remote-web-monitor-token"
+
+    - command: "systemctl is-active mysql"
+      name: "remote_db"
+      timeout: 15
+      ssh:
+        connection: db-server.prod.example.com
+        key_file: /etc/kuma-scout/prod_db_key
+      uptime_kuma:
+        token: "remote-db-monitor-token"
+
+    # Backup verification (different SSH config + individual monitor)
+    - command: "test -f /backups/latest.tar.gz"
+      name: "backup_check"
+      timeout: 30
+      ssh:
+        connection: backup@nas.prod.example.com:2222
+        key_file: /etc/kuma-scout/backup_key
+      uptime_kuma:
+        token: "backup-monitor-token"
+
+    # Routine monitoring (no individual alerts, only aggregated)
+    - command: "test -d /var/log"
+      name: "log_directory"
+      timeout: 5
+
+    - command: "uptime"
+      name: "system_load"
+      timeout: 5
+
+# Result: 5 individual alerts (web, db, remote-web, remote-db, backup) + 1 aggregated alert
+# Routine checks (disk_space, system_load) only appear in aggregated results
 ```
 
 ### Use Cases

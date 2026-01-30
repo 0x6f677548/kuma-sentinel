@@ -364,6 +364,10 @@ class CmdCheckChecker(Checker):
         failure_pattern = cmd_config.get(
             "failure_pattern", self.config.cmdcheck_failure_pattern
         )
+        # Get per-command token or use global
+        command_token = None
+        if "uptime_kuma" in cmd_config and isinstance(cmd_config["uptime_kuma"], dict):
+            command_token = cmd_config["uptime_kuma"].get("token")
 
         self.logger.debug(f"Running command {idx + 1}: {name}")
 
@@ -384,6 +388,7 @@ class CmdCheckChecker(Checker):
                         "exit_code": None,
                         "output": f"Invalid command syntax: {sanitized_error}",
                         "duration_seconds": duration,
+                        "token": command_token,
                     },
                     f"{name}[{command}] (Invalid command syntax)",
                 )
@@ -404,6 +409,7 @@ class CmdCheckChecker(Checker):
                         "exit_code": None,
                         "output": f"Timeout after {timeout}s",
                         "duration_seconds": duration,
+                        "token": command_token,
                     },
                     f"{name}[{command}] (timeout)",
                 )
@@ -433,6 +439,7 @@ class CmdCheckChecker(Checker):
                     output_truncated[:200] if output_truncated else "(no output)"
                 ),
                 "duration_seconds": duration,
+                "token": command_token,
             }
 
             failure_msg = None
@@ -452,6 +459,7 @@ class CmdCheckChecker(Checker):
                     "exit_code": None,
                     "output": sanitized_error,
                     "duration_seconds": duration,
+                    "token": command_token,
                 },
                 f"{name}[{command}] ({sanitized_error})",
             )

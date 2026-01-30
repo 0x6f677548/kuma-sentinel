@@ -89,6 +89,16 @@ cmdcheck:
       timeout: 5
       expect_exit_code: 0
     
+    # ✅ SUPPORTED: Per-command token (sends individual notification to specific monitor)
+    # Commands without per-token participate only in aggregated notification (no individual alerts)
+    # This allows separate monitors for critical commands while avoiding alert spam for routine checks
+    - command: "systemctl is-active postgresql"
+      name: "database_status"
+      timeout: 10
+      expect_exit_code: 0
+      uptime_kuma:
+        token: your_postgresql_monitor_token_here
+    
     # ✅ SUPPORTED: Pattern matching on output
     # - command: "systemctl status nginx"
     #   name: "nginx_detailed"
@@ -116,6 +126,75 @@ cmdcheck:
   # These are default patterns; can be overridden per-command
   success_pattern: null
   failure_pattern: null
+
+# === ADVANCED CMDCHECK EXAMPLE: Mixed Local + SSH with Per-Command Tokens ===
+# This example shows how to monitor services across multiple servers with different tokens
+# Local commands use default SSH config, remote commands override SSH settings
+# Each critical service gets its own Uptime Kuma monitor via per-command tokens
+
+cmdcheck_advanced:
+  uptime_kuma:
+    # Global token for aggregated results (commands without per-token)
+    token: your_infrastructure_monitor_token_here
+
+  # Global SSH config (used by commands without per-command SSH override)
+  ssh:
+    connection: infrastructure-server.local
+
+  commands:
+    # Local services (no SSH override = uses global SSH config above)
+    - command: "systemctl is-active nginx"
+      name: "local_web_server"
+      timeout: 10
+      uptime_kuma:
+        token: your_web_monitor_token_here
+
+    - command: "systemctl is-active postgresql"
+      name: "local_database"
+      timeout: 15
+      uptime_kuma:
+        token: your_database_monitor_token_here
+
+    # Remote services (per-command SSH override)
+    - command: "systemctl is-active apache2"
+      name: "remote_web_server"
+      timeout: 10
+      ssh:
+        connection: web-server.prod.example.com
+      uptime_kuma:
+        token: your_remote_web_monitor_token_here
+
+    - command: "systemctl is-active mysql"
+      name: "remote_database"
+      timeout: 15
+      ssh:
+        connection: db-server.prod.example.com
+        key_file: /etc/kuma-scout/prod_db_key
+      uptime_kuma:
+        token: your_remote_db_monitor_token_here
+
+    # Backup server (different SSH user/key)
+    - command: "test -f /backups/latest.tar.gz"
+      name: "backup_integrity"
+      timeout: 30
+      ssh:
+        connection: backup@nas.prod.example.com:2222
+        key_file: /etc/kuma-scout/backup_key
+      uptime_kuma:
+        token: your_backup_monitor_token_here
+
+    # Routine checks (no per-command token = only in aggregated results)
+    - command: "test -d /var/log"
+      name: "log_directory_check"
+      timeout: 5
+
+    - command: "uptime"
+      name: "system_load"
+      timeout: 5
+
+  timeout: 30
+  expect_exit_code: 0
+  sanitize_output: true
 
 # === PORT SCAN COMMAND CONFIGURATION ===
 

@@ -388,6 +388,38 @@ class TestMultipleCommands:
             assert result.details["commands"][0]["name"] == "cmd1"
             assert result.details["commands"][1]["name"] == "cmd2"
 
+    def test_multiple_commands_per_command_tokens(self, checker):
+        """Test per-command token configuration."""
+        checker.config.cmdcheck_commands = [
+            {"command": "echo hello", "name": "cmd1"},
+            {
+                "command": "echo world",
+                "name": "cmd2",
+                "uptime_kuma": {"token": "specific-token"},
+            },
+            {"command": "echo test", "name": "cmd3"},
+        ]
+
+        with patch.object(checker, "run_command") as mock_run:
+            mock_run.return_value = (True, "output", "", 0)
+
+            result = checker.execute()
+
+            assert result.details is not None
+            assert "commands" in result.details
+            assert len(result.details["commands"]) == 3
+
+            # Check that tokens are included in results
+            assert (
+                result.details["commands"][0]["token"] is None
+            )  # No per-command token
+            assert (
+                result.details["commands"][1]["token"] == "specific-token"
+            )  # Per-command token
+            assert (
+                result.details["commands"][2]["token"] is None
+            )  # No per-command token
+
 
 class TestShellExecution:
     """Test shell execution details.

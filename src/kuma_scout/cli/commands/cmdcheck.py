@@ -8,6 +8,7 @@ from kuma_scout.cli.commands import register_command
 from kuma_scout.cli.commands.executor import CommandExecutor
 from kuma_scout.core.checkers.cmdcheck_checker import CmdCheckChecker
 from kuma_scout.core.config.cmdcheck_config import CmdCheckConfig
+from kuma_scout.core.uptime_kuma import send_push
 
 
 @register_command(
@@ -143,3 +144,48 @@ Examples:
                 "Heartbeat Enabled": "heartbeat_enabled",
             },
         }
+
+    def send_result_alert(
+        self,
+        logger,
+        cfg,
+        command_name: str,
+        result,
+        duration_ms: int,
+    ) -> None:
+        """Send result alerts, handling per-command tokens and aggregated results."""
+
+        # Check if we have per-command results with tokens
+        command_results = result.details.get("commands", [])
+        has_per_command_tokens = any(cmd.get("token") for cmd in command_results)
+
+        if has_per_command_tokens:
+            # Send individual pushes only for commands that have per-command tokens
+            for cmd_result in command_results:
+                token = cmd_result.get("token")
+                if token:  # Only send individual push if command has its own token
+                    message = f"[{cmd_result['name']}] {cmd_result['output']}"
+                    send_push(
+                        logger=logger,
+                        uptime_kuma_url=cfg.uptime_kuma_url,
+                        push_token=token,
+                        message=message,
+                        command=f"{command_name}_{cmd_result['name']}",
+                        status=cmd_result["status"],
+                        ping_ms=int(cmd_result["duration_seconds"] * 1000),
+                    )
+
+            # Send aggregated push if global token exists
+            if cfg.command_token:
+                send_push(
+                    logger=logger,
+                    uptime_kuma_url=cfg.uptime_kuma_url,
+                    push_token=cfg.command_token,
+                    message=result.message,
+                    command=command_name,
+                    status=result.status,
+                    ping_ms=duration_ms,
+                )
+        else:
+            # Fallback to default behavior
+            super().send_result_alert(logger, cfg, command_name, result, duration_ms)

@@ -309,6 +309,59 @@ class TestValidation:
         with pytest.raises(ValueError, match="invalid success_pattern"):
             config.validate()
 
+    def test_validate_per_command_token_valid(self, config):
+        """Test per-command token validation accepts valid tokens."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "token"
+        config.command_token = "token"
+        config.cmdcheck_commands = [
+            {"command": "test", "uptime_kuma": {"token": "specific-token"}},
+            {"command": "true"},
+        ]
+
+        # Should not raise
+        config.validate()
+
+    def test_validate_per_command_token_invalid_dict(self, config):
+        """Test per-command token validation rejects non-dict uptime_kuma."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "token"
+        config.command_token = "token"
+        config.cmdcheck_commands = [
+            {"command": "test", "uptime_kuma": "not-a-dict"},
+        ]
+
+        with pytest.raises(ValueError, match="uptime_kuma must be a dictionary"):
+            config.validate()
+
+    def test_validate_per_command_token_empty_string(self, config):
+        """Test per-command token validation rejects empty token."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "token"
+        config.command_token = "token"
+        config.cmdcheck_commands = [
+            {"command": "test", "uptime_kuma": {"token": ""}},
+        ]
+
+        with pytest.raises(
+            ValueError, match="uptime_kuma.token must be a non-empty string"
+        ):
+            config.validate()
+
+    def test_validate_per_command_token_none(self, config):
+        """Test per-command token validation rejects None token."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "token"
+        config.command_token = "token"
+        config.cmdcheck_commands = [
+            {"command": "test", "uptime_kuma": {"token": None}},
+        ]
+
+        with pytest.raises(
+            ValueError, match="uptime_kuma.token must be a non-empty string"
+        ):
+            config.validate()
+
     def test_valid_single_command_config(self, config):
         """Test valid single command configuration."""
         config.uptime_kuma_url = "http://localhost"

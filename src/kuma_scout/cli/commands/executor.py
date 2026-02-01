@@ -218,7 +218,7 @@ class CommandExecutor(Command):
 
     def _load_from_config_file(self, args: Dict[str, Any]) -> None:
         """Load configuration from YAML file if it exists."""
-        config_file = args.get("config") or "/etc/kuma-scout/config.yaml"
+        config_file = args.get("config")
         if not config_file or not sys.modules.get("os"):
             return
 

@@ -115,3 +115,8 @@ All commands support `--ssh user@host` for remote execution. SSH settings config
 ## backward compatibility
 - don't worry about backward compatibility unless explicitly instructed
 - if there are config breaking changes, document them clearly in doc/CONFIGURATION_GUIDE.md and doc/MIGRATION.md, only if it is a breaking change compared to the last released version
+
+
+## planning
+- every time you start working on a new feature or a considerable change, create a plan first if not provided
+- always include the impact of the change on documentation, tests, and backward compatibility in your plan

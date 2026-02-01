@@ -120,10 +120,25 @@ class CmdCheckConfig(ConfigBase):
 
         return []
 
-    def validate(self):
+    def validate(self, validate_tokens: bool = True, validate_heartbeat_token: bool = True):
         """Validate command check configuration."""
-        super().validate()
+        # For cmdcheck, we always validate URL but handle tokens specially
+        # Skip base token validation and do our own
+        super().validate(validate_tokens=False, validate_heartbeat_token=validate_heartbeat_token)
 
+        # Custom token validation for cmdcheck (allows per-command tokens)
+        token_errors = self._validate_cmdcheck_tokens()
+        if token_errors:
+            error_message = "Configuration validation failed:\n  " + "\n  ".join(token_errors)
+            if self.logger:
+                self.logger.error(
+                    f"❌ Configuration validation failed with {len(token_errors)} error(s)"
+                )
+                for error in token_errors:
+                    self.logger.error(f"   - {error}")
+            raise ValueError(error_message)
+
+        # Cmdcheck-specific validations
         errors = []
         errors.extend(self._validate_command_specification())
         errors.extend(self._validate_timeout_and_exit_code())
@@ -134,6 +149,76 @@ class CmdCheckConfig(ConfigBase):
             raise ValueError(
                 "Configuration validation failed:\n  " + "\n  ".join(errors)
             )
+
+    def _validate_cmdcheck_tokens(self) -> List[str]:
+        """Validate command tokens for cmdcheck, allowing per-command tokens.
+
+        Note: Heartbeat token validation is handled by base class.
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+
+        # Command token validation: allow global token OR all commands having tokens
+        if self.command_token:
+            # Global token provided - use it
+            pass
+        else:
+            # No global token - check that all commands have their own tokens
+            token_errors = self._validate_per_command_tokens()
+            errors.extend(token_errors)
+
+        return errors
+
+    def _validate_per_command_tokens(self) -> List[str]:
+        """Validate that all commands have per-command tokens when no global token exists.
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        if not self.cmdcheck_commands:
+            return ["Command push token not provided (use --token)"]
+
+        commands_without_tokens = []
+        for idx, cmd_config in enumerate(self.cmdcheck_commands):
+            if not isinstance(cmd_config, dict):
+                continue
+            if not self._command_has_valid_token(cmd_config):
+                commands_without_tokens.append(idx)
+
+        if not commands_without_tokens:
+            return []
+
+        if len(commands_without_tokens) == 1:
+            return [f"Command {commands_without_tokens[0]} missing uptime_kuma.token "
+                   "(provide global --token or per-command token)"]
+        else:
+            cmd_list = ", ".join(str(i) for i in commands_without_tokens)
+            return [f"Commands {cmd_list} missing uptime_kuma.token "
+                   "(provide global --token or per-command tokens)"]
+
+    def _command_has_valid_token(self, cmd_config: Dict[str, Any]) -> bool:
+        """Check if a command configuration has a valid per-command token.
+
+        Args:
+            cmd_config: Command configuration dictionary
+
+        Returns:
+            True if command has valid token, False otherwise
+        """
+        if "uptime_kuma" not in cmd_config:
+            return False
+
+        uptime_kuma = cmd_config["uptime_kuma"]
+        if not isinstance(uptime_kuma, dict):
+            return False
+
+        if "token" not in uptime_kuma:
+            return False
+
+        token = uptime_kuma["token"]
+        return isinstance(token, str) and bool(token.strip())
 
     def _validate_command_specification(self) -> List[str]:
         """Validate that at least one command is provided."""

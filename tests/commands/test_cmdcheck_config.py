@@ -388,6 +388,112 @@ class TestValidation:
         config.validate()
 
 
+class TestPerCommandTokens:
+    """Test validation with per-command tokens (no global token)."""
+
+    def test_validate_per_command_tokens_only(self, config):
+        """Test validation passes when all commands have tokens but no global token."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "heartbeat-token"
+        # No global command_token
+        config.command_token = None
+        config.cmdcheck_commands = [
+            {
+                "command": "speedtest-cli --simple --no-upload",
+                "name": "Download speed test",
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+            },
+            {
+                "command": "speedtest-cli --simple --no-download",
+                "name": "Upload speed test",
+                "uptime_kuma": {"token": "KumaScoutSpeedtestUploadToken"}
+            }
+        ]
+
+        # Should not raise - per-command tokens satisfy requirement
+        config.validate()
+
+    def test_validate_mixed_tokens_global_and_per_command(self, config):
+        """Test validation passes with global token and some per-command tokens."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "heartbeat-token"
+        config.command_token = "global-token"
+        config.cmdcheck_commands = [
+            {
+                "command": "speedtest-cli --simple --no-upload",
+                "name": "Download speed test",
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+            },
+            {
+                "command": "speedtest-cli --simple --no-download",
+                "name": "Upload speed test"
+                # No per-command token - will use global
+            }
+        ]
+
+        # Should not raise
+        config.validate()
+
+    def test_validate_per_command_tokens_missing_one(self, config):
+        """Test validation fails when some commands missing tokens and no global token."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "heartbeat-token"
+        # No global command_token
+        config.command_token = None
+        config.cmdcheck_commands = [
+            {
+                "command": "speedtest-cli --simple --no-upload",
+                "name": "Download speed test",
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+            },
+            {
+                "command": "speedtest-cli --simple --no-download",
+                "name": "Upload speed test"
+                # Missing per-command token
+            }
+        ]
+
+        with pytest.raises(ValueError, match="Command 1 missing uptime_kuma.token"):
+            config.validate()
+
+    def test_validate_per_command_tokens_missing_multiple(self, config):
+        """Test validation fails when multiple commands missing tokens."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "heartbeat-token"
+        # No global command_token
+        config.command_token = None
+        config.cmdcheck_commands = [
+            {
+                "command": "cmd1",
+                # Missing per-command token
+            },
+            {
+                "command": "cmd2",
+                # Missing per-command token
+            },
+            {
+                "command": "cmd3",
+                "uptime_kuma": {"token": "token3"}
+            }
+        ]
+
+        with pytest.raises(ValueError, match="Commands 0, 1 missing uptime_kuma.token"):
+            config.validate()
+
+    def test_validate_no_tokens_at_all(self, config):
+        """Test validation fails when no tokens provided anywhere."""
+        config.uptime_kuma_url = "http://localhost"
+        config.heartbeat_token = "heartbeat-token"
+        # No global command_token
+        config.command_token = None
+        config.cmdcheck_commands = [
+            {"command": "test"},
+        ]
+
+        with pytest.raises(ValueError, match="Command 0 missing uptime_kuma.token"):
+            config.validate()
+
+
 class TestGetSummary:
     """Test configuration summary generation."""
 

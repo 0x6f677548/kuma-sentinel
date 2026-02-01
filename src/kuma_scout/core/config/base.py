@@ -284,10 +284,14 @@ class ConfigBase:
         """
         self._apply_field_mappings_from_env()
 
-    def validate(self) -> None:
+    def validate(self, validate_tokens: bool = True, validate_heartbeat_token: bool = True) -> None:
         """Validate shared configuration common to all commands.
 
         Logs validation failures and missing values for debugging.
+
+        Args:
+            validate_tokens: Whether to validate command tokens (default: True)
+            validate_heartbeat_token: Whether to validate heartbeat token (default: True)
 
         Raises:
             ValueError: If shared configuration is invalid
@@ -298,9 +302,10 @@ class ConfigBase:
         url_errors = self._validate_and_log_url()
         errors.extend(url_errors)
 
-        # Validate tokens
-        token_errors = self._validate_and_log_tokens()
-        errors.extend(token_errors)
+        # Validate tokens (conditionally)
+        if validate_tokens:
+            token_errors = self._validate_and_log_tokens(validate_heartbeat_token)
+            errors.extend(token_errors)
 
         if errors:
             error_message = "Configuration validation failed:\n  " + "\n  ".join(errors)
@@ -333,15 +338,18 @@ class ConfigBase:
                 self.logger.error(f"❌ {error_msg}")
             return [error_msg]
 
-    def _validate_and_log_tokens(self) -> List[str]:
+    def _validate_and_log_tokens(self, validate_heartbeat_token: bool = True) -> List[str]:
         """Validate heartbeat and command tokens and log results.
+
+        Args:
+            validate_heartbeat_token: Whether to validate heartbeat token (default: True)
 
         Returns:
             List of error messages (empty if valid)
         """
         errors = []
 
-        if not self.heartbeat_token:
+        if validate_heartbeat_token and not self.heartbeat_token:
             error_msg = "Heartbeat push token not provided (use --heartbeat-token)"
             errors.append(error_msg)
 

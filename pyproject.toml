@@ -151,5 +151,6 @@ format-check = "black --check src tests"
 check = [
     "ruff check src tests",
     "black --check src tests",
-    "mypy src tests",
+    "mypy src",
+    "mypy tests",
 ]

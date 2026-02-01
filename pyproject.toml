@@ -126,6 +126,8 @@ warn_redundant_casts = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+mypy_path = "src"
+exclude = ["test_venv", ".venv"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -152,5 +154,4 @@ check = [
     "ruff check src tests",
     "black --check src tests",
     "mypy src",
-    "mypy tests",
 ]

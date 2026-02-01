@@ -679,6 +679,23 @@ cmdcheck:
         token: KumaScoutSpeedtestUploadToken
 ```
 
+**Alternative YAML Configuration (Combined Speed Test):**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+heartbeat:
+  uptime_kuma:
+    token: your-heartbeat-token
+cmdcheck:
+  commands:
+    - name: 'Internet speed test'
+      command: 'speedtest-cli --simple --secure'
+      failure_pattern: '(Download:\ [0-4][0-9][0-9]\.[0-9][0-9]\ Mbit/s|Upload:\ [0-3][0-9][0-9]\.[0-9][0-9]\ Mbit/s)'
+      timeout: 300
+      uptime_kuma:
+        token: KumaScoutSpeedtestCombinedToken
+```
+
 **Setup Requirements:**
 1. Install `speedtest-cli`: `pip install speedtest-cli` or `apt install speedtest-cli`
 2. Run initial test to ensure it works: `speedtest-cli --simple`
@@ -688,6 +705,7 @@ cmdcheck:
 **Pattern Explanation:**
 - `Download: [0-9][0-9]\.[0-9][0-9] Mbit/s` matches download speeds below 100 Mbit/s (00.00-99.99)
 - `Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s` matches upload speeds below 50 Mbit/s (00.00-49.99)
+- Combined pattern `(Download:\ [0-4][0-9][0-9]\.[0-9][0-9]\ Mbit/s|Upload:\ [0-3][0-9][0-9]\.[0-9][0-9]\ Mbit/s)` matches download speeds below 500 Mbit/s OR upload speeds below 400 Mbit/s in a single test
 
 **Result:** Uptime Kuma will show DOWN status and alert when your internet speed drops below the configured thresholds, helping you identify ISP issues or network problems.
 

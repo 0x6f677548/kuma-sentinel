@@ -629,6 +629,7 @@ class CmdCheckChecker(Checker):
                     break  # Only warn once per tool
 
     @staticmethod
+    @staticmethod
     def _evaluate_result(
         exit_code: int,
         output: str,
@@ -656,15 +657,24 @@ class CmdCheckChecker(Checker):
         """
         # Check failure pattern first (highest priority)
         if failure_pattern:
-            if re.search(failure_pattern, output):
-                return "down", f"Failure pattern detected: {failure_pattern}"
+            match = re.search(failure_pattern, output)
+            if match:
+                matched_str = match.group(0)
+                if len(matched_str) > 50:
+                    matched_str = matched_str[:47] + "..."
+                return "down", f"Failure pattern '{failure_pattern}' matched '{matched_str}'"
 
         # Check success pattern
         if success_pattern:
-            if re.search(success_pattern, output):
-                return "up", f"Success pattern detected: {success_pattern}"
+            match = re.search(success_pattern, output)
+            if match:
+                matched_str = match.group(0)
+                if len(matched_str) > 50:
+                    matched_str = matched_str[:47] + "..."
+                return "up", f"Success pattern '{success_pattern}' matched '{matched_str}'"
             # If success pattern provided but doesn't match, it's a failure
-            return "down", f"Success pattern not found: {success_pattern}"
+            output_snippet = output[:100] + "..." if len(output) > 100 else output
+            return "down", f"Success pattern '{success_pattern}' not found in output: '{output_snippet}'"
 
         # Fall back to exit code
         if exit_code == expect_exit_code:

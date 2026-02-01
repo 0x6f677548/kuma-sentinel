@@ -144,10 +144,8 @@ class TestPatternMatching:
             result = checker.execute()
 
             assert result.status == "down"
-            # Check details for pattern match info
-            assert result.details is not None
-            cmd_details = result.details["commands"][0]
-            assert "failure pattern" in cmd_details or result.status == "down"
+            # Check that the message includes the matched pattern
+            assert "Failure pattern 'ERROR|FATAL' matched 'FATAL'" in result.message
 
     def test_success_pattern_match(self, checker):
         """Test success pattern detection."""
@@ -174,6 +172,7 @@ class TestPatternMatching:
             assert result.status == "down"
             # Pattern was specified but not found
             assert result.details is not None
+            assert "Success pattern '^HEALTHY$' not found in output: 'Status: UNHEALTHY'" in result.message
 
     def test_pattern_precedence_failure_over_success(self, checker):
         """Test failure pattern takes precedence over success pattern."""

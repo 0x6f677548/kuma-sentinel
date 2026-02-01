@@ -115,6 +115,16 @@ class CommandExecutor(Command):
                 "--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking",
                 help="Enable/disable SSH strict host key checking (default: enabled)",
             ),
+            "retry_count": typer.Option(
+                None,
+                "--retry-count",
+                help="Number of retry attempts for failed checks (default: 0)",
+            ),
+            "retry_delay": typer.Option(
+                None,
+                "--retry-delay",
+                help="Delay in seconds between retry attempts (default: 0)",
+            ),
             "log_file": typer.Option(
                 None,
                 "--log-file",

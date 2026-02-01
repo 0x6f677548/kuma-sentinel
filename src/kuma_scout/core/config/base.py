@@ -61,6 +61,10 @@ class ConfigBase:
         self.ignore_file_permissions = False  # Skip file permission checks if True
         self.logger = logger or get_logger()
 
+        # Retry configuration
+        self.retry_count = 0
+        self.retry_delay = 0
+
         # SSH configuration for remote execution
         self.ssh_host: Optional[str] = None
         self.ssh_user: Optional[str] = None
@@ -168,6 +172,16 @@ class ConfigBase:
                 arg_key="ignore_file_permissions",
                 yaml_path="logging.ignore_file_permissions",
                 converter=self._parse_bool,
+            ),
+            "retry_count": FieldMapping(
+                yaml_path="retry_count",
+                arg_key="retry_count",
+                converter=int,
+            ),
+            "retry_delay": FieldMapping(
+                yaml_path="retry_delay",
+                arg_key="retry_delay",
+                converter=int,
             ),
         }
 
@@ -299,6 +313,12 @@ class ConfigBase:
             ValueError: If shared configuration is invalid
         """
         errors = []
+
+        # Validate retry settings
+        if self.retry_count < 0:
+            errors.append(f"retry_count must be non-negative, got {self.retry_count}")
+        if self.retry_delay < 0:
+            errors.append(f"retry_delay must be non-negative, got {self.retry_delay}")
 
         # Validate URL
         url_errors = self._validate_and_log_url()

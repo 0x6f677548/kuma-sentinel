@@ -25,4 +25,6 @@ def test_subcommand_common_options():
     assert "--uptime-kuma-url" in result.output
     assert "--heartbeat-token" in result.output
     assert "--token" in result.output
+    assert "--retry-count" in result.output
+    assert "--retry-delay" in result.output
     # Note: Some options may be truncated in long help output, so we check the key ones

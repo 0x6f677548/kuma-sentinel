@@ -110,6 +110,45 @@ kopiasnapshotstatus:
 
 **Important:** SSH settings are NOT supported via environment variables. Use CLI args or YAML config. Environment variables are reserved for tokens and passwords only.
 
+### Global CLI Options
+
+All commands support these common CLI options for configuration:
+
+```bash
+# Core configuration
+--config /etc/kuma-scout/config.yaml          # YAML config file path
+--uptime-kuma-url http://uptimekuma:3001/api/push  # Uptime Kuma API URL
+--heartbeat-token your-heartbeat-token        # Heartbeat token
+--token your-command-token                    # Command-specific token
+
+# Retry configuration
+--retry-count 3                               # Number of retry attempts (default: 0)
+--retry-delay 5                               # Delay in seconds between retries (default: 0)
+
+# SSH remote execution
+--ssh user@host                               # SSH connection string
+--ssh-key-file /path/to/key                    # SSH private key path
+--ssh-password your-password                  # SSH password (discouraged)
+--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking  # Host key checking
+
+# Logging
+--log-file /var/log/kuma-scout.log            # Log file path
+--log-level INFO                              # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+# Development
+--ignore-file-permissions                     # Skip config and key file permission validation
+```
+
+**Example with retry options:**
+```bash
+kuma-scout cmdcheck \
+  --command "curl -s https://api.example.com/health" \
+  --retry-count 3 \
+  --retry-delay 5 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-token
+```
+
 ---
 
 ## Command Monitoring (cmdcheck)
@@ -215,6 +254,32 @@ cmdcheck:
     token: your-cmdcheck-token
 ```
 
+#### Retry Logic - Handle Transient Failures
+
+**YAML Configuration:**
+```yaml
+cmdcheck:
+  retry_count: 3                           # Global retry count for all commands
+  retry_delay: 5                           # Delay in seconds between retries
+  commands:
+    - command: "curl -s https://api.example.com/health"
+      name: api_check
+      retry_count: 5                       # Per-command override
+      retry_delay: 10                      # Per-command delay override
+```
+
+**CLI Configuration:**
+```bash
+kuma-scout cmdcheck \
+  --command "curl -s https://api.example.com/health" \
+  --retry-count 3 \
+  --retry-delay 5 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-token
+```
+
+**Result**: Failed commands are retried up to the specified count with delays between attempts. Only failed commands are retried; successful commands proceed normally. SSH connections are re-established for each retry attempt.
+
 ### Key Features
 
 - ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries
@@ -223,7 +288,8 @@ cmdcheck:
 - ✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
 - ✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
 - ✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
-- ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns per command in list
+- ✅ **Retry Logic** — Configurable retries with delays for failed commands
+- ✅ **Per-Command Overrides** — Individual timeouts, exit codes, patterns, retries per command in list
 - ✅ **Type-Safe Configuration** — YAML validation prevents configuration errors
 - ✅ **Security** — Commands executed without shell interpretation to prevent injection attacks
 
@@ -370,6 +436,8 @@ cmdcheck:
       expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
       success_pattern: null                  # Optional: per-command success pattern
       failure_pattern: null                  # Optional: per-command failure pattern
+      retry_count: 0                         # Optional: per-command retry count (inherits from defaults if omitted)
+      retry_delay: 0                         # Optional: per-command retry delay (inherits from defaults if omitted)
       uptime_kuma:
         token: "per-command-token"           # Optional: per-command token (overrides global token)
   
@@ -378,6 +446,8 @@ cmdcheck:
   expect_exit_code: 0                        # Default expected exit code (0-255, default 0)
   success_pattern: null                      # Default success pattern (optional)
   failure_pattern: null                      # Default failure pattern (optional, takes precedence)
+  retry_count: 0                             # Default number of retries (0 = no retries)
+  retry_delay: 0                             # Default delay between retries in seconds
   sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
   
   uptime_kuma:

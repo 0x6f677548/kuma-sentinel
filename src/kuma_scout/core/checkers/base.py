@@ -1,6 +1,7 @@
 """Abstract base class for scout checks."""
 
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import List, Optional, Tuple
@@ -200,28 +201,9 @@ class Checker(ABC):
             CheckResult from the check execution
         """
         try:
-            if self.heartbeat:
-                self.logger.debug(f"📤 Sending heartbeat start message for {self.name}")
-                self.heartbeat.send_message(f"{self.name} check starting...")
-                self.heartbeat.start()
-                self.logger.debug(f"✅ Heartbeat service started for {self.name}")
-
-            self.logger.info(f"▶️  Executing {self.name} check")
-            result = self.execute()
-            self.logger.info(
-                f"✅ {self.name} check completed with status: {result.status}"
-            )
-
-            # Send end message with only status and duration (no detailed results)
-            if self.heartbeat:
-                status_emoji = "✅" if result.status == "up" else "❌"
-                self.logger.debug(
-                    f"📤 Sending heartbeat completion message for {self.name}"
-                )
-                self.heartbeat.send_message(
-                    f"{status_emoji} {self.name} completed in {result.duration_seconds}s"
-                )
-
+            self._start_heartbeat()
+            result = self._execute_with_retry()
+            self._send_heartbeat_completion(result)
             return result
         except TimeoutError as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
@@ -234,6 +216,62 @@ class Checker(ABC):
             )
             raise
         finally:
-            if self.heartbeat:
-                self.logger.debug(f"Stopping heartbeat service for {self.name}")
-                self.heartbeat.stop()
+            self._stop_heartbeat()
+
+    def _start_heartbeat(self) -> None:
+        """Initialize and start heartbeat service if configured."""
+        if self.heartbeat:
+            self.logger.debug(f"📤 Sending heartbeat start message for {self.name}")
+            self.heartbeat.send_message(f"{self.name} check starting...")
+            self.heartbeat.start()
+            self.logger.debug(f"✅ Heartbeat service started for {self.name}")
+
+    def _execute_with_retry(self) -> CheckResult:
+        """Execute the check with retry logic."""
+        self.logger.info(f"▶️  Executing {self.name} check")
+        result = None
+        for attempt in range(self.config.retry_count + 1):
+            try:
+                result = self.execute()
+                if result.status == "up":
+                    break
+                else:
+                    if attempt < self.config.retry_count:
+                        self.logger.warning(
+                            f"Check failed (status: {result.status}), retrying in {self.config.retry_delay}s "
+                            f"(attempt {attempt + 1}/{self.config.retry_count + 1})"
+                        )
+                        time.sleep(self.config.retry_delay)
+            except Exception as e:
+                if attempt < self.config.retry_count:
+                    sanitized_error = DataSanitizer.sanitize_error_message(e)
+                    self.logger.warning(
+                        f"Check failed with exception, retrying in {self.config.retry_delay}s "
+                        f"(attempt {attempt + 1}/{self.config.retry_count + 1}): {sanitized_error}"
+                    )
+                    time.sleep(self.config.retry_delay)
+                else:
+                    raise
+        if result is None:
+            raise RuntimeError(f"{self.name} check failed after {self.config.retry_count + 1} attempts")
+        self.logger.info(
+            f"✅ {self.name} check completed with status: {result.status}"
+        )
+        return result
+
+    def _send_heartbeat_completion(self, result: CheckResult) -> None:
+        """Send heartbeat completion message."""
+        if self.heartbeat:
+            status_emoji = "✅" if result.status == "up" else "❌"
+            self.logger.debug(
+                f"📤 Sending heartbeat completion message for {self.name}"
+            )
+            self.heartbeat.send_message(
+                f"{status_emoji} {self.name} completed in {result.duration_seconds}s"
+            )
+
+    def _stop_heartbeat(self) -> None:
+        """Stop heartbeat service if running."""
+        if self.heartbeat:
+            self.logger.debug(f"Stopping heartbeat service for {self.name}")
+            self.heartbeat.stop()

@@ -27,6 +27,12 @@ class CmdCheckConfig(ConfigBase):
         self.cmdcheck_success_pattern: Optional[str] = None
         self.cmdcheck_failure_pattern: Optional[str] = None
         self.cmdcheck_sanitize_output = True  # Mask sensitive data by default
+        self.cmdcheck_retry_count = 0
+        self.cmdcheck_retry_delay = 0
+
+        # Disable base retry logic since cmdcheck has per-command retries
+        self.retry_count = 0
+        self.retry_delay = 0
 
     def _get_command_name(self) -> str:
         """Get the command name for command-specific configuration."""
@@ -35,6 +41,14 @@ class CmdCheckConfig(ConfigBase):
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for command check configuration."""
         mappings = super()._get_field_mappings()
+        
+        # Disable CLI arg for base retry_count since cmdcheck uses per-command retries
+        if "retry_count" in mappings:
+            mappings["retry_count"] = FieldMapping(
+                yaml_path="retry_count",
+                converter=int,
+            )
+        
         mappings.update(
             {
                 "cmdcheck_commands": FieldMapping(
@@ -65,6 +79,16 @@ class CmdCheckConfig(ConfigBase):
                     arg_key="sanitize_output",
                     yaml_path="cmdcheck.sanitize_output",
                     converter=self._parse_bool,
+                ),
+                "cmdcheck_retry_count": FieldMapping(
+                    yaml_path="cmdcheck.retry_count",
+                    arg_key="retry_count",
+                    converter=int,
+                ),
+                "cmdcheck_retry_delay": FieldMapping(
+                    yaml_path="cmdcheck.retry_delay",
+                    arg_key="retry_delay",
+                    converter=int,
                 ),
                 "command_token": FieldMapping(
                     env_var="KUMA_SCOUT_CMDCHECK_TOKEN",
@@ -129,6 +153,18 @@ class CmdCheckConfig(ConfigBase):
         super().validate(
             validate_tokens=False, validate_heartbeat_token=validate_heartbeat_token
         )
+
+        if self.cmdcheck_retry_count < 0:
+            raise ValueError(f"cmdcheck_retry_count must be non-negative, got {self.cmdcheck_retry_count}")
+        if self.cmdcheck_retry_delay < 0:
+            raise ValueError(f"cmdcheck_retry_delay must be non-negative, got {self.cmdcheck_retry_delay}")
+
+        # Validate per-command retry settings
+        for idx, cmd_config in enumerate(self.cmdcheck_commands):
+            if "retry_count" in cmd_config and cmd_config["retry_count"] < 0:
+                raise ValueError(f"Command {idx} retry_count must be non-negative, got {cmd_config['retry_count']}")
+            if "retry_delay" in cmd_config and cmd_config["retry_delay"] < 0:
+                raise ValueError(f"Command {idx} retry_delay must be non-negative, got {cmd_config['retry_delay']}")
 
         # Custom token validation for cmdcheck (allows per-command tokens)
         token_errors = self._validate_cmdcheck_tokens()

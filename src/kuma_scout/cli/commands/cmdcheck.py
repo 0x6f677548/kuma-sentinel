@@ -66,6 +66,8 @@ class CmdCheckCommand(CommandExecutor):
             ssh_strict_host_key_checking: bool = common_options[
                 "ssh_strict_host_key_checking"
             ],
+            retry_count: Optional[int] = common_options["retry_count"],
+            retry_delay: Optional[int] = common_options["retry_delay"],
             log_file: Optional[str] = common_options["log_file"],
             log_level: Optional[str] = common_options["log_level"],
         ):
@@ -112,6 +114,8 @@ Examples:
                 "ssh_key_file": ssh_key_file,
                 "ssh_password": ssh_password,
                 "ssh_strict_host_key_checking": ssh_strict_host_key_checking,
+                "retry_count": retry_count,
+                "retry_delay": retry_delay,
                 "command": command,
                 "timeout": timeout,
                 "expect_exit_code": expect_exit_code,

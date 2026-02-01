@@ -633,6 +633,64 @@ cmdcheck:
       timeout: 30
 ```
 
+#### 8. ISP Speed Test Monitoring (Real-World Example)
+
+Monitor your internet connection speed and alert when it drops below acceptable thresholds. This is a perfect example of using Kuma-Scout to monitor external service quality.
+
+**CLI Examples:**
+```bash
+# Monitor download speed - alert if below 100 Mbit/s
+kuma-scout cmdcheck \
+  --command "speedtest-cli --simple --no-upload" \
+  --failure-pattern "Download: [0-9][0-9]\.[0-9][0-9] Mbit/s" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-speedtest-token
+
+# Monitor upload speed - alert if below 50 Mbit/s  
+kuma-scout cmdcheck \
+  --command "speedtest-cli --simple --no-download" \
+  --failure-pattern "Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-upload-speedtest-token
+```
+
+**YAML Configuration (Recommended for production):**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+heartbeat:
+  uptime_kuma:
+    token: your-heartbeat-token
+cmdcheck:
+  commands:
+    - name: 'Download speed test'
+      command: 'speedtest-cli --simple --no-upload'
+      failure_pattern: 'Download: [0-9][0-9]\.[0-9][0-9] Mbit/s'
+      timeout: 300
+      uptime_kuma:
+        token: KumaScoutSpeedtestDownloadToken
+    - name: 'Upload speed test'
+      command: 'speedtest-cli --simple --no-download'
+      failure_pattern: 'Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s'
+      timeout: 300
+      uptime_kuma:
+        token: KumaScoutSpeedtestUploadToken
+```
+
+**Setup Requirements:**
+1. Install `speedtest-cli`: `pip install speedtest-cli` or `apt install speedtest-cli`
+2. Run initial test to ensure it works: `speedtest-cli --simple`
+3. Adjust failure patterns based on your acceptable minimum speeds
+4. Schedule via cron: `*/30 * * * * /usr/local/bin/kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml`
+
+**Pattern Explanation:**
+- `Download: [0-9][0-9]\.[0-9][0-9] Mbit/s` matches download speeds below 100 Mbit/s (00.00-99.99)
+- `Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s` matches upload speeds below 50 Mbit/s (00.00-49.99)
+
+**Result:** Uptime Kuma will show DOWN status and alert when your internet speed drops below the configured thresholds, helping you identify ISP issues or network problems.
+
 ### Security Considerations
 
 ⚠️ **SECURITY FIRST**: Kuma Scout is designed with security as a primary concern.

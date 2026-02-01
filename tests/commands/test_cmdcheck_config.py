@@ -401,13 +401,13 @@ class TestPerCommandTokens:
             {
                 "command": "speedtest-cli --simple --no-upload",
                 "name": "Download speed test",
-                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"},
             },
             {
                 "command": "speedtest-cli --simple --no-download",
                 "name": "Upload speed test",
-                "uptime_kuma": {"token": "KumaScoutSpeedtestUploadToken"}
-            }
+                "uptime_kuma": {"token": "KumaScoutSpeedtestUploadToken"},
+            },
         ]
 
         # Should not raise - per-command tokens satisfy requirement
@@ -422,13 +422,13 @@ class TestPerCommandTokens:
             {
                 "command": "speedtest-cli --simple --no-upload",
                 "name": "Download speed test",
-                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"},
             },
             {
                 "command": "speedtest-cli --simple --no-download",
-                "name": "Upload speed test"
+                "name": "Upload speed test",
                 # No per-command token - will use global
-            }
+            },
         ]
 
         # Should not raise
@@ -444,13 +444,13 @@ class TestPerCommandTokens:
             {
                 "command": "speedtest-cli --simple --no-upload",
                 "name": "Download speed test",
-                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"}
+                "uptime_kuma": {"token": "KumaScoutSpeedtestDownloadToken"},
             },
             {
                 "command": "speedtest-cli --simple --no-download",
-                "name": "Upload speed test"
+                "name": "Upload speed test",
                 # Missing per-command token
-            }
+            },
         ]
 
         with pytest.raises(ValueError, match="Command 1 missing uptime_kuma.token"):
@@ -471,10 +471,7 @@ class TestPerCommandTokens:
                 "command": "cmd2",
                 # Missing per-command token
             },
-            {
-                "command": "cmd3",
-                "uptime_kuma": {"token": "token3"}
-            }
+            {"command": "cmd3", "uptime_kuma": {"token": "token3"}},
         ]
 
         with pytest.raises(ValueError, match="Commands 0, 1 missing uptime_kuma.token"):

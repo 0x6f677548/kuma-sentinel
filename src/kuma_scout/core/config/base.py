@@ -284,7 +284,9 @@ class ConfigBase:
         """
         self._apply_field_mappings_from_env()
 
-    def validate(self, validate_tokens: bool = True, validate_heartbeat_token: bool = True) -> None:
+    def validate(
+        self, validate_tokens: bool = True, validate_heartbeat_token: bool = True
+    ) -> None:
         """Validate shared configuration common to all commands.
 
         Logs validation failures and missing values for debugging.
@@ -338,7 +340,9 @@ class ConfigBase:
                 self.logger.error(f"❌ {error_msg}")
             return [error_msg]
 
-    def _validate_and_log_tokens(self, validate_heartbeat_token: bool = True) -> List[str]:
+    def _validate_and_log_tokens(
+        self, validate_heartbeat_token: bool = True
+    ) -> List[str]:
         """Validate heartbeat and command tokens and log results.
 
         Args:

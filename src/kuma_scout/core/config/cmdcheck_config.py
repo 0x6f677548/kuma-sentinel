@@ -120,16 +120,22 @@ class CmdCheckConfig(ConfigBase):
 
         return []
 
-    def validate(self, validate_tokens: bool = True, validate_heartbeat_token: bool = True):
+    def validate(
+        self, validate_tokens: bool = True, validate_heartbeat_token: bool = True
+    ):
         """Validate command check configuration."""
         # For cmdcheck, we always validate URL but handle tokens specially
         # Skip base token validation and do our own
-        super().validate(validate_tokens=False, validate_heartbeat_token=validate_heartbeat_token)
+        super().validate(
+            validate_tokens=False, validate_heartbeat_token=validate_heartbeat_token
+        )
 
         # Custom token validation for cmdcheck (allows per-command tokens)
         token_errors = self._validate_cmdcheck_tokens()
         if token_errors:
-            error_message = "Configuration validation failed:\n  " + "\n  ".join(token_errors)
+            error_message = "Configuration validation failed:\n  " + "\n  ".join(
+                token_errors
+            )
             if self.logger:
                 self.logger.error(
                     f"❌ Configuration validation failed with {len(token_errors)} error(s)"
@@ -191,12 +197,16 @@ class CmdCheckConfig(ConfigBase):
             return []
 
         if len(commands_without_tokens) == 1:
-            return [f"Command {commands_without_tokens[0]} missing uptime_kuma.token "
-                   "(provide global --token or per-command token)"]
+            return [
+                f"Command {commands_without_tokens[0]} missing uptime_kuma.token "
+                "(provide global --token or per-command token)"
+            ]
         else:
             cmd_list = ", ".join(str(i) for i in commands_without_tokens)
-            return [f"Commands {cmd_list} missing uptime_kuma.token "
-                   "(provide global --token or per-command tokens)"]
+            return [
+                f"Commands {cmd_list} missing uptime_kuma.token "
+                "(provide global --token or per-command tokens)"
+            ]
 
     def _command_has_valid_token(self, cmd_config: Dict[str, Any]) -> bool:
         """Check if a command configuration has a valid per-command token.

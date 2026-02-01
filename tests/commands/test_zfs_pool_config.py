@@ -68,7 +68,7 @@ def test_zfs_pool_config_validation_no_pools():
     config.command_token = "token2"
     config.zfspoolstatus_pools = []
 
-    with pytest.raises(ValueError, match="No ZFS pools configured"):
+    with pytest.raises(ValueError, match="No ZFS pools configured \\(use --pools\\)"):
         config.validate()
 
 

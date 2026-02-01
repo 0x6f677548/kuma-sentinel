@@ -197,7 +197,9 @@ class TestValidation:
         config.command_token = "token"
         config.cmdcheck_commands = []
 
-        with pytest.raises(ValueError, match="Must specify at least one command"):
+        with pytest.raises(
+            ValueError, match="Must specify at least one command \\(use --command\\)"
+        ):
             config.validate()
 
     def test_validate_single_command(self, config):

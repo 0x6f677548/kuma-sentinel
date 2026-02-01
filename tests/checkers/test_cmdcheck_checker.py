@@ -172,7 +172,10 @@ class TestPatternMatching:
             assert result.status == "down"
             # Pattern was specified but not found
             assert result.details is not None
-            assert "Success pattern '^HEALTHY$' not found in output: 'Status: UNHEALTHY'" in result.message
+            assert (
+                "Success pattern '^HEALTHY$' not found in output: 'Status: UNHEALTHY'"
+                in result.message
+            )
 
     def test_pattern_precedence_failure_over_success(self, checker):
         """Test failure pattern takes precedence over success pattern."""

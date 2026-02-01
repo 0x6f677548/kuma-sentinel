@@ -127,7 +127,7 @@ class ZfsPoolStatusConfig(ConfigBase):
         errors = []
 
         if not self.zfspoolstatus_pools:
-            errors.append("No ZFS pools configured")
+            errors.append("No ZFS pools configured (use --pools)")
 
         if (
             self.zfspoolstatus_free_space_percent_default < 0

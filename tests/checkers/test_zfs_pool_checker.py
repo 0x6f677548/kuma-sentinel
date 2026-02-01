@@ -266,7 +266,7 @@ class TestZfsPoolStatusChecker:
         result = checker.execute()
 
         assert result.status == "down"
-        assert "No ZFS pools configured" in result.message
+        assert "No ZFS pools configured (use --pools)" in result.message
         assert result.details["error"] == "no_pools"
 
     @patch("kuma_scout.core.checkers.zfs_pool_checker._get_pool_status")

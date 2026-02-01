@@ -42,7 +42,7 @@ class TestConfigBaseLogging:
     """Tests for ConfigBase logging enhancements."""
 
     def test_validate_logs_url_not_provided(self):
-        """Test that URL validation failure is logged."""
+        """Test that URL validation failure raises ValueError."""
         config = SimpleTestConfig()
         logger = MagicMock(spec=logging.Logger)
         config.logger = logger
@@ -56,9 +56,6 @@ class TestConfigBaseLogging:
 
         with pytest.raises(ValueError):
             config.validate()
-
-        # Verify warning was logged
-        logger.warning.assert_called_with("⚠️  Uptime Kuma URL not provided")
 
     def test_validate_logs_invalid_url(self):
         """Test that invalid URL is logged."""
@@ -99,7 +96,7 @@ class TestConfigBaseLogging:
         logger.debug.assert_any_call("✅ Uptime Kuma URL validation passed")
 
     def test_validate_logs_missing_heartbeat_token(self):
-        """Test that missing heartbeat token is logged."""
+        """Test that missing heartbeat token raises ValueError."""
         config = SimpleTestConfig()
         logger = MagicMock(spec=logging.Logger)
         config.logger = logger
@@ -114,11 +111,8 @@ class TestConfigBaseLogging:
         with pytest.raises(ValueError):
             config.validate()
 
-        # Verify warning was logged
-        logger.warning.assert_called_with("⚠️  Heartbeat push token not provided")
-
     def test_validate_logs_missing_command_token(self):
-        """Test that missing command token is logged."""
+        """Test that missing command token raises ValueError."""
         config = SimpleTestConfig()
         logger = MagicMock(spec=logging.Logger)
         config.logger = logger
@@ -132,9 +126,6 @@ class TestConfigBaseLogging:
 
         with pytest.raises(ValueError):
             config.validate()
-
-        # Verify warning was logged
-        logger.warning.assert_called_with("⚠️  Command push token not provided")
 
     def test_validate_logs_all_errors(self):
         """Test that all validation errors are logged with error count."""
@@ -400,7 +391,6 @@ class TestLoggingIntegration:
 
         log_output = log_stream.getvalue()
         assert "URL validation passed" in log_output
-        assert "token configured" in log_output
 
     def test_full_logging_flow_failure(self):
         """Test full logging flow for validation failure."""

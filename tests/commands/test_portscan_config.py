@@ -71,7 +71,9 @@ def test_portscan_config_validation_missing_ip_ranges():
     config.heartbeat_token = "token1"
     config.command_token = "token2"
 
-    with pytest.raises(ValueError, match="No IP ranges specified"):
+    with pytest.raises(
+        ValueError, match="No IP ranges specified \\(use --ip-ranges\\)"
+    ):
         config.validate()
 
 

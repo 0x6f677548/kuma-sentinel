@@ -125,7 +125,7 @@ class ZfsPoolStatusChecker(Checker):
                 return CheckResult(
                     check_name=self.name,
                     status="down",
-                    message=f"[{self.name}] ✗ No ZFS pools configured",
+                    message=f"[{self.name}] ✗ No ZFS pools configured (use --pools)",
                     duration_seconds=int(time.time() - check_start),
                     details={"error": "no_pools"},
                 )

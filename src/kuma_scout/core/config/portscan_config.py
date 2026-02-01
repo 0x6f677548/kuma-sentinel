@@ -167,7 +167,7 @@ class PortscanConfig(ConfigBase):
         errors = []
 
         if not self.portscan_ip_ranges:
-            errors.append("No IP ranges specified")
+            errors.append("No IP ranges specified (use --ip-ranges)")
 
         if self.portscan_nmap_timing not in ["T0", "T1", "T2", "T3", "T4", "T5"]:
             errors.append(

@@ -140,7 +140,7 @@ class CmdCheckConfig(ConfigBase):
         errors: List[str] = []
 
         if not self.cmdcheck_commands:
-            errors.append("Must specify at least one command in 'commands' list")
+            errors.append("Must specify at least one command (use --command)")
 
         return errors
 

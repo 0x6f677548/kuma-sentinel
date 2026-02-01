@@ -662,7 +662,10 @@ class CmdCheckChecker(Checker):
                 matched_str = match.group(0)
                 if len(matched_str) > 50:
                     matched_str = matched_str[:47] + "..."
-                return "down", f"Failure pattern '{failure_pattern}' matched '{matched_str}'"
+                return (
+                    "down",
+                    f"Failure pattern '{failure_pattern}' matched '{matched_str}'",
+                )
 
         # Check success pattern
         if success_pattern:
@@ -671,10 +674,16 @@ class CmdCheckChecker(Checker):
                 matched_str = match.group(0)
                 if len(matched_str) > 50:
                     matched_str = matched_str[:47] + "..."
-                return "up", f"Success pattern '{success_pattern}' matched '{matched_str}'"
+                return (
+                    "up",
+                    f"Success pattern '{success_pattern}' matched '{matched_str}'",
+                )
             # If success pattern provided but doesn't match, it's a failure
             output_snippet = output[:100] + "..." if len(output) > 100 else output
-            return "down", f"Success pattern '{success_pattern}' not found in output: '{output_snippet}'"
+            return (
+                "down",
+                f"Success pattern '{success_pattern}' not found in output: '{output_snippet}'",
+            )
 
         # Fall back to exit code
         if exit_code == expect_exit_code:

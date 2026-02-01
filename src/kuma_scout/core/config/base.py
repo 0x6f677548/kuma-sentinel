@@ -319,9 +319,7 @@ class ConfigBase:
             List of error messages (empty if valid)
         """
         if not self.uptime_kuma_url:
-            error_msg = "Uptime Kuma URL not provided"
-            if self.logger:
-                self.logger.warning(f"⚠️  {error_msg}")
+            error_msg = "Uptime Kuma URL not provided (use --uptime-kuma-url)"
             return [error_msg]
 
         try:
@@ -344,22 +342,12 @@ class ConfigBase:
         errors = []
 
         if not self.heartbeat_token:
-            error_msg = "Heartbeat push token not provided"
+            error_msg = "Heartbeat push token not provided (use --heartbeat-token)"
             errors.append(error_msg)
-            if self.logger:
-                self.logger.warning(f"⚠️  {error_msg}")
-        else:
-            if self.logger:
-                self.logger.debug("✅ Heartbeat push token configured")
 
         if not self.command_token:
-            error_msg = "Command push token not provided"
+            error_msg = "Command push token not provided (use --token)"
             errors.append(error_msg)
-            if self.logger:
-                self.logger.warning(f"⚠️  {error_msg}")
-        else:
-            if self.logger:
-                self.logger.debug("✅ Command push token configured")
 
         return errors
 

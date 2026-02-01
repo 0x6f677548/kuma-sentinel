@@ -158,10 +158,12 @@ class PortscanConfig(ConfigBase):
 
         return None
 
-    def validate(self):
+    def validate(
+        self, validate_tokens: bool = True, validate_heartbeat_token: bool = True
+    ) -> None:
         """Validate portscan configuration."""
         # Validate shared config first (raises if invalid)
-        super().validate()
+        super().validate(validate_tokens, validate_heartbeat_token)
 
         # Validate portscan-specific config
         errors = []

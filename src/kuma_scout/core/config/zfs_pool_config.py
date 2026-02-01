@@ -120,9 +120,11 @@ class ZfsPoolStatusConfig(ConfigBase):
                 )
         return result
 
-    def validate(self):
+    def validate(
+        self, validate_tokens: bool = True, validate_heartbeat_token: bool = True
+    ) -> None:
         """Validate ZFS pool configuration."""
-        super().validate()
+        super().validate(validate_tokens, validate_heartbeat_token)
 
         errors = []
 

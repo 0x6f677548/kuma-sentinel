@@ -110,10 +110,12 @@ class KopiaSnapshotConfig(ConfigBase):
         )
         return mappings
 
-    def validate(self):
+    def validate(
+        self, validate_tokens: bool = True, validate_heartbeat_token: bool = True
+    ) -> None:
         """Validate kopia snapshot configuration."""
         # Validate shared config first (raises if invalid)
-        super().validate()
+        super().validate(validate_tokens, validate_heartbeat_token)
 
         # Validate snapshot paths if any are configured
         # (paths are optional at config time, but will be validated at execution time)

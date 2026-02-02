@@ -38,10 +38,10 @@ heartbeat:
 
 retry:
   # Number of retry attempts for failed commands (default: 0)
-  count: 3
+  attempts: 3
   
   # Delay in seconds between retry attempts (default: 0)
-  delay: 5
+  delay_seconds: 5
 
 # === SSH REMOTE EXECUTION CONFIGURATION ===
 # Configure SSH settings for remote command execution

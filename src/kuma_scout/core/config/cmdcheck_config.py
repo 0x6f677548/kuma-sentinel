@@ -27,12 +27,12 @@ class CmdCheckConfig(ConfigBase):
         self.cmdcheck_success_pattern: Optional[str] = None
         self.cmdcheck_failure_pattern: Optional[str] = None
         self.cmdcheck_sanitize_output = True  # Mask sensitive data by default
-        self.cmdcheck_retry_count = 0
-        self.cmdcheck_retry_delay = 0
+        self.cmdcheck_retry_attempts = 0
+        self.cmdcheck_retry_delay_seconds = 0
 
         # Disable base retry logic since cmdcheck has per-command retries
-        self.retry_count = 0
-        self.retry_delay = 0
+        self.retry_attempts = 0
+        self.retry_delay_seconds = 0
 
     def _get_command_name(self) -> str:
         """Get the command name for command-specific configuration."""
@@ -42,10 +42,10 @@ class CmdCheckConfig(ConfigBase):
         """Get field mappings for command check configuration."""
         mappings = super()._get_field_mappings()
 
-        # Disable CLI arg for base retry_count since cmdcheck uses per-command retries
-        if "retry_count" in mappings:
-            mappings["retry_count"] = FieldMapping(
-                yaml_path="retry_count",
+        # Disable CLI arg for base retry_attempts since cmdcheck uses per-command retries
+        if "retry_attempts" in mappings:
+            mappings["retry_attempts"] = FieldMapping(
+                yaml_path="retry_attempts",
                 converter=int,
             )
 
@@ -80,13 +80,13 @@ class CmdCheckConfig(ConfigBase):
                     yaml_path="cmdcheck.sanitize_output",
                     converter=self._parse_bool,
                 ),
-                "cmdcheck_retry_count": FieldMapping(
-                    yaml_path="cmdcheck.retry.count",
+                "cmdcheck_retry_attempts": FieldMapping(
+                    yaml_path="cmdcheck.retry.attempts",
                     arg_key="retry_count",
                     converter=int,
                 ),
-                "cmdcheck_retry_delay": FieldMapping(
-                    yaml_path="cmdcheck.retry.delay",
+                "cmdcheck_retry_delay_seconds": FieldMapping(
+                    yaml_path="cmdcheck.retry.delay_seconds",
                     arg_key="retry_delay",
                     converter=int,
                 ),
@@ -154,25 +154,18 @@ class CmdCheckConfig(ConfigBase):
             validate_tokens=False, validate_heartbeat_token=validate_heartbeat_token
         )
 
-        if self.cmdcheck_retry_count < 0:
+        if self.cmdcheck_retry_attempts < 0:
             raise ValueError(
-                f"cmdcheck_retry_count must be non-negative, got {self.cmdcheck_retry_count}"
+                f"cmdcheck_retry_attempts must be non-negative, got {self.cmdcheck_retry_attempts}"
             )
-        if self.cmdcheck_retry_delay < 0:
+        if self.cmdcheck_retry_delay_seconds < 0:
             raise ValueError(
-                f"cmdcheck_retry_delay must be non-negative, got {self.cmdcheck_retry_delay}"
+                f"cmdcheck_retry_delay_seconds must be non-negative, got {self.cmdcheck_retry_delay_seconds}"
             )
 
         # Validate per-command retry settings
         for idx, cmd_config in enumerate(self.cmdcheck_commands):
-            if "retry_count" in cmd_config and cmd_config["retry_count"] < 0:
-                raise ValueError(
-                    f"Command {idx} retry_count must be non-negative, got {cmd_config['retry_count']}"
-                )
-            if "retry_delay" in cmd_config and cmd_config["retry_delay"] < 0:
-                raise ValueError(
-                    f"Command {idx} retry_delay must be non-negative, got {cmd_config['retry_delay']}"
-                )
+            self._validate_command_retry_config(idx, cmd_config)
 
         # Custom token validation for cmdcheck (allows per-command tokens)
         token_errors = self._validate_cmdcheck_tokens()
@@ -416,6 +409,29 @@ class CmdCheckConfig(ConfigBase):
             errors.append(f"Command {idx} uptime_kuma.token must be a non-empty string")
 
         return errors
+
+    def _validate_command_retry_config(
+        self, idx: int, cmd_config: Dict[str, Any]
+    ) -> None:
+        """Validate per-command retry configuration."""
+        if "retry" in cmd_config:
+            retry_config = cmd_config["retry"]
+            if isinstance(retry_config, dict):
+                if "attempts" in retry_config and retry_config["attempts"] < 0:
+                    raise ValueError(
+                        f"Command {idx} retry.attempts must be non-negative, got {retry_config['attempts']}"
+                    )
+                if (
+                    "delay_seconds" in retry_config
+                    and retry_config["delay_seconds"] < 0
+                ):
+                    raise ValueError(
+                        f"Command {idx} retry.delay_seconds must be non-negative, got {retry_config['delay_seconds']}"
+                    )
+            else:
+                raise ValueError(
+                    f"Command {idx} retry must be a dictionary with 'attempts' and 'delay_seconds' keys"
+                )
 
     def get_summary(self) -> dict:
         """Get command check configuration summary for logging.

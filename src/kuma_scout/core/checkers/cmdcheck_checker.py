@@ -363,13 +363,13 @@ class CmdCheckChecker(Checker):
         )
 
         # Get retry settings
-        retry_count = self.config.cmdcheck_retry_count
+        retry_count = self.config.cmdcheck_retry_attempts
         if "retry" in cmd_config and isinstance(cmd_config["retry"], dict):
-            retry_count = cmd_config["retry"].get("count", retry_count)
+            retry_count = cmd_config["retry"].get("attempts", retry_count)
 
-        retry_delay = self.config.cmdcheck_retry_delay
+        retry_delay = self.config.cmdcheck_retry_delay_seconds
         if "retry" in cmd_config and isinstance(cmd_config["retry"], dict):
-            retry_delay = cmd_config["retry"].get("delay", retry_delay)
+            retry_delay = cmd_config["retry"].get("delay_seconds", retry_delay)
 
         # Get per-command token or use global
         command_token = None

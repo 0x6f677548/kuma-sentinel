@@ -62,8 +62,8 @@ class ConfigBase:
         self.logger = logger or get_logger()
 
         # Retry configuration
-        self.retry_count = 0
-        self.retry_delay = 0
+        self.retry_attempts = 0
+        self.retry_delay_seconds = 0
 
         # SSH configuration for remote execution
         self.ssh_host: Optional[str] = None
@@ -173,13 +173,13 @@ class ConfigBase:
                 yaml_path="logging.ignore_file_permissions",
                 converter=self._parse_bool,
             ),
-            "retry_count": FieldMapping(
-                yaml_path="retry.count",
+            "retry_attempts": FieldMapping(
+                yaml_path="retry.attempts",
                 arg_key="retry_count",
                 converter=int,
             ),
-            "retry_delay": FieldMapping(
-                yaml_path="retry.delay",
+            "retry_delay_seconds": FieldMapping(
+                yaml_path="retry.delay_seconds",
                 arg_key="retry_delay",
                 converter=int,
             ),
@@ -315,10 +315,14 @@ class ConfigBase:
         errors = []
 
         # Validate retry settings
-        if self.retry_count < 0:
-            errors.append(f"retry_count must be non-negative, got {self.retry_count}")
-        if self.retry_delay < 0:
-            errors.append(f"retry_delay must be non-negative, got {self.retry_delay}")
+        if self.retry_attempts < 0:
+            errors.append(
+                f"retry_attempts must be non-negative, got {self.retry_attempts}"
+            )
+        if self.retry_delay_seconds < 0:
+            errors.append(
+                f"retry_delay_seconds must be non-negative, got {self.retry_delay_seconds}"
+            )
 
         # Validate URL
         url_errors = self._validate_and_log_url()

@@ -230,31 +230,31 @@ class Checker(ABC):
         """Execute the check with retry logic."""
         self.logger.info(f"▶️  Executing {self.name} check")
         result = None
-        for attempt in range(self.config.retry_count + 1):
+        for attempt in range(self.config.retry_attempts + 1):
             try:
                 result = self.execute()
                 if result.status == "up":
                     break
                 else:
-                    if attempt < self.config.retry_count:
+                    if attempt < self.config.retry_attempts:
                         self.logger.warning(
-                            f"Check failed (status: {result.status}), retrying in {self.config.retry_delay}s "
-                            f"(attempt {attempt + 1}/{self.config.retry_count + 1})"
+                            f"Check failed (status: {result.status}), retrying in {self.config.retry_delay_seconds}s "
+                            f"(attempt {attempt + 1}/{self.config.retry_attempts + 1})"
                         )
-                        time.sleep(self.config.retry_delay)
+                        time.sleep(self.config.retry_delay_seconds)
             except Exception as e:
-                if attempt < self.config.retry_count:
+                if attempt < self.config.retry_attempts:
                     sanitized_error = DataSanitizer.sanitize_error_message(e)
                     self.logger.warning(
-                        f"Check failed with exception, retrying in {self.config.retry_delay}s "
-                        f"(attempt {attempt + 1}/{self.config.retry_count + 1}): {sanitized_error}"
+                        f"Check failed with exception, retrying in {self.config.retry_delay_seconds}s "
+                        f"(attempt {attempt + 1}/{self.config.retry_attempts + 1}): {sanitized_error}"
                     )
-                    time.sleep(self.config.retry_delay)
+                    time.sleep(self.config.retry_delay_seconds)
                 else:
                     raise
         if result is None:
             raise RuntimeError(
-                f"{self.name} check failed after {self.config.retry_count + 1} attempts"
+                f"{self.name} check failed after {self.config.retry_attempts + 1} attempts"
             )
         self.logger.info(f"✅ {self.name} check completed with status: {result.status}")
         return result

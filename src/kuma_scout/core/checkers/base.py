@@ -229,7 +229,9 @@ class Checker(ABC):
     def _execute_with_retry(self) -> CheckResult:
         """Execute the check with retry logic."""
         self.logger.info(f"▶️  Executing {self.name} check")
-        self.logger.debug(f"🔄 Retry config: attempts={self.config.retry_attempts}, delay={self.config.retry_delay_seconds}s")
+        self.logger.debug(
+            f"🔄 Retry config: attempts={self.config.retry_attempts}, delay={self.config.retry_delay_seconds}s"
+        )
         result = None
         for attempt in range(self.config.retry_attempts + 1):
             try:

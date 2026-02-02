@@ -584,7 +584,9 @@ class CmdCheckChecker(Checker):
         ) = self._parse_command_config(cmd_config, idx)
 
         self.logger.debug(f"Running command {idx + 1}: {name}")
-        self.logger.debug(f"🔄 Command retry config: attempts={retry_count}, delay={retry_delay}s")
+        self.logger.debug(
+            f"🔄 Command retry config: attempts={retry_count}, delay={retry_delay}s"
+        )
 
         # Parse command once - syntax errors are permanent and don't need retrying
         try:

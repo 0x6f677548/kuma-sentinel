@@ -114,6 +114,7 @@ All commands support `--ssh user@host` for remote execution. SSH settings config
 - always update readme.md if there are macro changes
 - update doc/CONFIGURATION_GUIDE.md for any config changes
 - update doc/DEVELOPMENT.MD for any changes to development workflow or the main architecture (writing new commands, checkers, etc)
+- make sure to update example.config.yaml for any config changes
 
 ## backward compatibility
 - don't worry about backward compatibility unless explicitly instructed

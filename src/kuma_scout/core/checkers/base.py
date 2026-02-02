@@ -253,10 +253,10 @@ class Checker(ABC):
                 else:
                     raise
         if result is None:
-            raise RuntimeError(f"{self.name} check failed after {self.config.retry_count + 1} attempts")
-        self.logger.info(
-            f"✅ {self.name} check completed with status: {result.status}"
-        )
+            raise RuntimeError(
+                f"{self.name} check failed after {self.config.retry_count + 1} attempts"
+            )
+        self.logger.info(f"✅ {self.name} check completed with status: {result.status}")
         return result
 
     def _send_heartbeat_completion(self, result: CheckResult) -> None:

@@ -32,6 +32,17 @@ heartbeat:
     # Push token for heartbeat monitor
     token: your_heartbeat_token_here
 
+# === RETRY CONFIGURATION ===
+# Configure retry behavior for failed commands
+# Applies to all commands unless overridden per-command
+
+retry:
+  # Number of retry attempts for failed commands (default: 0)
+  count: 3
+  
+  # Delay in seconds between retry attempts (default: 0)
+  delay: 5
+
 # === SSH REMOTE EXECUTION CONFIGURATION ===
 # Configure SSH settings for remote command execution
 # All commands support SSH remote execution

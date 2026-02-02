@@ -259,13 +259,15 @@ cmdcheck:
 **YAML Configuration:**
 ```yaml
 cmdcheck:
-  retry_count: 3                           # Global retry count for all commands
-  retry_delay: 5                           # Delay in seconds between retries
+  retry:
+    count: 3                              # Global retry count for all commands
+    delay: 5                              # Delay in seconds between retries
   commands:
     - command: "curl -s https://api.example.com/health"
       name: api_check
-      retry_count: 5                       # Per-command override
-      retry_delay: 10                      # Per-command delay override
+      retry:
+        count: 5                          # Per-command override
+        delay: 10                         # Per-command delay override
 ```
 
 **CLI Configuration:**
@@ -436,8 +438,9 @@ cmdcheck:
       expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
       success_pattern: null                  # Optional: per-command success pattern
       failure_pattern: null                  # Optional: per-command failure pattern
-      retry_count: 0                         # Optional: per-command retry count (inherits from defaults if omitted)
-      retry_delay: 0                         # Optional: per-command retry delay (inherits from defaults if omitted)
+      retry:
+        count: 0                             # Optional: per-command retry count (inherits from defaults if omitted)
+        delay: 0                             # Optional: per-command retry delay (inherits from defaults if omitted)
       uptime_kuma:
         token: "per-command-token"           # Optional: per-command token (overrides global token)
   
@@ -446,8 +449,9 @@ cmdcheck:
   expect_exit_code: 0                        # Default expected exit code (0-255, default 0)
   success_pattern: null                      # Default success pattern (optional)
   failure_pattern: null                      # Default failure pattern (optional, takes precedence)
-  retry_count: 0                             # Default number of retries (0 = no retries)
-  retry_delay: 0                             # Default delay between retries in seconds
+  retry:
+    count: 0                                 # Default number of retries (0 = no retries)
+    delay: 0                                 # Default delay between retries in seconds
   sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
   
   uptime_kuma:

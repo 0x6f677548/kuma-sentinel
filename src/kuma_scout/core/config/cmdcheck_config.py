@@ -41,14 +41,14 @@ class CmdCheckConfig(ConfigBase):
     def _get_field_mappings(self) -> Dict[str, FieldMapping]:
         """Get field mappings for command check configuration."""
         mappings = super()._get_field_mappings()
-        
+
         # Disable CLI arg for base retry_count since cmdcheck uses per-command retries
         if "retry_count" in mappings:
             mappings["retry_count"] = FieldMapping(
                 yaml_path="retry_count",
                 converter=int,
             )
-        
+
         mappings.update(
             {
                 "cmdcheck_commands": FieldMapping(
@@ -81,12 +81,12 @@ class CmdCheckConfig(ConfigBase):
                     converter=self._parse_bool,
                 ),
                 "cmdcheck_retry_count": FieldMapping(
-                    yaml_path="cmdcheck.retry_count",
+                    yaml_path="cmdcheck.retry.count",
                     arg_key="retry_count",
                     converter=int,
                 ),
                 "cmdcheck_retry_delay": FieldMapping(
-                    yaml_path="cmdcheck.retry_delay",
+                    yaml_path="cmdcheck.retry.delay",
                     arg_key="retry_delay",
                     converter=int,
                 ),
@@ -155,16 +155,24 @@ class CmdCheckConfig(ConfigBase):
         )
 
         if self.cmdcheck_retry_count < 0:
-            raise ValueError(f"cmdcheck_retry_count must be non-negative, got {self.cmdcheck_retry_count}")
+            raise ValueError(
+                f"cmdcheck_retry_count must be non-negative, got {self.cmdcheck_retry_count}"
+            )
         if self.cmdcheck_retry_delay < 0:
-            raise ValueError(f"cmdcheck_retry_delay must be non-negative, got {self.cmdcheck_retry_delay}")
+            raise ValueError(
+                f"cmdcheck_retry_delay must be non-negative, got {self.cmdcheck_retry_delay}"
+            )
 
         # Validate per-command retry settings
         for idx, cmd_config in enumerate(self.cmdcheck_commands):
             if "retry_count" in cmd_config and cmd_config["retry_count"] < 0:
-                raise ValueError(f"Command {idx} retry_count must be non-negative, got {cmd_config['retry_count']}")
+                raise ValueError(
+                    f"Command {idx} retry_count must be non-negative, got {cmd_config['retry_count']}"
+                )
             if "retry_delay" in cmd_config and cmd_config["retry_delay"] < 0:
-                raise ValueError(f"Command {idx} retry_delay must be non-negative, got {cmd_config['retry_delay']}")
+                raise ValueError(
+                    f"Command {idx} retry_delay must be non-negative, got {cmd_config['retry_delay']}"
+                )
 
         # Custom token validation for cmdcheck (allows per-command tokens)
         token_errors = self._validate_cmdcheck_tokens()

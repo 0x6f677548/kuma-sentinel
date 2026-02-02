@@ -338,7 +338,11 @@ class CmdCheckChecker(Checker):
                 details={},
             )
 
-    def _parse_command_config(self, cmd_config: Dict[str, Any], idx: int) -> Tuple[str, str, float, int, Optional[str], Optional[str], int, float, Optional[str]]:
+    def _parse_command_config(
+        self, cmd_config: Dict[str, Any], idx: int
+    ) -> Tuple[
+        str, str, float, int, Optional[str], Optional[str], int, float, Optional[str]
+    ]:
         """Parse command configuration and return setup variables."""
         command = cmd_config.get("command", "")
         name = cmd_config.get("name", f"cmd_{idx}")
@@ -357,17 +361,36 @@ class CmdCheckChecker(Checker):
         failure_pattern = cmd_config.get(
             "failure_pattern", self.config.cmdcheck_failure_pattern
         )
-        retry_count = cmd_config.get("retry_count", self.config.cmdcheck_retry_count)
-        retry_delay = cmd_config.get("retry_delay", self.config.cmdcheck_retry_delay)
+
+        # Get retry settings
+        retry_count = self.config.cmdcheck_retry_count
+        if "retry" in cmd_config and isinstance(cmd_config["retry"], dict):
+            retry_count = cmd_config["retry"].get("count", retry_count)
+
+        retry_delay = self.config.cmdcheck_retry_delay
+        if "retry" in cmd_config and isinstance(cmd_config["retry"], dict):
+            retry_delay = cmd_config["retry"].get("delay", retry_delay)
 
         # Get per-command token or use global
         command_token = None
         if "uptime_kuma" in cmd_config and isinstance(cmd_config["uptime_kuma"], dict):
             command_token = cmd_config["uptime_kuma"].get("token")
 
-        return command, name, timeout, expect_exit_code, success_pattern, failure_pattern, retry_count, retry_delay, command_token
+        return (
+            command,
+            name,
+            timeout,
+            expect_exit_code,
+            success_pattern,
+            failure_pattern,
+            retry_count,
+            retry_delay,
+            command_token,
+        )
 
-    def _parse_command_string(self, command: str, name: str, cmd_start: float, command_token: Optional[str]) -> List[str]:
+    def _parse_command_string(
+        self, command: str, name: str, cmd_start: float, command_token: Optional[str]
+    ) -> List[str]:
         """Parse command string and handle syntax errors."""
         try:
             return shlex.split(command)
@@ -378,10 +401,22 @@ class CmdCheckChecker(Checker):
             raise ValueError(f"Invalid command syntax: {sanitized_error}") from e
 
     def _handle_command_result(
-        self, success: bool, stdout: Optional[str], stderr: Optional[str], returncode: int,
-        command: str, name: str, cmd_start: float, command_token: Optional[str],
-        timeout: float, expect_exit_code: int, success_pattern: Optional[str],
-        failure_pattern: Optional[str], attempt: int, retry_count: int, retry_delay: float
+        self,
+        success: bool,
+        stdout: Optional[str],
+        stderr: Optional[str],
+        returncode: int,
+        command: str,
+        name: str,
+        cmd_start: float,
+        command_token: Optional[str],
+        timeout: float,
+        expect_exit_code: int,
+        success_pattern: Optional[str],
+        failure_pattern: Optional[str],
+        attempt: int,
+        retry_count: int,
+        retry_delay: float,
     ) -> Optional[Tuple[Dict[str, Any], Optional[str]]]:
         """Handle command execution result and return if final, None to retry."""
         output = (stdout or "") + (stderr or "")
@@ -395,10 +430,14 @@ class CmdCheckChecker(Checker):
                 sanitized_output = output
                 if self.config.cmdcheck_sanitize_output:
                     sanitized_output = DataSanitizer.sanitize_output(output)
-                self.logger.warning(f"Command {name} failed with SSH error, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1}): {sanitized_output}")
+                self.logger.warning(
+                    f"Command {name} failed with SSH error, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1}): {sanitized_output}"
+                )
                 time.sleep(retry_delay)
                 return None
-            return self._create_ssh_failure_result(command, name, returncode, output, cmd_start, command_token)
+            return self._create_ssh_failure_result(
+                command, name, returncode, output, cmd_start, command_token
+            )
 
         output_truncated = output[-500:] if len(output) > 500 else output
 
@@ -436,11 +475,20 @@ class CmdCheckChecker(Checker):
             return cmd_result, failure_msg
         else:
             # attempt < retry_count, retry
-            self.logger.warning(f"Command {name} failed ({message}), retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1})")
+            self.logger.warning(
+                f"Command {name} failed ({message}), retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1})"
+            )
             time.sleep(retry_delay)
             return None
 
-    def _create_timeout_result(self, command: str, name: str, timeout: float, cmd_start: float, command_token: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _create_timeout_result(
+        self,
+        command: str,
+        name: str,
+        timeout: float,
+        cmd_start: float,
+        command_token: Optional[str],
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Create result for timeout failures."""
         duration = time.time() - cmd_start
         return (
@@ -456,7 +504,14 @@ class CmdCheckChecker(Checker):
             f"{name}[{command}] (timeout)",
         )
 
-    def _create_exception_result(self, command: str, name: str, exception: Exception, cmd_start: float, command_token: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _create_exception_result(
+        self,
+        command: str,
+        name: str,
+        exception: Exception,
+        cmd_start: float,
+        command_token: Optional[str],
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Create result for general exception failures."""
         duration = time.time() - cmd_start
         sanitized_error = DataSanitizer.sanitize_error_message(exception)
@@ -473,7 +528,15 @@ class CmdCheckChecker(Checker):
             f"{name}[{command}] ({sanitized_error})",
         )
 
-    def _create_ssh_failure_result(self, command: str, name: str, returncode: int, output: str, cmd_start: float, command_token: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _create_ssh_failure_result(
+        self,
+        command: str,
+        name: str,
+        returncode: int,
+        output: str,
+        cmd_start: float,
+        command_token: Optional[str],
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Create result for SSH connection failures."""
         duration = time.time() - cmd_start
 
@@ -508,7 +571,17 @@ class CmdCheckChecker(Checker):
             Tuple of (result_dict, failure_message_or_none)
         """
         cmd_start = time.time()
-        command, name, timeout, expect_exit_code, success_pattern, failure_pattern, retry_count, retry_delay, command_token = self._parse_command_config(cmd_config, idx)
+        (
+            command,
+            name,
+            timeout,
+            expect_exit_code,
+            success_pattern,
+            failure_pattern,
+            retry_count,
+            retry_delay,
+            command_token,
+        ) = self._parse_command_config(cmd_config, idx)
 
         self.logger.debug(f"Running command {idx + 1}: {name}")
 
@@ -533,26 +606,49 @@ class CmdCheckChecker(Checker):
 
         for attempt in range(retry_count + 1):
             try:
-                success, stdout, stderr, returncode = self.run_command(args, timeout=int(timeout) if timeout else None)
+                success, stdout, stderr, returncode = self.run_command(
+                    args, timeout=int(timeout) if timeout else None
+                )
                 result = self._handle_command_result(
-                    success, stdout, stderr, returncode, command, name, cmd_start, command_token,
-                    timeout, expect_exit_code, success_pattern, failure_pattern, attempt, retry_count, retry_delay
+                    success,
+                    stdout,
+                    stderr,
+                    returncode,
+                    command,
+                    name,
+                    cmd_start,
+                    command_token,
+                    timeout,
+                    expect_exit_code,
+                    success_pattern,
+                    failure_pattern,
+                    attempt,
+                    retry_count,
+                    retry_delay,
                 )
                 if result is not None:
                     return result
             except subprocess.TimeoutExpired:
                 if attempt < retry_count:
-                    self.logger.warning(f"Command {name} timed out, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1})")
+                    self.logger.warning(
+                        f"Command {name} timed out, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1})"
+                    )
                     time.sleep(retry_delay)
                     continue
-                return self._create_timeout_result(command, name, timeout, cmd_start, command_token)
+                return self._create_timeout_result(
+                    command, name, timeout, cmd_start, command_token
+                )
             except Exception as e:
                 if attempt < retry_count:
                     sanitized_error = DataSanitizer.sanitize_error_message(e)
-                    self.logger.warning(f"Command {name} failed with exception, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1}): {sanitized_error}")
+                    self.logger.warning(
+                        f"Command {name} failed with exception, retrying in {retry_delay}s (attempt {attempt+1}/{retry_count+1}): {sanitized_error}"
+                    )
                     time.sleep(retry_delay)
                     continue
-                return self._create_exception_result(command, name, e, cmd_start, command_token)
+                return self._create_exception_result(
+                    command, name, e, cmd_start, command_token
+                )
 
         # Fallback return - should never be reached due to retry logic above
         duration = time.time() - cmd_start

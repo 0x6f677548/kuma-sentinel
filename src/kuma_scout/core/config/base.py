@@ -174,12 +174,12 @@ class ConfigBase:
                 converter=self._parse_bool,
             ),
             "retry_count": FieldMapping(
-                yaml_path="retry_count",
+                yaml_path="retry.count",
                 arg_key="retry_count",
                 converter=int,
             ),
             "retry_delay": FieldMapping(
-                yaml_path="retry_delay",
+                yaml_path="retry.delay",
                 arg_key="retry_delay",
                 converter=int,
             ),

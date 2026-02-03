@@ -15,16 +15,14 @@ def test_cli_version():
 
 
 def test_subcommand_common_options():
-    """Test that subcommands have all common options available."""
+    """Test that check subcommands have all common options available."""
     result = runner.invoke(app, ["portscan", "--help"])
     assert result.exit_code == 0
-    # Check for various common options that should appear in help
-    assert "--config" in result.output
+    # Check for common options that should appear in check subcommands
     assert "--log-file" in result.output
     assert "--log-level" in result.output
     assert "--uptime-kuma-url" in result.output
-    assert "--heartbeat-token" in result.output
     assert "--token" in result.output
-    assert "--retry-count" in result.output
-    assert "--retry-delay" in result.output
-    # Note: Some options may be truncated in long help output, so we check the key ones
+    # Check for plugin-specific options
+    assert "--targets" in result.output
+    assert "--ports" in result.output

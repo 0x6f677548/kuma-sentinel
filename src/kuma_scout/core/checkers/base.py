@@ -94,9 +94,9 @@ class Checker(ABC):
                 target += f":{self.config.ssh_port}"
             self.logger.debug(f"🔌 Running command on {target}: {' '.join(cmd)}")
             try:
-                success, stdout, stderr = self._ssh_runner.run(cmd)
-                # SSH returns success boolean, map to exit code
-                return success, stdout, stderr, 0 if success else 1
+                success, stdout, stderr, exit_code = self._ssh_runner.run(cmd)
+                # SSH returns success boolean and exit code
+                return success, stdout, stderr, exit_code
             except SSHConnectionError as e:
                 self.logger.error(f"🔌 SSH connection failed: {e.message}")
                 return False, "", f"SSH connection failed: {e.message}", -1

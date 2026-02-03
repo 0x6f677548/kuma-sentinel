@@ -120,10 +120,11 @@ class TestSSHRunner:
         mock_run.return_value = mock_result
 
         runner = SSHRunner(host="host")
-        success, stdout, stderr = runner.run(["echo", "test"])
+        success, stdout, stderr, exit_code = runner.run(["echo", "test"])
         assert success
         assert stdout == "output"
         assert stderr == "error"
+        assert exit_code == 0
         mock_run.assert_called_once()
 
     @patch("subprocess.run")
@@ -136,10 +137,11 @@ class TestSSHRunner:
         mock_run.return_value = mock_result
 
         runner = SSHRunner(host="host")
-        success, stdout, stderr = runner.run(["bad", "command"])
+        success, stdout, stderr, exit_code = runner.run(["bad", "command"])
         assert not success
         assert stdout == ""
         assert stderr == "command failed"
+        assert exit_code == 1
 
     @patch("subprocess.run")
     def test_run_timeout(self, mock_run):
@@ -149,10 +151,11 @@ class TestSSHRunner:
         mock_run.side_effect = TimeoutExpired(["ssh"], 30)
 
         runner = SSHRunner(host="host", timeout=30)
-        success, stdout, stderr = runner.run(["slow", "command"])
+        success, stdout, stderr, exit_code = runner.run(["slow", "command"])
         assert not success
         assert stdout == ""
         assert stderr == "Command timed out after 30s"
+        assert exit_code == -1
 
     @patch("subprocess.run")
     def test_run_exception(self, mock_run):
@@ -160,10 +163,11 @@ class TestSSHRunner:
         mock_run.side_effect = Exception("network error")
 
         runner = SSHRunner(host="host")
-        success, stdout, stderr = runner.run(["command"])
+        success, stdout, stderr, exit_code = runner.run(["command"])
         assert not success
         assert stdout == ""
         assert stderr == "network error"
+        assert exit_code == -1
 
     @patch("subprocess.run")
     def test_run_with_password(self, mock_run):

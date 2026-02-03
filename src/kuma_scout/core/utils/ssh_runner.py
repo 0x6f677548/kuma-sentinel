@@ -163,16 +163,21 @@ class SSHRunner:
         stderr_lower = stderr.lower()
         return any(pattern in stderr_lower for pattern in connection_error_patterns)
 
-    def run(self, cmd: List[str]) -> Tuple[bool, str, str]:
+    def run(
+        self, cmd: List[str], timeout: Optional[int] = None
+    ) -> Tuple[bool, str, str, int]:
         """Run command via SSH.
 
         Args:
             cmd: Command to execute on remote host as list of arguments
+            timeout: Optional timeout override in seconds
 
         Returns:
-            Tuple of (success: bool, stdout: str, stderr: str)
+            Tuple of (success: bool, stdout: str, stderr: str, exit_code: int)
         """
         ssh_cmd = self.build_ssh_command(cmd)
+
+        timeout = timeout or self.timeout
 
         # If password is provided, use sshpass (if available)
         if self.password:
@@ -209,13 +214,18 @@ class SSHRunner:
                     raise SSHConnectionError(
                         result.stderr or "Connection failed", result.stderr
                     )
-                return result.returncode == 0, result.stdout, result.stderr
+                return (
+                    result.returncode == 0,
+                    result.stdout,
+                    result.stderr,
+                    result.returncode,
+                )
             except subprocess.TimeoutExpired:
-                return False, "", f"Command timed out after {self.timeout}s"
+                return False, "", f"Command timed out after {timeout}s", -1
             except SSHConnectionError:
                 raise  # Re-raise SSH connection errors
             except Exception as e:
-                return False, "", str(e)
+                return False, "", str(e), -1
 
         # No password - use standard SSH
         try:
@@ -230,13 +240,18 @@ class SSHRunner:
                 raise SSHConnectionError(
                     result.stderr or "Connection failed", result.stderr
                 )
-            return result.returncode == 0, result.stdout, result.stderr
+            return (
+                result.returncode == 0,
+                result.stdout,
+                result.stderr,
+                result.returncode,
+            )
         except subprocess.TimeoutExpired:
-            return False, "", f"Command timed out after {self.timeout}s"
+            return False, "", f"Command timed out after {timeout}s", -1
         except SSHConnectionError:
             raise  # Re-raise SSH connection errors
         except Exception as e:
-            return False, "", str(e)
+            return False, "", str(e), -1
 
 
 def parse_ssh_shorthand(ssh: Optional[str]) -> Tuple[Optional[str], Optional[str]]:

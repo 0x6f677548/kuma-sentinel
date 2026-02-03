@@ -802,7 +802,7 @@ class TestSSHExecution:
 
         # Mock SSHRunner to return our mock
         mock_ssh_runner = MagicMock()
-        mock_ssh_runner.run.return_value = (True, "output", "")
+        mock_ssh_runner.run.return_value = (True, "output", "", 0)
 
         with patch(
             "kuma_scout.core.checkers.base.SSHRunner", return_value=mock_ssh_runner

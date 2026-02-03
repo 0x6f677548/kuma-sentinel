@@ -48,8 +48,11 @@ def _add_file_handler(logger: logging.Logger, log_file: str) -> None:
 
     Args:
         logger: Logger instance to add handler to
-        log_file: Path to log file
+        log_file: Path to log file (None to skip file logging)
     """
+    if not log_file:
+        return  # Skip file logging if no file specified
+
     try:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)

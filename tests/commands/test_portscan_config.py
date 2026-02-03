@@ -10,17 +10,17 @@ from kuma_scout.core.config.portscan_config import PortscanConfig
 
 
 def _set_test_env_vars():
-    os.environ['HEARTBEAT_TOKEN'] = 'test_heartbeat_token'
-    os.environ['CMDCHECK_TOKEN'] = 'test_cmdcheck_token'
-    os.environ['POSTGRESQL_TOKEN'] = 'test_postgresql_token'
-    os.environ['WEB_TOKEN'] = 'test_web_token'
-    os.environ['DB_TOKEN'] = 'test_db_token'
-    os.environ['REMOTE_WEB_TOKEN'] = 'test_remote_web_token'
-    os.environ['REMOTE_DB_TOKEN'] = 'test_remote_db_token'
-    os.environ['BACKUP_TOKEN'] = 'test_backup_token'
-    os.environ['PORTSCAN_TOKEN'] = 'test_portscan_token'
-    os.environ['KOPIA_TOKEN'] = 'test_kopia_token'
-    os.environ['ZFS_TOKEN'] = 'test_zfs_token'
+    os.environ["HEARTBEAT_TOKEN"] = "test_heartbeat_token"
+    os.environ["CMDCHECK_TOKEN"] = "test_cmdcheck_token"
+    os.environ["POSTGRESQL_TOKEN"] = "test_postgresql_token"
+    os.environ["WEB_TOKEN"] = "test_web_token"
+    os.environ["DB_TOKEN"] = "test_db_token"
+    os.environ["REMOTE_WEB_TOKEN"] = "test_remote_web_token"
+    os.environ["REMOTE_DB_TOKEN"] = "test_remote_db_token"
+    os.environ["BACKUP_TOKEN"] = "test_backup_token"
+    os.environ["PORTSCAN_TOKEN"] = "test_portscan_token"
+    os.environ["KOPIA_TOKEN"] = "test_kopia_token"
+    os.environ["ZFS_TOKEN"] = "test_zfs_token"
 
 
 def test_portscan_config_factory():
@@ -610,17 +610,18 @@ class TestConfigPrecedence:
 
     def _set_test_env_vars(self):
         import os
-        os.environ['HEARTBEAT_TOKEN'] = 'test_heartbeat_token'
-        os.environ['CMDCHECK_TOKEN'] = 'test_cmdcheck_token'
-        os.environ['POSTGRESQL_TOKEN'] = 'test_postgresql_token'
-        os.environ['WEB_TOKEN'] = 'test_web_token'
-        os.environ['DB_TOKEN'] = 'test_db_token'
-        os.environ['REMOTE_WEB_TOKEN'] = 'test_remote_web_token'
-        os.environ['REMOTE_DB_TOKEN'] = 'test_remote_db_token'
-        os.environ['BACKUP_TOKEN'] = 'test_backup_token'
-        os.environ['PORTSCAN_TOKEN'] = 'test_portscan_token'
-        os.environ['KOPIA_TOKEN'] = 'test_kopia_token'
-        os.environ['ZFS_TOKEN'] = 'test_zfs_token'
+
+        os.environ["HEARTBEAT_TOKEN"] = "test_heartbeat_token"
+        os.environ["CMDCHECK_TOKEN"] = "test_cmdcheck_token"
+        os.environ["POSTGRESQL_TOKEN"] = "test_postgresql_token"
+        os.environ["WEB_TOKEN"] = "test_web_token"
+        os.environ["DB_TOKEN"] = "test_db_token"
+        os.environ["REMOTE_WEB_TOKEN"] = "test_remote_web_token"
+        os.environ["REMOTE_DB_TOKEN"] = "test_remote_db_token"
+        os.environ["BACKUP_TOKEN"] = "test_backup_token"
+        os.environ["PORTSCAN_TOKEN"] = "test_portscan_token"
+        os.environ["KOPIA_TOKEN"] = "test_kopia_token"
+        os.environ["ZFS_TOKEN"] = "test_zfs_token"
 
     def test_yaml_preserved_when_typer_empty_tuple_provided(self):
         """Test that YAML values are not overridden by Typer's empty tuple from multiple=True.
@@ -639,7 +640,11 @@ class TestConfigPrecedence:
         config = PortscanConfig()
         self._set_test_env_vars()
         config.load_from_yaml("example.config.yaml")
-        assert config.portscan_ip_ranges == ["192.168.100.110-199", "10.0.0.0/24", "192.168.1.0/24"]
+        assert config.portscan_ip_ranges == [
+            "192.168.100.110-199",
+            "10.0.0.0/24",
+            "192.168.1.0/24",
+        ]
         assert config.portscan_exclude == []
 
         # Simulate Typer's behavior when multiple=True option not provided
@@ -661,7 +666,9 @@ class TestConfigPrecedence:
 
         # YAML values should be preserved
         assert config.portscan_ip_ranges == [
-            "192.168.100.110-199", "10.0.0.0/24", "192.168.1.0/24"
+            "192.168.100.110-199",
+            "10.0.0.0/24",
+            "192.168.1.0/24",
         ], "ip_ranges from YAML should not be overridden by empty tuple from CLI"
         assert (
             config.portscan_exclude == []
@@ -673,7 +680,11 @@ class TestConfigPrecedence:
         config = PortscanConfig()
         self._set_test_env_vars()
         config.load_from_yaml("example.config.yaml")
-        assert config.portscan_ip_ranges == ["192.168.100.110-199", "10.0.0.0/24", "192.168.1.0/24"]
+        assert config.portscan_ip_ranges == [
+            "192.168.100.110-199",
+            "10.0.0.0/24",
+            "192.168.1.0/24",
+        ]
 
         # Simulate Typer providing actual arguments (as tuples)
         args_from_typer = {

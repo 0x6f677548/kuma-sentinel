@@ -98,6 +98,7 @@ All commands support `--ssh user@host` for remote execution. SSH settings config
 - write tests for new features and changes
 - always use hatch to run tests
 - keep code coverage above 90% when possible.
+- if needing an yaml config file for tests, use pytest's tmp_path fixture to create it on the fly or the existing example.config.yaml in the root folder. never use the test.config.yaml file
 ## code style
 - adhere to existing coding style and patterns
 - ensure proper typing and docstrings for new code

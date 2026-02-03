@@ -30,18 +30,7 @@ heartbeat:
   
   uptime_kuma:
     # Push token for heartbeat monitor
-    token: your_heartbeat_token_here
-
-# === RETRY CONFIGURATION ===
-# Configure retry behavior for failed commands
-# Applies to all commands unless overridden per-command
-
-retry:
-  # Number of retry attempts for failed commands (default: 0)
-  attempts: 3
-  
-  # Delay in seconds between retry attempts (default: 0)
-  delay_seconds: 5
+    token: "${HEARTBEAT_TOKEN}"
 
 # === SSH REMOTE EXECUTION CONFIGURATION ===
 # Configure SSH settings for remote command execution
@@ -75,7 +64,7 @@ cmdcheck:
   uptime_kuma:
     # Push token for cmdcheck command (aggregated results for commands without per-token)
     # Can reference environment variables: token: "${CMDCHECK_TOKEN}"
-    token: your_cmdcheck_token_here
+    token: "${CMDCHECK_TOKEN}"
   
   # Command-specific SSH override (optional)
   # If not specified, uses global SSH configuration
@@ -110,20 +99,74 @@ cmdcheck:
       timeout: 10
       expect_exit_code: 0
       uptime_kuma:
-        token: your_postgresql_monitor_token_here
+        token: "${POSTGRESQL_TOKEN}"
+    
+    # Advanced examples: Mixed local + SSH with per-command tokens
+    - command: "systemctl is-active nginx"
+      name: "local_web_server"
+      timeout: 10
+      uptime_kuma:
+        token: "${WEB_TOKEN}"
+    
+    - command: "systemctl is-active postgresql"
+      name: "local_database"
+      timeout: 15
+      uptime_kuma:
+        token: "${DB_TOKEN}"
+    
+    # Remote services with SSH overrides
+    - command: "systemctl is-active apache2"
+      name: "remote_web_server"
+      timeout: 10
+      ssh:
+        connection: web-server.prod.example.com
+      uptime_kuma:
+        token: "${REMOTE_WEB_TOKEN}"
+    
+    - command: "systemctl is-active mysql"
+      name: "remote_database"
+      timeout: 15
+      ssh:
+        connection: db-server.prod.example.com
+        key_file: /etc/kuma-scout/prod_db_key
+      uptime_kuma:
+        token: "${REMOTE_DB_TOKEN}"
+    
+    # Backup server with different SSH and retry
+    - command: "test -f /backups/latest.tar.gz"
+      name: "backup_integrity"
+      timeout: 30
+      retry:
+        attempts: 3
+        delay_seconds: 5
+      ssh:
+        connection: backup@nas.prod.example.com:2222
+        key_file: /etc/kuma-scout/backup_key
+      uptime_kuma:
+        token: "${BACKUP_TOKEN}"
+    
+    # Routine checks without per-token
+    - command: "test -d /var/log"
+      name: "log_directory_check"
+      timeout: 5
+    
+    - command: "uptime"
+      name: "system_load"
+      timeout: 5
     
     # ✅ SUPPORTED: Pattern matching on output
-    # - command: "systemctl status nginx"
-    #   name: "nginx_detailed"
-    #   failure_pattern: "failed|error"
-    #   success_pattern: "active.*running"
-    #   timeout: 10
+    - command: "systemctl status nginx"
+      name: "nginx_detailed"
+      failure_pattern: "failed|error"
+      success_pattern: "active.*running"
+      timeout: 10
     
     # ❌ NOT SUPPORTED: Shell pipes, operators, substitution
     # ❌ DON'T USE: "systemctl is-active nginx | grep active"
     # ❌ DON'T USE: "systemctl is-active nginx && echo 'OK'"
     # ❌ DON'T USE: "echo $(whoami)"
-    # See CONFIGURATION_GUIDE.md for how to handle complex commands
+    # For complex commands, use scripts: command: "/path/to/check_script.sh"
+    # See CONFIGURATION_GUIDE.md for supported command syntax and migration guide.
   
   # Default timeout for all commands in seconds (used if not specified per-command)
   timeout: 30
@@ -140,86 +183,12 @@ cmdcheck:
   success_pattern: null
   failure_pattern: null
 
-# === ADVANCED CMDCHECK EXAMPLE: Mixed Local + SSH with Per-Command Tokens ===
-# This example shows how to monitor services across multiple servers with different tokens
-# Local commands use default SSH config, remote commands override SSH settings
-# Each critical service gets its own Uptime Kuma monitor via per-command tokens
-
-cmdcheck_advanced:
-  uptime_kuma:
-    # Global token for aggregated results (commands without per-token)
-    # Can reference environment variables: token: "${INFRA_TOKEN}"
-    token: your_infrastructure_monitor_token_here
-
-  # Global SSH config (used by commands without per-command SSH override)
-  ssh:
-    connection: infrastructure-server.local
-
-  commands:
-    # Local services (no SSH override = uses global SSH config above)
-    - command: "systemctl is-active nginx"
-      name: "local_web_server"
-      timeout: 10
-      uptime_kuma:
-        # Can reference environment variables: token: "${WEB_TOKEN}"
-        token: your_web_monitor_token_here
-
-    - command: "systemctl is-active postgresql"
-      name: "local_database"
-      timeout: 15
-      uptime_kuma:
-        # Can reference environment variables: token: "${DB_TOKEN}"
-        token: your_database_monitor_token_here
-
-    # Remote services (per-command SSH override)
-    - command: "systemctl is-active apache2"
-      name: "remote_web_server"
-      timeout: 10
-      ssh:
-        connection: web-server.prod.example.com
-      uptime_kuma:
-        # Can reference environment variables: token: "${REMOTE_WEB_TOKEN}"
-        token: your_remote_web_monitor_token_here
-
-    - command: "systemctl is-active mysql"
-      name: "remote_database"
-      timeout: 15
-      ssh:
-        connection: db-server.prod.example.com
-        key_file: /etc/kuma-scout/prod_db_key
-      uptime_kuma:
-        # Can reference environment variables: token: "${REMOTE_DB_TOKEN}"
-        token: your_remote_db_monitor_token_here
-
-    # Backup server (different SSH user/key)
-    - command: "test -f /backups/latest.tar.gz"
-      name: "backup_integrity"
-      timeout: 30
-      ssh:
-        connection: backup@nas.prod.example.com:2222
-        key_file: /etc/kuma-scout/backup_key
-      uptime_kuma:
-        token: your_backup_monitor_token_here
-
-    # Routine checks (no per-command token = only in aggregated results)
-    - command: "test -d /var/log"
-      name: "log_directory_check"
-      timeout: 5
-
-    - command: "uptime"
-      name: "system_load"
-      timeout: 5
-
-  timeout: 30
-  expect_exit_code: 0
-  sanitize_output: true
-
 # === PORT SCAN COMMAND CONFIGURATION ===
 
 portscan:
   uptime_kuma:
     # Push token for port scan alert monitor
-    token: your_portscan_token_here
+    token: "${PORTSCAN_TOKEN}"
   
   # Command-specific SSH override (optional)
   ssh:
@@ -250,13 +219,15 @@ portscan:
   # Example: ["192.168.1.0/24", "10.0.0.0/8"]
   ip_ranges:
     - 192.168.100.110-199
+    - 10.0.0.0/24
+    - 192.168.1.0/24
 
 # === KOPIA SNAPSHOT COMMAND CONFIGURATION ===
 
 kopiasnapshotstatus:
   uptime_kuma:
     # Push token for kopia snapshot status alerts
-    token: your_kopiasnapshotstatus_token_here
+    token: "${KOPIA_TOKEN}"
   
   # Command-specific SSH override (optional)
   ssh:
@@ -281,7 +252,7 @@ kopiasnapshotstatus:
 zfspoolstatus:
   uptime_kuma:
     # Push token for ZFS pool status alerts
-    token: your_zfspoolstatus_token_here
+    token: "${ZFS_TOKEN}"
   
   # Command-specific SSH override (optional)
   ssh:
@@ -294,7 +265,8 @@ zfspoolstatus:
       free_space_percent_min: 10      # Alert if less than 10% free
     - name: backup
       free_space_percent_min: 20      # Alert if less than 20% free
-    # - name: archive                  # Will use global default
+    - name: archive
+      free_space_percent_min: 5       # Alert if less than 5% free
   
   # Global default minimum free space percentage (default: 10)
   # Used for pools without explicit threshold

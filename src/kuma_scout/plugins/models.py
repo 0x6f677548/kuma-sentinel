@@ -69,7 +69,9 @@ class GlobalConfig(BaseModel):
     These settings apply to all checks unless overridden.
     """
 
-    uptime_kuma: Optional[UptimeKumaConfig] = Field(default=None, description="Uptime Kuma settings")
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None, description="Uptime Kuma settings"
+    )
     logging: LoggingConfig = Field(
         default_factory=lambda: LoggingConfig(), description="Logging settings"
     )

@@ -15,7 +15,9 @@ from ..plugins.base import CheckConfig
 from ..plugins.models import GlobalConfig
 
 
-def load_config(config_path: str, ignore_file_permissions: bool = False) -> Tuple[GlobalConfig, List[Tuple[str, dict]]]:
+def load_config(
+    config_path: str, ignore_file_permissions: bool = False
+) -> Tuple[GlobalConfig, List[Tuple[str, dict]]]:
     """
     Load and validate configuration from YAML file.
 
@@ -39,6 +41,7 @@ def load_config(config_path: str, ignore_file_permissions: bool = False) -> Tupl
     # Check file permissions unless ignored
     if not ignore_file_permissions:
         import stat
+
         file_stat = config_file.stat()
         # Check if file is world-readable or group-readable when it shouldn't be
         if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):

@@ -288,81 +288,63 @@ class CLIGenerator:
 
         return run_command
 
-    def generate_list_command(self) -> Callable:
-        """Generate the 'list' command for listing plugins and checks."""
+    def generate_list_plugins_command(self) -> Callable:
+        """Generate the 'list-plugins' command for listing available plugins."""
 
-        def list_command(
-            # Global options (also available via @app.callback(), but can be overridden per command)
-            log_level: str = typer.Option("INFO", "--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR)"),
-            log_file: Optional[str] = typer.Option(None, "--log-file", help="Log file path"),
-            uptime_kuma_url: Optional[str] = typer.Option(None, "--uptime-kuma-url", help="Uptime Kuma push API URL"),
-            token: Optional[str] = typer.Option(None, "--token", help="Uptime Kuma push token"),
-            heartbeat_token: Optional[str] = typer.Option(None, "--heartbeat-token", help="Uptime Kuma token for heartbeat"),
-            timeout: int = typer.Option(300, "--timeout", help="Global timeout for checks (seconds)"),
-            ssh: Optional[str] = typer.Option(None, "--ssh", help="SSH host (user@host or host)"),
-            ssh_key_file: Optional[str] = typer.Option(None, "--ssh-key-file", help="SSH private key file path"),
-            ssh_password: Optional[str] = typer.Option(None, "--ssh-password", help="SSH password"),
-            ssh_strict_host_key_checking: bool = typer.Option(True, "--ssh-strict-host-key-checking", help="Enable strict SSH host key checking"),
-            ssh_no_strict_host_key_checking: bool = typer.Option(False, "--ssh-no-strict-host-key-checking", help="Disable strict SSH host key checking"),
-            # Command-specific options
-            target: str = typer.Argument(
-                ..., help="What to list: 'plugins' or 'checks'"
-            ),
-            config: Optional[str] = typer.Option(
-                None, "--config", help="Config file (required for 'checks')"
-            ),
+        def list_plugins_command() -> None:
+            """List available plugins."""
+            # Initialize default logging
+            setup_default_logging()
+
+            plugins = get_all_plugins()
+            print("Available plugins:")
+            for plugin_type, plugin_class in sorted(plugins.items()):
+                print(f"  - {plugin_type}: {plugin_class.description}")
+
+        return list_plugins_command
+
+    def generate_list_checks_command(self) -> Callable:
+        """Generate the 'list-checks' command for listing checks in a config file."""
+
+        def list_checks_command(
+            config: str = typer.Option(..., "--config", help="Config file path"),
             tag: Optional[List[str]] = typer.Option(
-                None, "--tag", help="Filter checks by tag"
+                None, "--tag", help="Filter by tag (can be used multiple times)"
             ),
             name: Optional[List[str]] = typer.Option(
-                None, "--name", help="Filter checks by name"
+                None, "--name", help="Filter by check name (can be used multiple times)"
             ),
             plugin_type: Optional[List[str]] = typer.Option(
-                None, "--type", help="Filter checks by plugin type"
+                None, "--type", help="Filter by plugin type (can be used multiple times)"
             ),
             ignore_file_permissions: bool = typer.Option(
                 False, "--ignore-file-permissions", help="Ignore file permission checks on config file"
             ),
         ) -> None:
-            """List available plugins or checks in a config file."""
+            """List checks available in a configuration file."""
             # Initialize default logging
             setup_default_logging()
 
-            # Setup logging based on options
-            logger = setup_logging(log_file, log_level)
-
-            if target == "plugins":
-                plugins = get_all_plugins()
-                logger.info("Available plugins:")
-                for plugin_type, plugin_class in sorted(plugins.items()):
-                    logger.info(f"  - {plugin_type}: {plugin_class.description}")
-            elif target == "checks":
-                if not config:
-                    logger.error("Error: --config is required when listing checks")
-                    raise typer.Exit(1)
-
-                try:
-                    global_config, checks = load_config(
-                        config,
-                        ignore_file_permissions=ignore_file_permissions
-                    )
-                except ValueError as e:
-                    logger.error(f"Configuration error: {e}")
-                    raise typer.Exit(1) from e
-                filtered_checks = self._filter_checks(
-                    checks, tag, name, plugin_type, None
+            try:
+                global_config, checks = load_config(
+                    config,
+                    ignore_file_permissions=ignore_file_permissions
                 )
+            except ValueError as e:
+                print(f"Configuration error: {e}")
+                raise typer.Exit(1) from e
 
-                logger.info(f"Checks in {config}:")
-                for check_type, check_config in filtered_checks:
-                    tags = check_config.get("tags", [])
-                    tags_str = f" [{', '.join(tags)}]" if tags else ""
-                    logger.info(f"  - {check_config['name']} ({check_type}){tags_str}")
-            else:
-                logger.error(f"Error: Unknown target '{target}'. Use 'plugins' or 'checks'.")
-                raise typer.Exit(1)
+            filtered_checks = self._filter_checks(
+                checks, tag, name, plugin_type, None
+            )
 
-        return list_command
+            print(f"Checks in {config}:")
+            for check_type, check_config in filtered_checks:
+                tags = check_config.get("tags", [])
+                tags_str = f" [{', '.join(tags)}]" if tags else ""
+                print(f"  - {check_config['name']} ({check_type}){tags_str}")
+
+        return list_checks_command
 
     def generate_check_commands(self) -> List[Callable]:
         """Generate individual 'check <type>' subcommands for each plugin."""
@@ -464,18 +446,16 @@ class CLIGenerator:
                     )
                     new_params.append(param)
                 continue
-            elif field_name in ['tags', 'uptime_kuma']:  # Optional fields
-                if field_name == 'tags':
-                    param = inspect.Parameter(
-                        field_name,
-                        inspect.Parameter.KEYWORD_ONLY,
-                        default=typer.Option(None, f"--{field_name.replace('_', '-')}", help=field_info.description),
-                        annotation=Optional[List[str]]
-                    )
-                    new_params.append(param)
-                elif field_name == 'uptime_kuma':
-                    # Skip uptime_kuma as it's handled globally
-                    continue
+            elif field_name in ['uptime_kuma']:  # Optional fields
+                # Skip uptime_kuma as it's handled globally
+                continue
+
+            # Skip tags for individual check commands - tags are for filtering multiple checks
+            if field_name == 'tags':
+                continue
+
+            # Skip snapshots for individual check commands - it's for YAML config only
+            if field_name == 'snapshots':
                 continue
 
             # Handle other fields based on type
@@ -483,12 +463,13 @@ class CLIGenerator:
             default_value = field_info.default if not field_info.is_required() else None
 
             if hasattr(field_type, '__origin__') and field_type.__origin__ is list:
-                # List types - use string and let Pydantic handle conversion
+                # List types - use List[str] with multiple values
+                from typing import List
                 param = inspect.Parameter(
                     field_name,
                     inspect.Parameter.KEYWORD_ONLY,
-                    default=typer.Option(default_value, f"--{field_name.replace('_', '-')}", help=field_info.description),
-                    annotation=str
+                    default=typer.Option(None, f"--{field_name.replace('_', '-')}", help=field_info.description),
+                    annotation=List[str]
                 )
             elif field_type is str:
                 param = inspect.Parameter(
@@ -536,10 +517,10 @@ class CLIGenerator:
             inspect.Parameter('ssh_strict_host_key_checking', inspect.Parameter.KEYWORD_ONLY, default=typer.Option(True, "--ssh-strict-host-key-checking", help="Enable strict SSH host key checking")),
             inspect.Parameter('ssh_no_strict_host_key_checking', inspect.Parameter.KEYWORD_ONLY, default=typer.Option(False, "--ssh-no-strict-host-key-checking", help="Disable strict SSH host key checking")),
         ]
-        
+
         # Add plugin-specific parameters
         all_params = base_params + new_params
-        
+
         # Create new signature
         new_sig = inspect.Signature(all_params)
         check_command.__signature__ = new_sig

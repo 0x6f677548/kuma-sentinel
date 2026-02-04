@@ -23,7 +23,9 @@ class PortscanConfig(CheckConfig):
     timeout: int = Field(default=3600, ge=1, description="Scan timeout in seconds")
     exclude: List[str] = Field(default_factory=list, description="Hosts to exclude")
     timing: str = Field(default="T3", description="Nmap timing template")
-    arguments: List[str] = Field(default_factory=list, description="Additional nmap arguments")
+    arguments: List[str] = Field(
+        default_factory=list, description="Additional nmap arguments"
+    )
     keep_xml: bool = Field(default=False, description="Keep XML output file")
 
 
@@ -50,13 +52,17 @@ class PortscanPlugin(Plugin):
             self.logger.info(f"🔍 Running: {' '.join(cmd)}")
 
             # Run nmap scan
-            success, stdout, stderr, exit_code = self.run_command(cmd, timeout=config.timeout)
+            success, stdout, stderr, exit_code = self.run_command(
+                cmd, timeout=config.timeout
+            )
 
             if success:
                 self.logger.info("✅ Nmap scan completed successfully")
 
                 # Parse results
-                hosts_with_ports = self._parse_nmap_xml(nmap_xml) if os.path.exists(nmap_xml) else []
+                hosts_with_ports = (
+                    self._parse_nmap_xml(nmap_xml) if os.path.exists(nmap_xml) else []
+                )
 
                 scan_duration = int(time.time() - scan_start)
 
@@ -102,18 +108,26 @@ class PortscanPlugin(Plugin):
             )
         finally:
             # Cleanup XML file
-            if 'nmap_xml' in locals() and nmap_xml and os.path.exists(nmap_xml) and not config.keep_xml:
+            if (
+                "nmap_xml" in locals()
+                and nmap_xml
+                and os.path.exists(nmap_xml)
+                and not config.keep_xml
+            ):
                 try:
                     os.remove(nmap_xml)
                     self.logger.debug(f"🗑️  Cleaned up temporary file: {nmap_xml}")
                 except OSError as e:
-                    self.logger.warning(f"⚠️  Failed to cleanup temporary file {nmap_xml}: {e}")
+                    self.logger.warning(
+                        f"⚠️  Failed to cleanup temporary file {nmap_xml}: {e}"
+                    )
 
     def _build_nmap_command(self, config: PortscanConfig) -> List[str]:
         """Build the nmap command."""
         cmd = [
             "nmap",
-            "-p", config.ports,
+            "-p",
+            config.ports,
             f"-{config.timing}",
         ]
 
@@ -128,6 +142,7 @@ class PortscanPlugin(Plugin):
     def _create_nmap_xml_file(self) -> str:
         """Create temporary file for nmap XML output."""
         import tempfile
+
         fd, path = tempfile.mkstemp(suffix=".xml", text=True)
         os.chmod(path, 0o600)
         os.close(fd)

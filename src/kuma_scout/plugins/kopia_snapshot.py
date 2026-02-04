@@ -8,7 +8,7 @@ import json
 import re
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 from pydantic import Field
 
@@ -19,8 +19,8 @@ from .base import CheckConfig, Plugin
 class KopiaSnapshotConfig(CheckConfig):
     """Configuration for kopia snapshot plugin."""
 
-    snapshots: List[Dict[str, Any]] = Field(default_factory=list, description="List of snapshots to check")
-    max_age_hours: int = Field(default=24, ge=1, description="Default maximum age in hours")
+    path: str = Field(..., description="Snapshot path to check")
+    max_age_hours: int = Field(default=24, ge=1, description="Maximum age in hours")
 
 
 class KopiaSnapshotPlugin(Plugin):
@@ -37,91 +37,64 @@ class KopiaSnapshotPlugin(Plugin):
         try:
             self.logger.info("🔍 Starting Kopia snapshot status check")
 
-            if not config.snapshots:
-                self.logger.error("❌ No snapshots configured")
+            if not config.path:
+                self.logger.error("❌ No snapshot path configured")
                 return CheckResult(
                     check_name=config.name,
                     status="down",
-                    message="No snapshots configured",
+                    message="No snapshot path configured",
                     duration_seconds=int(time.time() - check_start),
-                    details={"error": "no_snapshots"},
+                    details={"error": "no_path"},
                 )
 
-            # Check each snapshot
-            all_results: Dict[str, tuple[bool, Optional[float], Optional[Dict]]] = {}
-            failed_paths: List[str] = []
-            old_snapshots: List[tuple[str, float, int, Optional[Dict]]] = []
+            # Validate path format
+            try:
+                self._validate_snapshot_path(config.path)
+            except ValueError as e:
+                self.logger.error(f"❌ Invalid snapshot path configuration: {str(e)}")
+                return CheckResult(
+                    check_name=config.name,
+                    status="down",
+                    message=f"Invalid snapshot path: {str(e)}",
+                    duration_seconds=int(time.time() - check_start),
+                    details={"error": str(e), "path": config.path},
+                )
 
-            for snapshot_config in config.snapshots:
-                path = snapshot_config.get("path")
-                if not path:
-                    self.logger.warning("⚠️  Snapshot config missing 'path' field, skipping")
-                    continue
+            self.logger.info(f"📋 Checking snapshot path: {config.path} (max age: {config.max_age_hours}h)")
 
-                # Validate path format
-                try:
-                    self._validate_snapshot_path(path)
-                except ValueError as e:
-                    self.logger.error(f"❌ Invalid snapshot path configuration: {str(e)}")
-                    failed_paths.append(path)
-                    continue
+            # Get snapshot info
+            age_hours, metadata = self._get_snapshot_info(config.path)
 
-                # Get per-path max_age_hours or use default
-                max_age_hours = snapshot_config.get("max_age_hours", config.max_age_hours)
+            if age_hours is None:
+                self.logger.error(f"❌ Failed to get snapshot info for {config.path}")
+                return CheckResult(
+                    check_name=config.name,
+                    status="down",
+                    message=f"Failed to get snapshot info for {config.path}",
+                    duration_seconds=int(time.time() - check_start),
+                    details={"error": "failed_to_get_info", "path": config.path},
+                )
 
-                self.logger.info(f"📋 Checking snapshot path: {path} (max age: {max_age_hours}h)")
-
-                # Get snapshot info
-                age_hours, metadata = self._get_snapshot_info(path)
-
-                if age_hours is None:
-                    failed_paths.append(path)
-                    continue
-
-                all_results[path] = (True, age_hours, metadata)
-
-                # Check if snapshot is too old
-                if age_hours <= max_age_hours:
-                    self.logger.info(f"✅ OK ({path}): {age_hours:.1f}h <= {max_age_hours}h")
-                else:
-                    self.logger.warning(f"⚠️  TOO OLD ({path}): {age_hours:.1f}h > {max_age_hours}h")
-                    old_snapshots.append((path, age_hours, max_age_hours, metadata))
-
-            # Determine overall result
+            # Check if snapshot is too old
             check_duration = int(time.time() - check_start)
 
-            if failed_paths:
-                failed_str = ", ".join(failed_paths)
-                self.logger.error(f"❌ Failed to check snapshots: {failed_str}")
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Failed to check snapshots: {failed_str}",
-                    duration_seconds=check_duration,
-                    details={"failed_paths": failed_paths},
-                )
-            elif old_snapshots:
-                old_info = []
-                for path, age, max_age, _metadata in old_snapshots:
-                    old_info.append(f"{path} ({age:.1f}h old, max {max_age}h)")
-                    self.logger.warning(f"⚠️  Old snapshot: {path} is {age:.1f}h old (max {max_age}h)")
-
-                old_str = "; ".join(old_info)
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Old snapshots found: {old_str}",
-                    duration_seconds=check_duration,
-                    details={"old_snapshots": old_snapshots},
-                )
-            else:
-                self.logger.info("✅ All snapshots are fresh")
+            if age_hours <= config.max_age_hours:
+                self.logger.info(f"✅ OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h")
                 return CheckResult(
                     check_name=config.name,
                     status="up",
-                    message="All snapshots are fresh",
+                    message=f"Snapshot is fresh ({age_hours:.1f}h old)",
                     duration_seconds=check_duration,
-                    details={"checked_snapshots": len(all_results)},
+                    details={"age_hours": age_hours, "max_age_hours": config.max_age_hours, "path": config.path},
+                )
+            else:
+                self.logger.warning(f"⚠️  TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h")
+                return CheckResult(
+                    check_name=config.name,
+                    status="down",
+                    message=f"Snapshot is too old ({age_hours:.1f}h > {config.max_age_hours}h)",
+                    duration_seconds=check_duration,
+                    details={"age_hours": age_hours, "max_age_hours": config.max_age_hours, "path": config.path},
                 )
 
         except Exception as e:
@@ -132,7 +105,7 @@ class KopiaSnapshotPlugin(Plugin):
                 status="down",
                 message=f"Snapshot check error: {str(e)}",
                 duration_seconds=check_duration,
-                details={"error": str(e)},
+                details={"error": str(e), "path": config.path},
             )
 
     def _validate_snapshot_path(self, path: str) -> None:

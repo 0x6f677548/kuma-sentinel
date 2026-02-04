@@ -20,7 +20,9 @@ class CmdCheckConfig(CheckConfig):
     """Configuration for command check plugin."""
 
     command: str = Field(description="Shell command to execute")
-    expect_exit_code: int = Field(default=0, description="Expected exit code for success")
+    expect_exit_code: int = Field(
+        default=0, description="Expected exit code for success"
+    )
     success_pattern: Optional[str] = Field(
         default=None, description="Regex pattern that indicates success"
     )
@@ -53,15 +55,15 @@ class CmdCheckPlugin(Plugin):
             duration = time.time() - start_time
 
             # Sanitize output if requested
-            sanitize_output = getattr(config, 'sanitize_output', True)
+            sanitize_output = getattr(config, "sanitize_output", True)
             if sanitize_output:
                 stdout = DataSanitizer.sanitize(stdout)
                 stderr = DataSanitizer.sanitize(stderr)
 
             # Determine success based on exit code and patterns
-            expect_exit_code = getattr(config, 'expect_exit_code', 0)
-            success_pattern = getattr(config, 'success_pattern', None)
-            failure_pattern = getattr(config, 'failure_pattern', None)
+            expect_exit_code = getattr(config, "expect_exit_code", 0)
+            success_pattern = getattr(config, "success_pattern", None)
+            failure_pattern = getattr(config, "failure_pattern", None)
 
             is_success = exit_code == expect_exit_code
 

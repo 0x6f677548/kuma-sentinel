@@ -112,7 +112,9 @@ class Plugin(ABC):
             heartbeat_config.interval,
             check_name=self.name,
         )
-        self.logger.debug(f"✅ Heartbeat initialized (interval: {heartbeat_config.interval}s)")
+        self.logger.debug(
+            f"✅ Heartbeat initialized (interval: {heartbeat_config.interval}s)"
+        )
 
     def _initialize_ssh(self) -> None:
         """Initialize SSH runner if SSH is configured in global config."""
@@ -128,7 +130,9 @@ class Plugin(ABC):
             password=ssh_config.password,
             strict_host_key_checking=ssh_config.strict_host_key_checking,
         )
-        self.logger.debug(f"🔌 SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}")
+        self.logger.debug(
+            f"🔌 SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}"
+        )
 
     def execute_with_heartbeat(self, config: CheckConfig) -> CheckResult:
         """Execute check with automatic heartbeat management.
@@ -153,7 +157,9 @@ class Plugin(ABC):
             raise
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ {self.name} check failed with unexpected error: {sanitized_error}")
+            self.logger.error(
+                f"❌ {self.name} check failed with unexpected error: {sanitized_error}"
+            )
             raise
         finally:
             self._stop_heartbeat()
@@ -169,7 +175,9 @@ class Plugin(ABC):
     def _execute_with_retry(self, config: CheckConfig) -> CheckResult:
         """Execute the check with retry logic."""
         self.logger.info(f"▶️  Executing {self.name} check")
-        self.logger.debug(f"🔄 Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s")
+        self.logger.debug(
+            f"🔄 Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s"
+        )
 
         result = None
         for attempt in range(config.retry.attempts + 1):
@@ -196,7 +204,9 @@ class Plugin(ABC):
                     raise
 
         if result is None:
-            raise RuntimeError(f"{self.name} check failed after {config.retry.attempts + 1} attempts")
+            raise RuntimeError(
+                f"{self.name} check failed after {config.retry.attempts + 1} attempts"
+            )
 
         self.logger.info(f"✅ {self.name} check completed with status: {result.status}")
         return result
@@ -205,7 +215,9 @@ class Plugin(ABC):
         """Send heartbeat completion message."""
         if self.heartbeat:
             status_emoji = "✅" if result.status == "up" else "❌"
-            self.logger.debug(f"📤 Sending heartbeat completion message for {self.name}")
+            self.logger.debug(
+                f"📤 Sending heartbeat completion message for {self.name}"
+            )
             self.heartbeat.send_message(
                 f"{status_emoji} {self.name} completed in {result.duration_seconds}s"
             )

@@ -8,7 +8,7 @@ monitoring plugins must inherit from.
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import ClassVar, Optional, Type
+from typing import ClassVar, Optional, Type, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -258,6 +258,9 @@ class Plugin(ABC):
         timeout = timeout or 30
 
         if self.ssh_runner:
+            assert (
+                self.global_config.ssh is not None
+            )  # Since ssh_runner is set only when ssh config exists
             target = f"{self.global_config.ssh.user or 'current_user'}@{self.global_config.ssh.host}"
             if self.global_config.ssh.port != 22:
                 target += f":{self.global_config.ssh.port}"
@@ -302,7 +305,11 @@ class Plugin(ABC):
         """
         # Start with global config
         effective = {
-            "uptime_kuma": self.global_config.uptime_kuma.model_dump(),
+            "uptime_kuma": (
+                self.global_config.uptime_kuma.model_dump()
+                if self.global_config.uptime_kuma
+                else None
+            ),
             "ssh": (
                 self.global_config.ssh.model_dump() if self.global_config.ssh else None
             ),
@@ -312,9 +319,11 @@ class Plugin(ABC):
 
         # Apply check-specific overrides
         if check_config.uptime_kuma:
-            effective["uptime_kuma"].update(
-                check_config.uptime_kuma.model_dump(exclude_unset=True)
-            )
+            check_dict = check_config.uptime_kuma.model_dump(exclude_unset=True)
+            if effective["uptime_kuma"]:
+                cast(dict, effective["uptime_kuma"]).update(check_dict)
+            else:
+                effective["uptime_kuma"] = check_dict
 
         # Note: SSH overrides would be handled here if needed
 

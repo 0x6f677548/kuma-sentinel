@@ -17,7 +17,9 @@ class ZfsPoolConfig(CheckConfig):
     """Configuration for ZFS pool plugin."""
 
     pool: str = Field(..., description="Name of the ZFS pool to check")
-    min_free_percent: int = Field(default=10, ge=1, le=99, description="Minimum free space percentage")
+    min_free_percent: int = Field(
+        default=10, ge=1, le=99, description="Minimum free space percentage"
+    )
 
 
 class ZfsPoolPlugin(Plugin):
@@ -64,13 +66,19 @@ class ZfsPoolPlugin(Plugin):
 
             # Check health status
             if health != "ONLINE":
-                self.logger.warning(f"⚠️  Pool '{config.pool}' health is {health} (not ONLINE)")
+                self.logger.warning(
+                    f"⚠️  Pool '{config.pool}' health is {health} (not ONLINE)"
+                )
                 return CheckResult(
                     check_name=config.name,
                     status="down",
                     message=f"Pool '{config.pool}' is not healthy (status: {health})",
                     duration_seconds=check_duration,
-                    details={"health": health, "free_percent": free_percent, "pool": config.pool},
+                    details={
+                        "health": health,
+                        "free_percent": free_percent,
+                        "pool": config.pool,
+                    },
                 )
 
             # Check free space threshold
@@ -83,16 +91,28 @@ class ZfsPoolPlugin(Plugin):
                     status="down",
                     message=f"Pool '{config.pool}' low on space ({free_percent:.1f}% free < {config.min_free_percent}%)",
                     duration_seconds=check_duration,
-                    details={"health": health, "free_percent": free_percent, "min_free_percent": config.min_free_percent, "pool": config.pool},
+                    details={
+                        "health": health,
+                        "free_percent": free_percent,
+                        "min_free_percent": config.min_free_percent,
+                        "pool": config.pool,
+                    },
                 )
             else:
-                self.logger.info(f"✅ Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%")
+                self.logger.info(
+                    f"✅ Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%"
+                )
                 return CheckResult(
                     check_name=config.name,
                     status="up",
                     message=f"Pool '{config.pool}' is healthy ({free_percent:.1f}% free)",
                     duration_seconds=check_duration,
-                    details={"health": health, "free_percent": free_percent, "min_free_percent": config.min_free_percent, "pool": config.pool},
+                    details={
+                        "health": health,
+                        "free_percent": free_percent,
+                        "min_free_percent": config.min_free_percent,
+                        "pool": config.pool,
+                    },
                 )
 
         except Exception as e:

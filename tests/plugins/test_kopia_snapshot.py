@@ -1,0 +1,112 @@
+"""Tests for kopia_snapshot plugin."""
+
+import json
+from unittest.mock import patch
+
+import pytest
+
+from kuma_scout.plugins.kopia_snapshot import KopiaSnapshotConfig, KopiaSnapshotPlugin
+from kuma_scout.plugins.models import GlobalConfig
+
+
+@pytest.fixture
+def global_config():
+    """Create basic global config."""
+    return GlobalConfig(
+        uptime_kuma={"url": "http://localhost:3001/api/push", "token": "global-token"},
+        logging={"level": "INFO"},
+    )
+
+
+@pytest.fixture
+def plugin(global_config):
+    """Create kopia_snapshot plugin instance."""
+    return KopiaSnapshotPlugin(global_config=global_config)
+
+
+@pytest.fixture
+def config():
+    """Create basic kopia snapshot config."""
+    return KopiaSnapshotConfig(
+        name="test-snapshot",
+        path="user@host:/path/to/repo",
+        max_age_hours=24,
+    )
+
+
+class TestKopiaSnapshotExecution:
+    """Test kopia snapshot plugin execution."""
+
+    def test_recent_snapshot_success(self, plugin, config):
+        """Test successful check with recent snapshot."""
+        mock_output = {
+            "snapshots": [
+                {
+                    "startTime": "2024-01-01T12:00:00Z",
+                    "endTime": "2024-01-01T12:05:00Z",
+                    "rootEntry": {"name": "test"},
+                }
+            ]
+        }
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, json.dumps(mock_output), "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "up"
+            assert "Snapshot is recent" in result.message
+
+    def test_old_snapshot_failure(self, plugin, config):
+        """Test failure with old snapshot."""
+        # Set max_age to 1 hour, snapshot is 2 hours old
+        config.max_age_hours = 1
+        mock_output = {
+            "snapshots": [
+                {
+                    "startTime": "2024-01-01T10:00:00Z",  # 2 hours ago
+                    "endTime": "2024-01-01T10:05:00Z",
+                    "rootEntry": {"name": "test"},
+                }
+            ]
+        }
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, json.dumps(mock_output), "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Snapshot is too old" in result.message
+
+    def test_no_snapshots_failure(self, plugin, config):
+        """Test failure when no snapshots exist."""
+        mock_output = {"snapshots": []}
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, json.dumps(mock_output), "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "No snapshots found" in result.message
+
+    def test_command_execution_error(self, plugin, config):
+        """Test handling of command execution errors."""
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.side_effect = Exception("Command failed")
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to check snapshot status" in result.message
+
+    def test_invalid_json_response(self, plugin, config):
+        """Test handling of invalid JSON response."""
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, "invalid json", "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to parse snapshot data" in result.message

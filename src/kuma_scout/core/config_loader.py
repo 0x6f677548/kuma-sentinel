@@ -33,24 +33,43 @@ def load_config(
         FileNotFoundError: If config file doesn't exist
         ValueError: If config is invalid
     """
-    config_file = Path(config_path)
+    config_file = _check_file_exists(config_path)
 
+    if not ignore_file_permissions:
+        _check_file_permissions(config_file, config_path)
+
+    raw_config = _load_yaml_config(config_file)
+    _parse_ssh_host(raw_config)
+
+    global_config = _parse_global_config(raw_config)
+    checks = _parse_checks(raw_config)
+
+    return global_config, checks
+
+
+def _check_file_exists(config_path: str) -> Path:
+    """Check if configuration file exists and return Path object."""
+    config_file = Path(config_path)
     if not config_file.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
+    return config_file
 
-    # Check file permissions unless ignored
-    if not ignore_file_permissions:
-        import stat
 
-        file_stat = config_file.stat()
-        # Check if file is world-readable or group-readable when it shouldn't be
-        if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):
-            raise ValueError(
-                f"Configuration file {config_path} has overly permissive permissions. "
-                "Remove group/other read permissions (chmod 600) or use --ignore-file-permissions"
-            )
+def _check_file_permissions(config_file: Path, config_path: str) -> None:
+    """Check that configuration file has secure permissions."""
+    import stat
 
-    # Load YAML
+    file_stat = config_file.stat()
+    # Check if file is world-readable or group-readable when it shouldn't be
+    if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):
+        raise ValueError(
+            f"Configuration file {config_path} has overly permissive permissions. "
+            "Remove group/other read permissions (chmod 600) or use --ignore-file-permissions"
+        )
+
+
+def _load_yaml_config(config_file: Path) -> dict:
+    """Load YAML configuration and expand environment variables."""
     with open(config_file, encoding="utf-8") as f:
         raw_config = yaml.safe_load(f)
 
@@ -58,14 +77,12 @@ def load_config(
         raw_config = {}
 
     # Expand environment variables in the raw config
-    _expand_env_vars(raw_config)
+    raw_config = _expand_env_vars(raw_config)
+    return raw_config
 
-    # Convert old SSH format to new format for backward compatibility
-    if "ssh" in raw_config and "connection" in raw_config["ssh"]:
-        # Convert old 'connection' field to 'host'
-        raw_config["ssh"]["host"] = raw_config["ssh"].pop("connection")
 
-    # Parse SSH host for user@host format
+def _parse_ssh_host(raw_config: dict) -> None:
+    """Parse SSH host for user@host format."""
     if "ssh" in raw_config and "host" in raw_config["ssh"]:
         host = raw_config["ssh"]["host"]
         if "@" in host and "user" not in raw_config["ssh"]:
@@ -73,13 +90,17 @@ def load_config(
             raw_config["ssh"]["user"] = user
             raw_config["ssh"]["host"] = host
 
-    # Parse global config
+
+def _parse_global_config(raw_config: dict) -> GlobalConfig:
+    """Parse and validate global configuration."""
     try:
-        global_config = GlobalConfig(**raw_config)
+        return GlobalConfig(**raw_config)
     except Exception as e:
         raise ValueError(f"Invalid global configuration: {e}") from e
 
-    # Parse checks
+
+def _parse_checks(raw_config: dict) -> List[Tuple[str, dict]]:
+    """Parse and validate checks configuration."""
     checks = []
     raw_checks = raw_config.get("checks", [])
 
@@ -104,7 +125,7 @@ def load_config(
 
         checks.append((plugin_type, check_config_data))
 
-    return global_config, checks
+    return checks
 
 
 def _expand_env_vars(data: Any) -> Any:

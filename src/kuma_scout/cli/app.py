@@ -6,9 +6,7 @@ from typing import Optional
 import typer
 
 __version__ = version("kuma-scout")
-from kuma_scout.cli.commands import _COMMAND_REGISTRY
 from kuma_scout.cli.generator import CLIGenerator
-from kuma_scout.cli.state import state
 
 
 def version_callback(value: bool) -> None:
@@ -47,32 +45,21 @@ def main(
         raise typer.Exit(code=1)
 
 
-# Register commands at function definition time
+# Register  plugin-based commands
 def _register_commands():
-    """Register all commands from the registry."""
-    for cmd_name, command_class in sorted(_COMMAND_REGISTRY.items()):
-        cmd_instance = command_class()
-        registered_cmd = cmd_instance.register_command()
-        # Use the function's docstring if available, otherwise use the class help text
-        help_text = registered_cmd.__doc__ or command_class._help_text
-        app.command(name=cmd_name, help=help_text)(registered_cmd)
-
-
-# Register new plugin-based commands
-def _register_new_commands():
     """Register the new plugin-based commands."""
     generator = CLIGenerator()
 
     # Add run command
     run_cmd = generator.generate_run_command()
-    app.command("run", help="Run checks from a configuration file")(run_cmd)
+    app.command("run", help="Runs checks from a configuration file")(run_cmd)
 
     # Add list commands
     list_plugins_cmd = generator.generate_list_plugins_command()
-    app.command("list-plugins", help="List available plugins")(list_plugins_cmd)
+    app.command("list-plugins", help="Lists available plugins")(list_plugins_cmd)
 
     list_checks_cmd = generator.generate_list_checks_command()
-    app.command("list-checks", help="List checks available in a configuration file")(
+    app.command("list-checks", help="Lists checks available in a configuration file")(
         list_checks_cmd
     )
 
@@ -85,8 +72,7 @@ def _register_new_commands():
 
 
 # Call registration
-# _register_commands()  # Disabled during Phase 2 migration
-_register_new_commands()
+_register_commands()
 
 # Create alias for compatibility
 cli = app

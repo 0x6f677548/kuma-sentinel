@@ -16,7 +16,7 @@ from ..core.heartbeat import HeartbeatService
 from ..core.models import CheckResult
 from ..core.utils.sanitizer import DataSanitizer
 from ..core.utils.ssh_runner import SSHConnectionError, SSHRunner
-from .models import GlobalConfig, RetryConfig, UptimeKumaConfig
+from .models import GlobalConfig, RetryConfig, SSHConfig, UptimeKumaConfig
 
 
 class CheckConfig(BaseModel):
@@ -35,6 +35,9 @@ class CheckConfig(BaseModel):
     )
     uptime_kuma: Optional[UptimeKumaConfig] = Field(
         default=None, description="Override global Uptime Kuma settings"
+    )
+    ssh: Optional[SSHConfig] = Field(
+        default=None, description="Override global SSH settings"
     )
     tags: list[str] = Field(default_factory=list, description="Tags for filtering")
 

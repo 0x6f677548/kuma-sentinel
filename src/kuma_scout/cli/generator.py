@@ -1,6 +1,7 @@
 """CLI generator for the new plugin-based architecture."""
 
 import inspect
+import os
 from typing import TYPE_CHECKING, Callable, List, Optional
 
 import typer
@@ -27,6 +28,12 @@ class CLIGenerator:
         logger,
     ) -> None:
         """Apply command-line overrides to global configuration."""
+        # Expand environment variables in tokens
+        if token:
+            token = os.path.expandvars(token)
+        if heartbeat_token:
+            heartbeat_token = os.path.expandvars(heartbeat_token)
+
         # Only set uptime_kuma config if both URL and token are provided
         if uptime_kuma_url and token:
             global_config.uptime_kuma = UptimeKumaConfig(url=uptime_kuma_url, token=token)
@@ -87,6 +94,7 @@ class CLIGenerator:
             global_config.ssh.key_file = ssh_key_file
 
         if ssh_password:
+            ssh_password = os.path.expandvars(ssh_password)
             global_config.ssh.password = ssh_password
 
         if ssh_strict_host_key_checking is not True or ssh_no_strict_host_key_checking:

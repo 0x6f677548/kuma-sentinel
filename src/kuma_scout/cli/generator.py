@@ -650,7 +650,7 @@ class CLIGenerator:
         kwargs: dict,
     ) -> dict:
         """Build configuration data dictionary from command arguments."""
-        check_config_data = {"name": name}
+        check_config_data: dict = {"name": name}
         for key, value in kwargs.items():
             if value != "PydanticUndefined" and value is not None:
                 # Skip retry as it's handled separately via CLI options

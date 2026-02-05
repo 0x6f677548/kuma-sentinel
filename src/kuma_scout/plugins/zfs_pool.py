@@ -18,7 +18,7 @@ class ZfsPoolConfig(CheckConfig):
 
     pool: str = Field(..., description="Name of the ZFS pool to check")
     min_free_percent: int = Field(
-        default=10, ge=1, le=99, description="Minimum free space percentage"
+        default=10, ge=1, le=99, description="Minimum free space percentage of the pool"
     )
 
 

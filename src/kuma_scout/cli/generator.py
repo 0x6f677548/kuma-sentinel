@@ -484,10 +484,10 @@ class CLIGenerator:
             ),
             name: Optional[str] = typer.Option(None, "--name", help="Check name (default: cli-check-<timestamp>)"),
             retry_attempts: Optional[int] = typer.Option(
-                None, "--retry-attempts", help="Number of retry attempts on failure (0 = no retry)"
+                0, "--retry-attempts", help="Number of retry attempts on failure (0 = no retry)"
             ),
             retry_delay_seconds: Optional[int] = typer.Option(
-                None, "--retry-delay-seconds", help="Delay between retry attempts in seconds"
+                5, "--retry-delay-seconds", help="Delay between retry attempts in seconds"
             ),
             # Global options
             **kwargs,

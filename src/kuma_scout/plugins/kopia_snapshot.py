@@ -20,7 +20,7 @@ class KopiaSnapshotConfig(CheckConfig):
     """Configuration for kopia snapshot plugin."""
 
     path: str = Field(..., description="Snapshot path to check")
-    max_age_hours: int = Field(default=24, ge=1, description="Maximum age in hours")
+    max_age_hours: int = Field(default=24, ge=1, description="Maximum age of the snapshot in hours")
 
 
 class KopiaSnapshotPlugin(Plugin):

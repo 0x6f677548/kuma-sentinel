@@ -8,11 +8,12 @@ import json
 import re
 import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 from pydantic import Field
 
-from ..core.models import CheckResult
+from kuma_scout.core.models import CheckResult
+
 from .base import CheckConfig, Plugin
 
 
@@ -32,8 +33,10 @@ class KopiaSnapshotPlugin(Plugin):
     description = "Checks Kopia snapshot freshness and reports to Uptime Kuma"
     config_class = KopiaSnapshotConfig
 
-    def execute(self, config: KopiaSnapshotConfig) -> CheckResult:
+    def execute(self, config: CheckConfig) -> CheckResult:
         """Execute the snapshot status check."""
+        # Cast to the specific config type
+        config = cast(KopiaSnapshotConfig, config)
         check_start = time.time()
 
         try:

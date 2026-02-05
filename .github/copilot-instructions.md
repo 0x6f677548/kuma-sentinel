@@ -109,6 +109,7 @@ All commands support `--ssh user@host` for remote execution. SSH settings config
 - never apply fixes like ignoring errors from code quality tools unless explicitly instructed
   - if you find code that has ignored errors from code quality tools, try to fix the underlying issue instead of adding more ignores
   - never, ever, use solutions like ' # type: ignore[return]' or similar unless explicitly instructed
+- never use relative imports
 ## security
 - always use DataSanitizer to sanitize any output sent to Uptime Kuma
 ## documentation

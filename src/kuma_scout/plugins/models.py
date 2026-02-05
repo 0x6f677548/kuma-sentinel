@@ -82,6 +82,7 @@ class GlobalConfig(BaseModel):
     heartbeat: HeartbeatConfig = Field(
         default_factory=HeartbeatConfig, description="Heartbeat settings"
     )
+    timeout: int = Field(default=300, description="Global timeout for checks (seconds)")
     checks: list[dict] = Field(
         default_factory=list, description="List of check configurations"
     )

@@ -7,12 +7,13 @@ Executes shell commands and reports results to Uptime Kuma.
 import re
 import shlex
 import time
-from typing import Optional
+from typing import Optional, cast
 
 from pydantic import Field
 
-from ..core.models import CheckResult
-from ..core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.models import CheckResult
+from kuma_scout.core.utils.sanitizer import DataSanitizer
+
 from .base import CheckConfig, Plugin
 
 
@@ -41,8 +42,10 @@ class CmdCheckPlugin(Plugin):
     description = "Executes shell commands and reports results to Uptime Kuma"
     config_class = CmdCheckConfig
 
-    def execute(self, config: CmdCheckConfig) -> CheckResult:
+    def execute(self, config: CheckConfig) -> CheckResult:
         """Execute the command check."""
+        # Cast to the specific config type
+        config = cast(CmdCheckConfig, config)
         start_time = time.time()
 
         try:

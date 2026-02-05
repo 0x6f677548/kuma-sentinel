@@ -7,11 +7,12 @@ Scans TCP ports on target IP ranges and reports results to Uptime Kuma.
 import os
 import time
 import xml.etree.ElementTree as ET
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from pydantic import Field
 
-from ..core.models import CheckResult
+from kuma_scout.core.models import CheckResult
+
 from .base import CheckConfig, Plugin
 
 
@@ -36,8 +37,10 @@ class PortscanPlugin(Plugin):
     description = "Scans TCP ports on target IP ranges and reports to Uptime Kuma"
     config_class = PortscanConfig
 
-    def execute(self, config: PortscanConfig) -> CheckResult:
+    def execute(self, config: CheckConfig) -> CheckResult:
         """Execute the port scan."""
+        # Cast to the specific config type
+        config = cast(PortscanConfig, config)
         scan_start = time.time()
 
         try:

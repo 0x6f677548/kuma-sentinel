@@ -5,11 +5,12 @@ Checks ZFS pool health status and free space percentage.
 """
 
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 from pydantic import Field
 
-from ..core.models import CheckResult
+from kuma_scout.core.models import CheckResult
+
 from .base import CheckConfig, Plugin
 
 
@@ -29,8 +30,10 @@ class ZfsPoolPlugin(Plugin):
     description = "Checks ZFS pool health status and free space percentage"
     config_class = ZfsPoolConfig
 
-    def execute(self, config: ZfsPoolConfig) -> CheckResult:
+    def execute(self, config: CheckConfig) -> CheckResult:
         """Execute ZFS pool status check."""
+        # Cast to the specific config type
+        config = cast(ZfsPoolConfig, config)
         check_start = time.time()
 
         try:

@@ -11,8 +11,8 @@ from typing import Any, List, Optional, Tuple
 
 import yaml
 
-from ..plugins.base import CheckConfig
-from ..plugins.models import GlobalConfig
+from kuma_scout.plugins.base import CheckConfig
+from kuma_scout.plugins.models import GlobalConfig
 
 
 def load_config(

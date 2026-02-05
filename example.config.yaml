@@ -22,6 +22,10 @@ logging:
 # Default: false (permissions are validated)
 ignore_file_permissions: false
 
+# Global timeout for checks in seconds (default: 300)
+# Individual checks can override this with their own timeout setting
+timeout: 300
+
 # === GLOBAL SSH CONFIGURATION ===
 # Default SSH settings for remote execution (can be overridden per-check)
 ssh:

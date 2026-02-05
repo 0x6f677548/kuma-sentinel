@@ -2,14 +2,14 @@
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 import typer
 
-from ..core.config_loader import load_config
-from ..core.logger import setup_default_logging, setup_logging
-from ..plugins import get_all_plugins
-from ..plugins.models import GlobalConfig, UptimeKumaConfig
+from kuma_scout.core.config_loader import load_config
+from kuma_scout.core.logger import setup_default_logging, setup_logging
+from kuma_scout.plugins import get_all_plugins
+from kuma_scout.plugins.models import GlobalConfig, UptimeKumaConfig
 
 if TYPE_CHECKING:
     pass
@@ -42,7 +42,7 @@ class CLIGenerator:
 
         if heartbeat_token:
             if not global_config.heartbeat:
-                from ..plugins.models import HeartbeatConfig
+                from kuma_scout.plugins.models import HeartbeatConfig
 
                 global_config.heartbeat = HeartbeatConfig()
             global_config.heartbeat.token = heartbeat_token
@@ -76,12 +76,17 @@ class CLIGenerator:
             return
 
         # Parse SSH host string using the utility function
-        from ..core.utils.ssh_runner import parse_ssh_connection_string
+        from kuma_scout.core.utils.ssh_runner import parse_ssh_connection_string
 
         host, user, port = parse_ssh_connection_string(ssh)
 
+        # Ensure host is not None (should not happen with valid input)
+        if host is None:
+            logger.error("❌ Failed to parse SSH host from connection string")
+            raise typer.Exit(1)
+
         if not global_config.ssh:
-            from ..plugins.models import SSHConfig
+            from kuma_scout.plugins.models import SSHConfig
 
             global_config.ssh = SSHConfig(host=host, user=user, port=port or 22)
         else:
@@ -135,6 +140,10 @@ class CLIGenerator:
             # Use global ssh if check doesn't have one
             ssh_data = global_config.ssh.model_dump()
 
+        # Handle timeout merging: check-level config can override global
+        if "timeout" not in merged_config and global_config.timeout != 300:
+            merged_config["timeout"] = global_config.timeout
+
         # Remove uptime_kuma and ssh from merged_config for config creation
         merged_config.pop("uptime_kuma", None)
         merged_config.pop("ssh", None)
@@ -147,7 +156,7 @@ class CLIGenerator:
 
         # Set ssh separately if available
         if ssh_data:
-            from ..plugins.models import SSHConfig
+            from kuma_scout.plugins.models import SSHConfig
 
             check_config_obj.ssh = SSHConfig(**ssh_data)
 
@@ -171,7 +180,7 @@ class CLIGenerator:
             if "@" in host:
                 user, host = host.split("@", 1)
 
-            from ..core.utils.ssh_runner import SSHRunner
+            from kuma_scout.core.utils.ssh_runner import SSHRunner
 
             ssh_runner = SSHRunner(
                 host=host,
@@ -200,7 +209,7 @@ class CLIGenerator:
             and uptime_config.token
             and not uptime_config.token.startswith("${")
         ):
-            from ..core.uptime_kuma import send_push
+            from kuma_scout.core.uptime_kuma import send_push
 
             status = result.status
             success = send_push(
@@ -444,7 +453,7 @@ class CLIGenerator:
 
         return list_checks_command
 
-    def generate_check_commands(self) -> List[Callable]:
+    def generate_check_commands(self) -> List[Tuple[str, Callable]]:
         """Generate individual 'check <type>' subcommands for each plugin."""
         commands = []
         plugins = get_all_plugins()
@@ -523,7 +532,7 @@ class CLIGenerator:
             **kwargs,
         ) -> None:
             """Execute a single {plugin_type} check."""
-            self._execute_single_check(
+            self._execute_individual_check(
                 plugin_class,
                 name,
                 log_level,
@@ -550,7 +559,7 @@ class CLIGenerator:
 
         return check_command
 
-    def _execute_single_check(
+    def _execute_individual_check(
         self,
         plugin_class,
         name: Optional[str],
@@ -623,7 +632,7 @@ class CLIGenerator:
 
         # Set uptime_kuma config if both URL and token are provided
         if uptime_kuma_url and token:
-            from ..plugins.models import UptimeKumaConfig
+            from kuma_scout.plugins.models import UptimeKumaConfig
 
             check_config_obj.uptime_kuma = UptimeKumaConfig(
                 url=uptime_kuma_url, token=token
@@ -644,6 +653,9 @@ class CLIGenerator:
         check_config_data = {"name": name}
         for key, value in kwargs.items():
             if value != "PydanticUndefined" and value is not None:
+                # Skip retry as it's handled separately via CLI options
+                if key == "retry":
+                    continue
                 check_config_data[key] = value
 
         # Add retry configuration if provided
@@ -706,8 +718,8 @@ class CLIGenerator:
 
     def _create_plugin_parameters(self, config_class, existing_param_names) -> list:
         """Create plugin-specific parameters for the command signature."""
-        required_params = []
-        optional_params = []
+        required_params: list = []
+        optional_params: list = []
         global_param_names = {
             "log_level",
             "log_file",

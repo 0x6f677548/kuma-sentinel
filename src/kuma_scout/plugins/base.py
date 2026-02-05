@@ -12,10 +12,11 @@ from typing import ClassVar, Optional, Type, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..core.heartbeat import HeartbeatService
-from ..core.models import CheckResult
-from ..core.utils.sanitizer import DataSanitizer
-from ..core.utils.ssh_runner import SSHConnectionError, SSHRunner
+from kuma_scout.core.heartbeat import HeartbeatService
+from kuma_scout.core.models import CheckResult
+from kuma_scout.core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.utils.ssh_runner import SSHConnectionError, SSHRunner
+
 from .models import GlobalConfig, RetryConfig, SSHConfig, UptimeKumaConfig
 
 

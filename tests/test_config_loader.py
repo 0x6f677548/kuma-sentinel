@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 from kuma_scout.core.config_loader import (
     _expand_env_vars,
@@ -48,11 +47,8 @@ class TestExpandEnvVars:
         os.environ["TEST_TOKEN"] = "secret-token"
         try:
             data = {
-                "uptime_kuma": {
-                    "url": "http://test:3001",
-                    "token": "$TEST_TOKEN"
-                },
-                "other": "no_expand"
+                "uptime_kuma": {"url": "http://test:3001", "token": "$TEST_TOKEN"},
+                "other": "no_expand",
             }
             result = _expand_env_vars(data)
             assert result["uptime_kuma"]["token"] == "secret-token"
@@ -80,7 +76,7 @@ class TestExpandEnvVars:
             data = {
                 "token1": "$VAR1",
                 "token2": "${VAR2}",
-                "list": ["$VAR1", "${VAR2}"]
+                "list": ["$VAR1", "${VAR2}"],
             }
             result = _expand_env_vars(data)
             assert result["token1"] == "value1"
@@ -97,7 +93,7 @@ class TestExpandEnvVars:
             "boolean": True,
             "none": None,
             "list": [1, 2, 3],
-            "dict": {"nested": 123}
+            "dict": {"nested": 123},
         }
         result = _expand_env_vars(data)
         assert result == data
@@ -118,7 +114,9 @@ uptime_kuma:
 other:
   static: value
 """
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as f:
                 f.write(yaml_content)
                 temp_path = f.name
 
@@ -135,7 +133,7 @@ other:
 
     def test_load_empty_config(self):
         """Test loading empty YAML file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("")  # Empty file
             temp_path = f.name
 
@@ -165,7 +163,7 @@ checks:
     command: echo hello
     timeout: 30
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
             temp_path = f.name
 
@@ -194,12 +192,16 @@ checks:
     type: cmdcheck
     command: echo $HOME
 """
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as f:
                 f.write(config_content)
                 temp_path = f.name
 
             try:
-                global_config, checks = load_config(temp_path, ignore_file_permissions=True)
+                global_config, checks = load_config(
+                    temp_path, ignore_file_permissions=True
+                )
                 assert global_config.uptime_kuma.url == "http://env:3001/api/push"
                 assert global_config.uptime_kuma.token == "env-token"
                 assert len(checks) == 1
@@ -221,7 +223,7 @@ checks:
         config_content = """
 checks: "not a list"
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
             temp_path = f.name
 
@@ -238,12 +240,14 @@ checks:
   - name: test-check
     command: echo hello
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Check 0 missing required 'type' field"):
+            with pytest.raises(
+                ValueError, match="Check 0 missing required 'type' field"
+            ):
                 load_config(temp_path, ignore_file_permissions=True)
         finally:
             Path(temp_path).unlink()
@@ -257,19 +261,13 @@ class TestFilterChecks:
         from kuma_scout.plugins.cmdcheck import CmdCheckConfig
 
         check1 = CmdCheckConfig(
-            name="check1",
-            command="echo hello",
-            tags=["web", "production"]
+            name="check1", command="echo hello", tags=["web", "production"]
         )
         check2 = CmdCheckConfig(
-            name="check2",
-            command="echo world",
-            tags=["db", "production"]
+            name="check2", command="echo world", tags=["db", "production"]
         )
         check3 = CmdCheckConfig(
-            name="check3",
-            command="echo test",
-            tags=["web", "staging"]
+            name="check3", command="echo test", tags=["web", "staging"]
         )
 
         return [

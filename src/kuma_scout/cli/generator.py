@@ -36,7 +36,9 @@ class CLIGenerator:
 
         # Only set uptime_kuma config if both URL and token are provided
         if uptime_kuma_url and token:
-            global_config.uptime_kuma = UptimeKumaConfig(url=uptime_kuma_url, token=token)
+            global_config.uptime_kuma = UptimeKumaConfig(
+                url=uptime_kuma_url, token=token
+            )
 
         if heartbeat_token:
             if not global_config.heartbeat:
@@ -127,11 +129,7 @@ class CLIGenerator:
         if "ssh" in check_config:
             # Merge check-level ssh with global config
             check_ssh = check_config["ssh"]
-            global_ssh = (
-                global_config.ssh.model_dump()
-                if global_config.ssh
-                else {}
-            )
+            global_ssh = global_config.ssh.model_dump() if global_config.ssh else {}
             ssh_data = {**global_ssh, **check_ssh}
         elif global_config.ssh:
             # Use global ssh if check doesn't have one
@@ -150,6 +148,7 @@ class CLIGenerator:
         # Set ssh separately if available
         if ssh_data:
             from ..plugins.models import SSHConfig
+
             check_config_obj.ssh = SSHConfig(**ssh_data)
 
         return check_config_obj
@@ -281,13 +280,17 @@ class CLIGenerator:
             ),
             # Global options
             uptime_kuma_url: Optional[str] = typer.Option(
-                None, "--uptime-kuma-url", help="Uptime Kuma push API URL (overrides config)"
+                None,
+                "--uptime-kuma-url",
+                help="Uptime Kuma push API URL (overrides config)",
             ),
             token: Optional[str] = typer.Option(
                 None, "--token", help="Uptime Kuma push token (overrides config)"
             ),
             heartbeat_token: Optional[str] = typer.Option(
-                None, "--heartbeat-token", help="Uptime Kuma token for heartbeat (overrides config) "
+                None,
+                "--heartbeat-token",
+                help="Uptime Kuma token for heartbeat (overrides config) ",
             ),
             timeout: int = typer.Option(
                 300, "--timeout", help="Global timeout for checks (seconds)"
@@ -296,7 +299,9 @@ class CLIGenerator:
                 None, "--ssh", help="SSH host (user@host or host) (overrides config)"
             ),
             ssh_key_file: Optional[str] = typer.Option(
-                None, "--ssh-key-file", help="SSH private key file path (overrides config)"
+                None,
+                "--ssh-key-file",
+                help="SSH private key file path (overrides config)",
             ),
             ssh_password: Optional[str] = typer.Option(
                 None, "--ssh-password", help="SSH password (overrides config)"
@@ -312,7 +317,9 @@ class CLIGenerator:
                 help="Disable strict SSH host key checking (overrides config)",
             ),
             log_level: str = typer.Option(
-                "INFO", "--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR) (overrides config)"
+                "INFO",
+                "--log-level",
+                help="Log level (DEBUG, INFO, WARNING, ERROR) (overrides config)",
             ),
             log_file: Optional[str] = typer.Option(
                 None, "--log-file", help="Log file path (overrides config)"
@@ -442,7 +449,6 @@ class CLIGenerator:
         commands = []
         plugins = get_all_plugins()
 
-
         for plugin_type, plugin_class in plugins.items():
             command = self._create_simple_check_command(plugin_type, plugin_class)
             commands.append((plugin_type, command))
@@ -452,29 +458,37 @@ class CLIGenerator:
     def _create_simple_check_command(self, plugin_type: str, plugin_class) -> Callable:
         """Generate a single check subcommand for a plugin."""
 
-
-
         def check_command(
             uptime_kuma_url: str = typer.Option(
-                ..., "--uptime-kuma-url", help="Uptime Kuma push API URL [required] (e,g. http://localhost:3001/api/push)"
+                ...,
+                "--uptime-kuma-url",
+                help="Uptime Kuma push API URL [required] (e,g. http://localhost:3001/api/push)",
             ),
             token: str = typer.Option(
                 ..., "--token", help="Uptime Kuma push token [required]"
             ),
             heartbeat_token: Optional[str] = typer.Option(
-                None, "--heartbeat-token", help="Uptime Kuma token for heartbeat (heartbeat disabled if not provided)"
+                None,
+                "--heartbeat-token",
+                help="Uptime Kuma token for heartbeat (heartbeat disabled if not provided)",
             ),
             timeout: int = typer.Option(
                 300, "--timeout", help="Global timeout for checks (seconds)"
             ),
             ssh: Optional[str] = typer.Option(
-                None, "--ssh", help="SSH host (user@host or host) (e.g. user@remotehost or remotehost or user@remotehost:2222)"
+                None,
+                "--ssh",
+                help="SSH host (user@host or host) (e.g. user@remotehost or remotehost or user@remotehost:2222)",
             ),
             ssh_key_file: Optional[str] = typer.Option(
-                None, "--ssh-key-file", help="SSH private key file path (e.g. ~/.ssh/key.pem)"
+                None,
+                "--ssh-key-file",
+                help="SSH private key file path (e.g. ~/.ssh/key.pem)",
             ),
             ssh_password: Optional[str] = typer.Option(
-                None, "--ssh-password", help="SSH password (not recommended, use SSH key if possible)"
+                None,
+                "--ssh-password",
+                help="SSH password (not recommended, use SSH key if possible)",
             ),
             ssh_strict_host_key_checking: bool = typer.Option(
                 True,
@@ -486,16 +500,24 @@ class CLIGenerator:
                 "--ssh-no-strict-host-key-checking",
                 help="Disables strict SSH host key checking",
             ),
-            log_level: str = typer.Option("INFO", "--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR)"),
+            log_level: str = typer.Option(
+                "INFO", "--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR)"
+            ),
             log_file: Optional[str] = typer.Option(
                 "/var/log/kuma-scout.log", "--log-file", help="Log file path"
             ),
-            name: Optional[str] = typer.Option(None, "--name", help="Check name (default: cli-check-<timestamp>)"),
+            name: Optional[str] = typer.Option(
+                None, "--name", help="Check name (default: cli-check-<timestamp>)"
+            ),
             retry_attempts: Optional[int] = typer.Option(
-                0, "--retry-attempts", help="Number of retry attempts on failure (0 = no retry)"
+                0,
+                "--retry-attempts",
+                help="Number of retry attempts on failure (0 = no retry)",
             ),
             retry_delay_seconds: Optional[int] = typer.Option(
-                5, "--retry-delay-seconds", help="Delay between retry attempts in seconds"
+                5,
+                "--retry-delay-seconds",
+                help="Delay between retry attempts in seconds",
             ),
             # Global options
             **kwargs,
@@ -575,17 +597,22 @@ class CLIGenerator:
 
         # Validate Uptime Kuma options - both URL and token are required for individual checks
         if not uptime_kuma_url or not token:
-            logger.error("❌ Both --uptime-kuma-url and --token are required for individual check commands")
+            logger.error(
+                "❌ Both --uptime-kuma-url and --token are required for individual check commands"
+            )
             raise typer.Exit(1)
 
         # Generate default name if not provided
         if name is None:
             import time
+
             name = f"cli-check-{int(time.time())}"
 
         # Build config data from kwargs (plugin-specific parameters)
         config_class = plugin_class.config_class
-        check_config_data = self._build_check_config_data(name, retry_attempts, retry_delay_seconds, kwargs)
+        check_config_data = self._build_check_config_data(
+            name, retry_attempts, retry_delay_seconds, kwargs
+        )
 
         # Validate required fields
         try:
@@ -606,7 +633,13 @@ class CLIGenerator:
             plugin_class, check_config_obj, global_config, logger
         )
 
-    def _build_check_config_data(self, name: str, retry_attempts: Optional[int], retry_delay_seconds: Optional[int], kwargs: dict) -> dict:
+    def _build_check_config_data(
+        self,
+        name: str,
+        retry_attempts: Optional[int],
+        retry_delay_seconds: Optional[int],
+        kwargs: dict,
+    ) -> dict:
         """Build configuration data dictionary from command arguments."""
         check_config_data = {"name": name}
         for key, value in kwargs.items():
@@ -634,8 +667,7 @@ class CLIGenerator:
 
         # Extract base parameters from existing signature (exclude **kwargs)
         base_params = [
-            param for param in sig.parameters.values()
-            if param.name != 'kwargs'
+            param for param in sig.parameters.values() if param.name != "kwargs"
         ]
 
         # Separate positional and keyword-only parameters
@@ -644,14 +676,20 @@ class CLIGenerator:
 
         # Add base parameters
         for param in base_params:
-            if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            if param.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ):
                 positional_params.append(param)
             else:
                 keyword_only_params.append(param)
 
         # Add new parameters
         for param in new_params:
-            if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            if param.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ):
                 positional_params.append(param)
             else:
                 keyword_only_params.append(param)
@@ -689,11 +727,15 @@ class CLIGenerator:
                 continue
 
             if field_name == "name":  # name is now optional
-                if "name" not in {p.name for p in required_params + optional_params}:  # Avoid duplicates
+                if "name" not in {
+                    p.name for p in required_params + optional_params
+                }:  # Avoid duplicates
                     param = inspect.Parameter(
                         field_name,
                         inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                        default=typer.Argument(None, help=f"{field_info.description} (optional)"),
+                        default=typer.Argument(
+                            None, help=f"{field_info.description} (optional)"
+                        ),
                         annotation=Optional[str],
                     )
                     optional_params.append(param)
@@ -731,7 +773,10 @@ class CLIGenerator:
         field_type = field_info.annotation
         is_required = field_info.is_required()
         from pydantic_core import PydanticUndefined
-        default_value = field_info.default if field_info.default is not PydanticUndefined else None
+
+        default_value = (
+            field_info.default if field_info.default is not PydanticUndefined else None
+        )
 
         if hasattr(field_type, "__origin__") and field_type.__origin__ is list:
             # List types - use List[str] with multiple values

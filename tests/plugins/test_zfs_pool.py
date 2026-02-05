@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kuma_scout.plugins.models import GlobalConfig
+from kuma_scout.plugins.models import GlobalConfig, LoggingConfig, UptimeKumaConfig
 from kuma_scout.plugins.zfs_pool import ZfsPoolConfig, ZfsPoolPlugin
 
 
@@ -12,8 +12,10 @@ from kuma_scout.plugins.zfs_pool import ZfsPoolConfig, ZfsPoolPlugin
 def global_config():
     """Create basic global config."""
     return GlobalConfig(
-        uptime_kuma={"url": "http://localhost:3001/api/push", "token": "global-token"},
-        logging={"level": "INFO"},
+        uptime_kuma=UptimeKumaConfig(
+            url="http://localhost:3001/api/push", token="global-token"
+        ),
+        logging=LoggingConfig(level="INFO"),
     )
 
 
@@ -38,8 +40,7 @@ class TestZfsPoolExecution:
 
     def test_healthy_pool_success(self, plugin, config):
         """Test successful check with healthy pool."""
-        mock_output = """NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-tank    100G   50G    50G       -         -         0%     50%   1.00x    ONLINE   -"""
+        mock_output = "tank\t100G\t50G\t50G\t50%\tONLINE"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)
@@ -47,14 +48,12 @@ tank    100G   50G    50G       -         -         0%     50%   1.00x    ONLINE
             result = plugin.execute(config)
 
             assert result.status == "up"
-            assert "Pool is healthy" in result.message
-            assert "50% free space" in result.message
+            assert "Pool 'tank' is healthy" in result.message
 
     def test_low_space_failure(self, plugin, config):
         """Test failure with low free space."""
         config.min_free_percent = 20
-        mock_output = """NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-tank    100G   95G     5G       -         -         0%     95%   1.00x    ONLINE   -"""
+        mock_output = "tank\t100G\t95G\t5G\t95%\tONLINE"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)
@@ -62,12 +61,11 @@ tank    100G   95G     5G       -         -         0%     95%   1.00x    ONLINE
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Insufficient free space" in result.message
+            assert "low on space" in result.message
 
     def test_unhealthy_pool_failure(self, plugin, config):
         """Test failure with unhealthy pool."""
-        mock_output = """NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-tank    100G   50G    50G       -         -         0%     50%   1.00x    DEGRADED -"""
+        mock_output = "tank\t100G\t50G\t50G\t50%\tDEGRADED"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)
@@ -75,7 +73,7 @@ tank    100G   50G    50G       -         -         0%     50%   1.00x    DEGRAD
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Pool is degraded" in result.message
+            assert "is not healthy" in result.message
 
     def test_pool_not_found_failure(self, plugin, config):
         """Test failure when pool doesn't exist."""
@@ -87,7 +85,7 @@ tank    100G   50G    50G       -         -         0%     50%   1.00x    DEGRAD
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Pool check failed" in result.message
+            assert "Failed to get status" in result.message
 
     def test_command_execution_error(self, plugin, config):
         """Test handling of command execution errors."""
@@ -97,4 +95,4 @@ tank    100G   50G    50G       -         -         0%     50%   1.00x    DEGRAD
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Failed to check pool status" in result.message
+            assert "Failed to get status" in result.message

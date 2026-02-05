@@ -5,15 +5,17 @@ from unittest.mock import patch
 import pytest
 
 from kuma_scout.plugins.cmdcheck import CmdCheckConfig, CmdCheckPlugin
-from kuma_scout.plugins.models import GlobalConfig
+from kuma_scout.plugins.models import GlobalConfig, LoggingConfig, UptimeKumaConfig
 
 
 @pytest.fixture
 def global_config():
     """Create basic global config."""
     return GlobalConfig(
-        uptime_kuma={"url": "http://localhost:3001/api/push", "token": "global-token"},
-        logging={"level": "INFO"},
+        uptime_kuma=UptimeKumaConfig(
+            url="http://localhost:3001/api/push", token="global-token"
+        ),
+        logging=LoggingConfig(level="INFO"),
     )
 
 
@@ -36,26 +38,27 @@ def config():
 class TestCmdCheckExecution:
     """Test cmdcheck plugin execution."""
 
-    def test_success_exit_code_zero(self, plugin, config):
-        """Test successful command with exit code 0."""
+    def test_success_message_includes_stdout(self, plugin, config):
+        """Test successful command message includes stdout."""
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, "file exists\n", "", 0)
 
             result = plugin.execute(config)
 
             assert result.status == "up"
-            assert "Exit code 0" in result.message
+            assert result.details["exit_code"] == 0
+            assert "stdout: file exists" in result.message
 
-    def test_failure_exit_code_nonzero(self, plugin, config):
-        """Test failed command with non-zero exit code."""
-        config.expect_exit_code = 1
+    def test_failure_message_includes_stderr(self, plugin, config):
+        """Test failed command message includes stderr."""
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (False, "", "file not found", 1)
 
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Exit code 1" in result.message
+            assert result.details["exit_code"] == 1
+            assert "stderr: file not found" in result.message
 
     def test_success_pattern_match(self, plugin, config):
         """Test success when output matches success pattern."""
@@ -66,7 +69,7 @@ class TestCmdCheckExecution:
             result = plugin.execute(config)
 
             assert result.status == "up"
-            assert "Success pattern matched" in result.message
+            assert "stdout: Status: healthy" in result.message
 
     def test_failure_pattern_match(self, plugin, config):
         """Test failure when output matches failure pattern."""
@@ -77,7 +80,7 @@ class TestCmdCheckExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Failure pattern matched" in result.message
+            assert "stdout: ERROR: connection refused" in result.message
 
     def test_command_execution_error(self, plugin, config):
         """Test handling of command execution errors."""

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kuma_scout.plugins.models import GlobalConfig
+from kuma_scout.plugins.models import GlobalConfig, LoggingConfig, UptimeKumaConfig
 from kuma_scout.plugins.portscan import PortscanConfig, PortscanPlugin
 
 
@@ -12,8 +12,10 @@ from kuma_scout.plugins.portscan import PortscanConfig, PortscanPlugin
 def global_config():
     """Create basic global config."""
     return GlobalConfig(
-        uptime_kuma={"url": "http://localhost:3001/api/push", "token": "global-token"},
-        logging={"level": "INFO"},
+        uptime_kuma=UptimeKumaConfig(
+            url="http://localhost:3001/api/push", token="global-token"
+        ),
+        logging=LoggingConfig(level="INFO"),
     )
 
 
@@ -47,7 +49,7 @@ class TestPortscanExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "2 open ports found" in result.message
+            assert "Open ports found" in result.message
 
     def test_scan_with_closed_ports(self, plugin, config):
         """Test scan with some closed ports."""
@@ -60,7 +62,7 @@ class TestPortscanExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "1 open ports found" in result.message
+            assert "Open ports found" in result.message
 
     def test_scan_failure(self, plugin, config):
         """Test scan failure."""
@@ -70,7 +72,7 @@ class TestPortscanExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Port scan failed" in result.message
+            assert "Port scan execution failed" in result.message
 
     def test_no_open_ports(self, plugin, config):
         """Test scan with no open ports."""

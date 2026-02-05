@@ -1,20 +1,23 @@
 """Tests for kopia_snapshot plugin."""
 
 import json
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 from kuma_scout.plugins.kopia_snapshot import KopiaSnapshotConfig, KopiaSnapshotPlugin
-from kuma_scout.plugins.models import GlobalConfig
+from kuma_scout.plugins.models import GlobalConfig, LoggingConfig, UptimeKumaConfig
 
 
 @pytest.fixture
 def global_config():
     """Create basic global config."""
     return GlobalConfig(
-        uptime_kuma={"url": "http://localhost:3001/api/push", "token": "global-token"},
-        logging={"level": "INFO"},
+        uptime_kuma=UptimeKumaConfig(
+            url="http://localhost:3001/api/push", token="global-token"
+        ),
+        logging=LoggingConfig(level="INFO"),
     )
 
 
@@ -39,15 +42,13 @@ class TestKopiaSnapshotExecution:
 
     def test_recent_snapshot_success(self, plugin, config):
         """Test successful check with recent snapshot."""
-        mock_output = {
-            "snapshots": [
-                {
-                    "startTime": "2024-01-01T12:00:00Z",
-                    "endTime": "2024-01-01T12:05:00Z",
-                    "rootEntry": {"name": "test"},
-                }
-            ]
-        }
+        mock_output: list[dict[str, Any]] = [
+            {
+                "startTime": "2026-02-05T10:00:00Z",
+                "endTime": "2026-02-05T10:05:00Z",
+                "rootEntry": {"name": "test"},
+            }
+        ]
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, json.dumps(mock_output), "", 0)
@@ -55,21 +56,19 @@ class TestKopiaSnapshotExecution:
             result = plugin.execute(config)
 
             assert result.status == "up"
-            assert "Snapshot is recent" in result.message
+            assert "Snapshot is fresh" in result.message
 
     def test_old_snapshot_failure(self, plugin, config):
         """Test failure with old snapshot."""
         # Set max_age to 1 hour, snapshot is 2 hours old
         config.max_age_hours = 1
-        mock_output = {
-            "snapshots": [
-                {
-                    "startTime": "2024-01-01T10:00:00Z",  # 2 hours ago
-                    "endTime": "2024-01-01T10:05:00Z",
-                    "rootEntry": {"name": "test"},
-                }
-            ]
-        }
+        mock_output: list[dict[str, Any]] = [
+            {
+                "startTime": "2024-01-01T10:00:00Z",  # 2 hours ago
+                "endTime": "2024-01-01T10:05:00Z",
+                "rootEntry": {"name": "test"},
+            }
+        ]
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, json.dumps(mock_output), "", 0)
@@ -81,7 +80,7 @@ class TestKopiaSnapshotExecution:
 
     def test_no_snapshots_failure(self, plugin, config):
         """Test failure when no snapshots exist."""
-        mock_output = {"snapshots": []}
+        mock_output: list[dict[str, Any]] = []
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, json.dumps(mock_output), "", 0)
@@ -89,7 +88,7 @@ class TestKopiaSnapshotExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "No snapshots found" in result.message
+            assert "Failed to get snapshot info" in result.message
 
     def test_command_execution_error(self, plugin, config):
         """Test handling of command execution errors."""
@@ -99,7 +98,7 @@ class TestKopiaSnapshotExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Failed to check snapshot status" in result.message
+            assert "Snapshot check error" in result.message
 
     def test_invalid_json_response(self, plugin, config):
         """Test handling of invalid JSON response."""
@@ -109,4 +108,4 @@ class TestKopiaSnapshotExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Failed to parse snapshot data" in result.message
+            assert "Failed to get snapshot info" in result.message

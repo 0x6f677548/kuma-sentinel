@@ -483,6 +483,12 @@ class CLIGenerator:
                 "/var/log/kuma-scout.log", "--log-file", help="Log file path"
             ),
             name: Optional[str] = typer.Option(None, "--name", help="Check name (default: cli-check-<timestamp>)"),
+            retry_attempts: Optional[int] = typer.Option(
+                None, "--retry-attempts", help="Number of retry attempts on failure (0 = no retry)"
+            ),
+            retry_delay_seconds: Optional[int] = typer.Option(
+                None, "--retry-delay-seconds", help="Delay between retry attempts in seconds"
+            ),
             # Global options
             **kwargs,
         ) -> None:
@@ -501,6 +507,8 @@ class CLIGenerator:
                 ssh_password,
                 ssh_strict_host_key_checking,
                 ssh_no_strict_host_key_checking,
+                retry_attempts,
+                retry_delay_seconds,
                 kwargs,
             )
 
@@ -527,6 +535,8 @@ class CLIGenerator:
         ssh_password: Optional[str],
         ssh_strict_host_key_checking: bool,
         ssh_no_strict_host_key_checking: bool,
+        retry_attempts: Optional[int],
+        retry_delay_seconds: Optional[int],
         kwargs: dict,
     ) -> None:
         """Execute a single check with the provided parameters."""
@@ -567,7 +577,7 @@ class CLIGenerator:
 
         # Build config data from kwargs (plugin-specific parameters)
         config_class = plugin_class.config_class
-        check_config_data = self._build_check_config_data(name, kwargs)
+        check_config_data = self._build_check_config_data(name, retry_attempts, retry_delay_seconds, kwargs)
 
         # Validate required fields
         try:
@@ -588,12 +598,22 @@ class CLIGenerator:
             plugin_class, check_config_obj, global_config, logger
         )
 
-    def _build_check_config_data(self, name: str, kwargs: dict) -> dict:
+    def _build_check_config_data(self, name: str, retry_attempts: Optional[int], retry_delay_seconds: Optional[int], kwargs: dict) -> dict:
         """Build configuration data dictionary from command arguments."""
         check_config_data = {"name": name}
         for key, value in kwargs.items():
             if value != "PydanticUndefined" and value is not None:
                 check_config_data[key] = value
+
+        # Add retry configuration if provided
+        if retry_attempts is not None or retry_delay_seconds is not None:
+            retry_config = {}
+            if retry_attempts is not None:
+                retry_config["attempts"] = retry_attempts
+            if retry_delay_seconds is not None:
+                retry_config["delay_seconds"] = retry_delay_seconds
+            check_config_data["retry"] = retry_config
+
         return check_config_data
 
     def _add_plugin_parameters_to_signature(
@@ -603,10 +623,10 @@ class CLIGenerator:
         sig = inspect.signature(check_command)
         existing_param_names = {p.name for p in sig.parameters.values()}
         new_params = self._create_plugin_parameters(config_class, existing_param_names)
-        
+
         # Extract base parameters from existing signature (exclude **kwargs)
         base_params = [
-            param for param in sig.parameters.values() 
+            param for param in sig.parameters.values()
             if param.name != 'kwargs'
         ]
 
@@ -679,6 +699,10 @@ class CLIGenerator:
 
             # Skip snapshots for individual check commands - it's for YAML config only
             if field_name == "snapshots":
+                continue
+
+            # Skip retry for individual check commands - it's handled via CLI options
+            if field_name == "retry":
                 continue
 
             # Handle other fields based on type and requirement

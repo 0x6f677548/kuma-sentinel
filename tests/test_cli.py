@@ -23,6 +23,8 @@ def test_subcommand_common_options():
     assert "--log-level" in result.output
     assert "--uptime-kuma-url" in result.output
     assert "--token" in result.output
+    assert "--retry-attempts" in result.output
+    assert "--retry-delay-seconds" in result.output
     # Check for plugin-specific options
-    assert "--targets" in result.output
+    assert "TAR" in result.output
     assert "--ports" in result.output

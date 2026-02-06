@@ -118,7 +118,7 @@ class KopiaSnapshotPlugin(Plugin):
 
         except Exception as e:
             check_duration = int(time.time() - check_start)
-            self.logger.error(f"❌ Unexpected error during snapshot check: {str(e)}")
+            self.logger.error("❌ Unexpected error during snapshot check", exc_info=True)
             return CheckResult(
                 check_name=config.name,
                 status="down",

@@ -25,6 +25,8 @@ kuma-scout run config.yaml --name nginx-check
 kuma-scout run config.yaml --type portscan
 ```
 
+**Note:** When running multiple checks, each check sends its result independently to Uptime Kuma. Checks with their own `uptime_kuma.token` send to individual monitors. Checks without a token use the global token. There is no aggregation of results - if you need combined status reporting, implement it in a custom script.
+
 ### Command-Line Check (Ad-Hoc)
 
 Execute a single check without config file (requires `--uptime-kuma-url` and `--token`):

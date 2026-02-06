@@ -259,13 +259,11 @@ class Plugin(ABC):
         timeout = timeout or 30
 
         if self.ssh_runner:
-            assert (
-                self.global_config.ssh is not None
-            )  # Since ssh_runner is set only when ssh config exists
-            target = f"{self.global_config.ssh.user or 'current_user'}@{self.global_config.ssh.host}"
-            if self.global_config.ssh.port != 22:
-                target += f":{self.global_config.ssh.port}"
-            self.logger.debug(f"🔌 Running command on {target}: {' '.join(cmd)}")
+            target = f"{self.ssh_runner.user or 'current_user'}@{self.ssh_runner.host}"
+            if self.ssh_runner.port != 22:
+                target += f":{self.ssh_runner.port}"
+            self.logger.info(f"🔌 Running command via SSH on {target}...")
+            self.logger.debug(f"Command: {' '.join(cmd)}")
             try:
                 success, stdout, stderr, exit_code = self.ssh_runner.run(cmd, timeout)
                 return success, stdout, stderr, exit_code
@@ -275,8 +273,8 @@ class Plugin(ABC):
 
         # Local execution
         import subprocess
-
-        self.logger.debug(f"🔧 Running command: {' '.join(cmd)}")
+        self.logger.info("🔧 Running command locally...")
+        self.logger.debug(f"Command: {' '.join(cmd)}")
         try:
             result = subprocess.run(
                 cmd,

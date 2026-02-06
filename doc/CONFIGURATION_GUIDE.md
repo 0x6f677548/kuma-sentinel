@@ -56,6 +56,8 @@ kuma-scout run config.yaml --type cmdcheck
 kuma-scout run config.yaml --type portscan
 ```
 
+**Important:** When running multiple checks with `kuma-scout run`, each check executes independently and sends its result to Uptime Kuma separately. Checks with their own `uptime_kuma.token` send to individual monitors. Checks without a token use the global token. There is no aggregation of results across checks.
+
 **Method 2: CLI Arguments (Recommended for testing/one-off runs)**
 - Quick testing and debugging
 - No files needed
@@ -183,9 +185,9 @@ kuma-scout cmdcheck "systemctl is-active nginx" \
   --heartbeat-token your-heartbeat-token
 ```
 
-#### Multiple Commands - All Must Pass
+#### Multiple Independent Checks
 
-**YAML Configuration (Multiple Commands):**
+**YAML Configuration (Multiple Checks):**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
@@ -214,9 +216,9 @@ checks:
     timeout: 5
 ```
 
-**Result**: DOWN if ANY command fails, UP only if ALL succeed. Individual commands with per-token configuration send separate push notifications to their respective Uptime Kuma monitors, plus an aggregated push to the global monitor if configured.
+**Result**: Each check executes independently and sends its own UP/DOWN result to Uptime Kuma. Checks with their own `uptime_kuma.token` send to individual monitors. Checks without a token use the global token. There is no aggregation of results across checks.
 
-**CLI Limitation**: CLI only supports single commands. For multiple commands, use YAML configuration as shown above.
+**CLI Limitation**: CLI only supports single checks. For multiple checks, use YAML configuration as shown above.
 
 #### Pattern Matching - Detect Conditions in Output
 
@@ -312,7 +314,7 @@ kuma-scout cmdcheck "curl -s https://api.example.com/health" \
 
 - ✅ **Arbitrary Commands** — Run shell commands, scripts, binaries
 - ✅ **Pattern Matching** — Detect success/failure via regex patterns on command output (failure > success > exit code precedence)
-- ✅ **Multiple Commands** — Run multiple independent checks (via YAML), all must pass for UP
+- ✅ **Multiple Checks** — Run multiple independent checks (via YAML), each sending results independently
 - ✅ **Custom Exit Codes** — Specify expected exit code (default 0), handles non-zero success cases (grep, test, etc.)
 - ✅ **Output Truncation** — Last 500 characters captured and sent to Uptime Kuma (prevents log flooding)
 - ✅ **Timeout Protection** — Configure per-command timeout (1-300 seconds) to prevent hangs
@@ -545,7 +547,7 @@ checks:
     uptime_kuma:
       token: your-token
 
-# Example 5: Multiple independent checks (all must pass)
+# Example 5: Multiple independent checks
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
 
@@ -604,7 +606,7 @@ checks:
 # Monitor services across multiple servers with individual monitors for critical services
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
-  token: "infrastructure-aggregate-token"  # For aggregated results
+  token: "global-token"  # Used by checks that don't specify their own token
 
 # Global SSH config (used by local commands)
 ssh:
@@ -658,7 +660,7 @@ checks:
     uptime_kuma:
       token: "backup-monitor-token"
 
-  # Routine monitoring (no individual alerts, only aggregated)
+  # Routine monitoring (uses global token)
   - name: log_directory
     type: cmdcheck
     command: "test -d /var/log"
@@ -669,8 +671,9 @@ checks:
     command: "uptime"
     timeout: 5
 
-# Result: 5 individual alerts (web, db, remote-web, remote-db, backup) + 1 aggregated alert
-# Routine checks (disk_space, system_load) only appear in aggregated results
+# Result: 5 individual alerts (web, db, remote-web, remote-db, backup) + 2 alerts to global monitor
+# Checks with their own tokens send to individual monitors
+# Checks without tokens (log_directory, system_load) send to the global monitor
 ```
 
 ### Use Cases

@@ -120,7 +120,9 @@ class ZfsPoolPlugin(Plugin):
 
         except Exception as e:
             duration = int(time.time() - check_start)
-            self.logger.error(f"❌ ZfsPoolStatus: Unexpected error during ZFS pool check: {str(e)}")
+            self.logger.error(
+                f"❌ ZfsPoolStatus: Unexpected error during ZFS pool check: {str(e)}"
+            )
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -178,7 +180,9 @@ class ZfsPoolPlugin(Plugin):
                 cap_percent = float(cap_str)
                 free_percent = 100.0 - cap_percent
             except ValueError:
-                self.logger.error(f"❌ ZfsPoolStatus: Could not parse capacity percentage: '{cap}'")
+                self.logger.error(
+                    f"❌ ZfsPoolStatus: Could not parse capacity percentage: '{cap}'"
+                )
                 return None, None
 
             return health, free_percent

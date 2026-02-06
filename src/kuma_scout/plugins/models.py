@@ -62,6 +62,15 @@ class HeartbeatConfig(BaseModel):
     )
 
 
+class TagConfig(BaseModel):
+    """Tag-based result aggregation configuration."""
+
+    token: str = Field(description="Uptime Kuma token for aggregated results")
+    description: Optional[str] = Field(
+        default=None, description="Description of what this tag monitors"
+    )
+
+
 class GlobalConfig(BaseModel):
     """
     Global configuration loaded from YAML.
@@ -83,6 +92,9 @@ class GlobalConfig(BaseModel):
         default_factory=HeartbeatConfig, description="Heartbeat settings"
     )
     timeout: int = Field(default=300, description="Global timeout for checks (seconds)")
+    tags: dict[str, TagConfig] = Field(
+        default_factory=dict, description="Tag-based result aggregation configuration"
+    )
     checks: list[dict] = Field(
         default_factory=list, description="List of check configurations"
     )

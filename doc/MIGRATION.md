@@ -125,16 +125,72 @@ checks:
    - All plugins support SSH remote execution
    - Tag-based filtering allows running subsets of checks
 
-#### 5. Benefits of the New Architecture
+#### 5. Tag-Based Result Aggregation (New in v0.2.0)
+
+**What changed:** v0.2.0 introduces automatic tag-based result aggregation. Each check can be tagged, and results are automatically aggregated by tag and sent to tag-specific tokens.
+
+**How it works:**
+- Each check gets an individual result sent to its token (or global token if not configured)
+- Checks with tags are ALSO aggregated and results sent to the tag's configured token
+- This means each check generates TWO API calls to Uptime Kuma (individual + aggregated)
+
+**Configuration Example:**
+
+```yaml
+# Global token for individual check results
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: DEFAULT_TOKEN  # Each check sends individual result here
+
+# Tag-specific tokens for aggregated results
+tags:
+  web:
+    uptime_kuma:
+      token: WEB_AGGREGATION_TOKEN
+  critical:
+    uptime_kuma:
+      token: CRITICAL_AGGREGATION_TOKEN
+
+# Checks with tags
+checks:
+  - name: nginx
+    type: cmdcheck
+    command: systemctl is-active nginx
+    tags: [web, critical]  # Sends to DEFAULT_TOKEN + WEB_AGGREGATION_TOKEN + CRITICAL_AGGREGATION_TOKEN
+  
+  - name: postgres
+    type: cmdcheck
+    command: systemctl is-active postgresql
+    tags: [database, critical]  # Sends to DEFAULT_TOKEN + CRITICAL_AGGREGATION_TOKEN
+```
+
+**API Call Breakdown Example:**
+- 2 checks with tags: 2 individual results + 2 aggregated by tag = 4 total API calls
+- 3 checks with tags: 3 individual results + 3 aggregated by tag = 6 total API calls
+- Checks without tags: Only individual results sent (no additional aggregation calls)
+
+**Token Precedence:**
+For individual check results:
+1. Check-level `uptime_kuma.token` (if configured)
+2. Global `uptime_kuma.token` (if configured)
+3. No report (if neither configured)
+
+For aggregated results by tag:
+1. Tag-level `uptime_kuma.token` (if configured)
+2. No report (aggregation only happens if tag token configured)
+
+See [Tag-Based Result Aggregation](CONFIGURATION_GUIDE.md#tag-based-result-aggregation) for complete details.
+
+#### 6. Benefits of the New Architecture
 
 - **70% Less Code**: ~60-80 lines per plugin vs ~525 lines per command
 - **Auto-Discovery**: Drop a plugin file and it's automatically available
-- **Tag-Based Filtering**: Run checks by tags: `--tag critical`, `--tag web`
+- **Tag-Based Filtering and Aggregation**: Filter with `--tag critical` and aggregate results automatically
 - **Consistent Patterns**: All plugins follow the same structure
 - **Flat Config**: Simple YAML that's easy to read and maintain
+- **Dual Reporting**: Get both granular per-check AND high-level tag aggregation monitoring
 
 ---
-
 
 ## Future Versions
 

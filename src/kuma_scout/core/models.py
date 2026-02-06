@@ -14,6 +14,7 @@ class CheckResult:
         message: Human-readable message
         duration_seconds: How long the check took to execute
         details: Additional metadata for the check (optional)
+        tags: Tags associated with this check for aggregation (optional)
     """
 
     check_name: str
@@ -21,6 +22,7 @@ class CheckResult:
     message: str
     duration_seconds: int
     details: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate status field."""

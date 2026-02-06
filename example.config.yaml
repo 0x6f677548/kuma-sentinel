@@ -47,6 +47,21 @@ heartbeat:
   # Uptime Kuma token for heartbeat monitor
   token: "${HEARTBEAT_TOKEN}"
 
+# === TAG-BASED RESULT AGGREGATION ===
+# Configure tokens for aggregated check results by tag
+# When running with --tag flags, aggregated results are sent to these tokens
+# Individual check results still go to their specific tokens
+tags:
+  services:
+    token: "${TAG_SERVICES_TOKEN}"
+    description: "Aggregated status for all service checks"
+  web:
+    token: "${TAG_WEB_TOKEN}"
+    description: "Aggregated status for web service checks"
+  backup:
+    token: "${TAG_BACKUP_TOKEN}"
+    description: "Aggregated status for backup checks"
+
 # === CHECKS ===
 # List of monitoring checks to execute
 checks:

@@ -8,6 +8,7 @@ import typer
 
 from kuma_scout.core.config_loader import load_config
 from kuma_scout.core.logger import setup_default_logging, setup_logging
+from kuma_scout.core.models import CheckResult
 from kuma_scout.plugins import get_all_plugins
 from kuma_scout.plugins.models import GlobalConfig, UptimeKumaConfig
 
@@ -17,6 +18,112 @@ if TYPE_CHECKING:
 
 class CLIGenerator:
     """Generates CLI commands for the new plugin architecture."""
+
+    def _compute_aggregated_result(
+        self, results: list, tag_name: str
+    ) -> Tuple[str, str, int]:
+        """
+        Compute aggregated result for a tag.
+
+        Args:
+            results: List of CheckResult objects belonging to this tag
+            tag_name: Name of the tag for logging
+
+        Returns:
+            Tuple of (status, message, duration_ms)
+        """
+        if not results:
+            return "up", f"Tag '{tag_name}': no checks executed", 0
+
+        # Status is "down" if ANY check is down
+        overall_status = "down" if any(r.status == "down" for r in results) else "up"
+
+        # Combine messages with check status
+        check_summaries = [f"{r.check_name}: {r.status}" for r in results]
+        message = f"Tag '{tag_name}' [{len([r for r in results if r.status == 'up'])}/{len(results)} healthy]: {' | '.join(check_summaries)}"
+
+        # Total duration is sum of all check durations
+        total_duration_ms = sum(r.duration_seconds for r in results) * 1000
+
+        return overall_status, message, int(total_duration_ms)
+
+    def _send_aggregated_results(
+        self,
+        results_by_tag: dict[str, list],
+        requested_tags: Optional[List[str]],
+        global_config: GlobalConfig,
+        logger,
+    ) -> None:
+        """
+        Send aggregated results to Uptime Kuma for each requested tag.
+
+        Args:
+            results_by_tag: Dict mapping tag_name -> list of CheckResults
+            requested_tags: List of tag names passed via --tag flags
+            global_config: Global configuration containing tag configs
+            logger: Logger instance
+        """
+        if not requested_tags or not global_config.tags:
+            logger.debug(
+                f"No tag aggregation: requested_tags={requested_tags}, "
+                f"global_config.tags={bool(global_config.tags)}"
+            )
+            return
+
+        from kuma_scout.core.uptime_kuma import send_push
+        from kuma_scout.core.utils.sanitizer import DataSanitizer
+
+        logger.debug(
+            f"Starting tag aggregation for tags: {requested_tags}, "
+            f"available results: {list(results_by_tag.keys())}"
+        )
+
+        for tag_name in requested_tags:
+            if tag_name not in global_config.tags:
+                logger.warning(
+                    f"⚠️  Tag '{tag_name}' has no aggregation config, skipping aggregation"
+                )
+                continue
+
+            tag_config = global_config.tags[tag_name]
+            tag_results = results_by_tag.get(tag_name, [])
+
+            if not tag_results:
+                logger.debug(f"No checks found for tag '{tag_name}'")
+                continue
+
+            status, message, duration_ms = self._compute_aggregated_result(
+                tag_results, tag_name
+            )
+
+            # Sanitize message before sending
+            sanitized_message = DataSanitizer.sanitize_output(message)
+
+            logger.info(
+                f"📊 Aggregating {len(tag_results)} check(s) for tag '{tag_name}': {status}"
+            )
+
+            # Send to Uptime Kuma
+            success = send_push(
+                logger=logger,
+                uptime_kuma_url=(
+                    global_config.uptime_kuma.url if global_config.uptime_kuma else None
+                ),
+                push_token=tag_config.token,
+                message=sanitized_message,
+                command=f"tag-{tag_name}",
+                status=status,
+                ping_ms=duration_ms,
+            )
+
+            if success:
+                logger.info(
+                    f"✅ Aggregated result for tag '{tag_name}' sent to Uptime Kuma"
+                )
+            else:
+                logger.error(
+                    f"❌ Failed to send aggregated result for tag '{tag_name}' to Uptime Kuma"
+                )
 
     def _apply_command_line_overrides(
         self,
@@ -168,8 +275,12 @@ class CLIGenerator:
         check_config_obj,
         global_config: GlobalConfig,
         logger,
-    ) -> None:
-        """Execute a check and handle SSH setup and Uptime Kuma reporting."""
+    ) -> Optional[CheckResult]:
+        """Execute a check and handle SSH setup and Uptime Kuma reporting.
+
+        Returns:
+            CheckResult from the check execution, or None if execution failed
+        """
         # Create SSH runner if needed - use check-level SSH config if available, fallback to global
         ssh_runner = None
         ssh_config = check_config_obj.ssh or global_config.ssh
@@ -201,6 +312,12 @@ class CLIGenerator:
         # Execute the check
         result = plugin.execute_with_heartbeat(check_config_obj)
 
+        # Attach tags to result for aggregation
+        result.tags = check_config_obj.tags
+        logger.debug(
+            f"Check '{check_config_obj.name}' completed with tags: {result.tags}"
+        )
+
         # Send to Uptime Kuma if configured
         uptime_config = check_config_obj.uptime_kuma or global_config.uptime_kuma
         if (
@@ -230,6 +347,8 @@ class CLIGenerator:
         else:
             logger.info(f"✅ {check_config_obj.name} executed (no Uptime Kuma config)")
 
+        return result
+
     def _execute_single_check(
         self,
         check_type: str,
@@ -237,18 +356,22 @@ class CLIGenerator:
         global_config: GlobalConfig,
         plugins: dict,
         logger,
-    ) -> None:
-        """Execute a single check and handle reporting."""
+    ) -> Optional[CheckResult]:
+        """Execute a single check and handle reporting.
+
+        Returns:
+            CheckResult from the check execution, or None if execution failed
+        """
         try:
             plugin_class = plugins.get(check_type)
             if not plugin_class:
                 logger.error(f"❌ Unknown plugin type: {check_type}")
-                return
+                return None
 
             check_config_obj = self._create_plugin_config(
                 plugin_class, check_config, global_config
             )
-            self._execute_check_with_reporting(
+            return self._execute_check_with_reporting(
                 plugin_class, check_config_obj, global_config, logger
             )
 
@@ -256,6 +379,7 @@ class CLIGenerator:
             logger.error(
                 f"❌ Failed to execute {check_config.get('name', check_type)}: {str(e)}"
             )
+            return None
 
     def generate_run_command(self) -> Callable:
         """Generate the 'run' command for running checks from config file."""
@@ -387,9 +511,31 @@ class CLIGenerator:
             plugins = get_all_plugins()
             logger.info(f"🚀 Starting execution of {len(filtered_checks)} checks")
 
+            # Collect results for aggregation
+            results_by_tag: dict[str, list] = {}
+            all_results = []
+
             for check_type, check_config in filtered_checks:
-                self._execute_single_check(
+                result = self._execute_single_check(
                     check_type, check_config, global_config, plugins, logger
+                )
+                if result:
+                    all_results.append(result)
+                    # Organize results by tag for aggregation
+                    for result_tag in result.tags:
+                        if result_tag not in results_by_tag:
+                            results_by_tag[result_tag] = []
+                        results_by_tag[result_tag].append(result)
+
+            # Send aggregated results for all tags found in executed checks
+            if results_by_tag and all_results:
+                all_tags = list(results_by_tag.keys())
+                logger.debug(
+                    f"Auto-aggregating results for tags: {all_tags}, "
+                    f"total checks: {len(all_results)}"
+                )
+                self._send_aggregated_results(
+                    results_by_tag, all_tags, global_config, logger
                 )
 
         return run_command

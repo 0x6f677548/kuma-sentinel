@@ -25,7 +25,31 @@ kuma-scout run config.yaml --name nginx-check
 kuma-scout run config.yaml --type portscan
 ```
 
-**Note:** When running multiple checks, each check sends its result independently to Uptime Kuma. Checks with their own `uptime_kuma.token` send to individual monitors. Checks without a token use the global token. There is no aggregation of results - if you need combined status reporting, implement it in a custom script.
+**Result Reporting Behavior:**
+
+When running checks:
+
+1. **Individual Results**: Each check sends its result to:
+   - Check-specific token (if configured with `uptime_kuma.token`)
+   - Global token (if check has no specific token but global token is configured)
+
+2. **Automatic Tag Aggregation**: Results are automatically aggregated by tag if:
+   - Checks have `tags` defined
+   - Tag tokens are configured in the `tags:` section
+   - Aggregated results are sent IN ADDITION to individual results
+
+**Example:** Running 3 checks with tags `[network, critical]` using config with global token and tag tokens:
+```
+✓ check-1 result → global token
+✓ check-2 result → global token
+✓ check-3 result → global token
+✓ network tag aggregated result → network tag token
+✓ critical tag aggregated result → critical tag token
+
+Total: 5 API calls to Uptime Kuma (3 individual + 2 aggregated)
+```
+
+**Note on `--tag` filtering:** The `--tag` flag filters which checks to execute (e.g., `--tag critical` only runs checks tagged "critical"). Aggregation happens independently - all executed checks are aggregated by their tags.
 
 ### Command-Line Check (Ad-Hoc)
 

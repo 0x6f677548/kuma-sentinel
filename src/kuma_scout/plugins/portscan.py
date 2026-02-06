@@ -22,7 +22,9 @@ class PortscanConfig(CheckConfig):
     targets: List[str] = Field(description="IP ranges to scan")
     ports: str = Field(default="1-1000", description="Ports to scan (nmap format)")
     timeout: int = Field(default=3600, ge=1, description="Scan timeout in seconds")
-    exclude: List[str] = Field(default_factory=list, description="Hosts to exclude (can be repeated)")
+    exclude: List[str] = Field(
+        default_factory=list, description="Hosts to exclude (can be repeated)"
+    )
     timing: str = Field(default="T3", description="Nmap timing template")
     arguments: List[str] = Field(
         default_factory=list, description="Additional nmap arguments"
@@ -71,7 +73,9 @@ class PortscanPlugin(Plugin):
 
                 if hosts_with_ports:
                     open_ports_str = ", ".join(hosts_with_ports)
-                    self.logger.warning(f"⚠️ Portscan: Open ports found: {open_ports_str}")
+                    self.logger.warning(
+                        f"⚠️ Portscan: Open ports found: {open_ports_str}"
+                    )
                     return CheckResult(
                         check_name=config.name,
                         status="down",
@@ -119,7 +123,9 @@ class PortscanPlugin(Plugin):
             ):
                 try:
                     os.remove(nmap_xml)
-                    self.logger.debug(f"🗑️ Portscan: Cleaned up temporary file: {nmap_xml}")
+                    self.logger.debug(
+                        f"🗑️ Portscan: Cleaned up temporary file: {nmap_xml}"
+                    )
                 except OSError as e:
                     self.logger.warning(
                         f"⚠️ Portscan: Failed to cleanup temporary file {nmap_xml}: {e}"

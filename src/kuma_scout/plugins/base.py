@@ -273,6 +273,7 @@ class Plugin(ABC):
 
         # Local execution
         import subprocess
+
         self.logger.info("🔧 Running command locally...")
         self.logger.debug(f"Command: {' '.join(cmd)}")
         try:

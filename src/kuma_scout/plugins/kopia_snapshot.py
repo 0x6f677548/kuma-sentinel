@@ -56,7 +56,9 @@ class KopiaSnapshotPlugin(Plugin):
             try:
                 self._validate_snapshot_path(config.path)
             except ValueError as e:
-                self.logger.error(f"❌ KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}")
+                self.logger.error(
+                    f"❌ KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}"
+                )
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -73,7 +75,9 @@ class KopiaSnapshotPlugin(Plugin):
             age_hours, metadata = self._get_snapshot_info(config.path)
 
             if age_hours is None:
-                self.logger.error(f"❌ KopiaSnapshotStatus: Failed to get snapshot info for {config.path}")
+                self.logger.error(
+                    f"❌ KopiaSnapshotStatus: Failed to get snapshot info for {config.path}"
+                )
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -118,7 +122,10 @@ class KopiaSnapshotPlugin(Plugin):
 
         except Exception as e:
             check_duration = int(time.time() - check_start)
-            self.logger.error("❌ KopiaSnapshotStatus: Unexpected error during snapshot check", exc_info=True)
+            self.logger.error(
+                "❌ KopiaSnapshotStatus: Unexpected error during snapshot check",
+                exc_info=True,
+            )
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -172,7 +179,9 @@ class KopiaSnapshotPlugin(Plugin):
                 snapshots = [snapshots]
 
             if not snapshots:
-                self.logger.warning(f"⚠️ KopiaSnapshotStatus: No snapshots found for {snapshot_path}")
+                self.logger.warning(
+                    f"⚠️ KopiaSnapshotStatus: No snapshots found for {snapshot_path}"
+                )
                 return None, None
 
             latest_snapshot = snapshots[0]

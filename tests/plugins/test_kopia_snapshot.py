@@ -44,7 +44,11 @@ class TestKopiaSnapshotExecution:
     def test_recent_snapshot_success(self, plugin, config):
         """Test successful check with recent snapshot."""
         # Use a time 1 hour ago to ensure it's within 24h max_age
-        recent_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace('+00:00', 'Z')
+        recent_time = (
+            (datetime.now(timezone.utc) - timedelta(hours=1))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
         mock_output: list[dict[str, Any]] = [
             {
                 "startTime": recent_time,

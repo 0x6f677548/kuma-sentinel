@@ -41,10 +41,10 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 - Filter checks by name, type, or tag:
 
 ```bash
-# Run all checks
+# Run all checks (results auto-aggregate by tag)
 kuma-scout run config.yaml
 
-# Filter by tag
+# Filter to run only specific tags
 kuma-scout run config.yaml --tag critical
 kuma-scout run config.yaml --tag backup
 
@@ -56,7 +56,12 @@ kuma-scout run config.yaml --type cmdcheck
 kuma-scout run config.yaml --type portscan
 ```
 
-**Important:** When running multiple checks with `kuma-scout run`, each check executes independently and sends its result to Uptime Kuma separately. Checks with their own `uptime_kuma.token` send to individual monitors. Checks without a token use the global token. There is no aggregation of results across checks.
+**Important - Automatic Tag Aggregation:**
+- When running checks, results are AUTOMATICALLY aggregated by tag
+- Each check sends an individual result to its token
+- Additionally, aggregated results are sent to each tag's token
+- `--tag` filtering selects which checks to run, but aggregation happens independently for all executed checks
+- See [Tag-Based Result Aggregation](#tag-based-result-aggregation) section below for detailed explanation and examples
 
 **Method 2: CLI Arguments (Recommended for testing/one-off runs)**
 - Quick testing and debugging
@@ -86,6 +91,82 @@ heartbeat:
   interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
   token: ${HEARTBEAT_TOKEN}              # Uptime Kuma token for heartbeat
 ```
+
+**Tag-Based Result Aggregation:**
+```yaml
+tags:
+  network:
+    token: ${NETWORK_AGGREGATION_TOKEN}  # Token for aggregated network check results
+    description: "Aggregated status for all network checks"
+  
+  backup:
+    token: ${BACKUP_AGGREGATION_TOKEN}
+    description: "Aggregated status for all backup checks"
+```
+
+**How Tag Aggregation Works:**
+
+When checks are executed, results are automatically aggregated by tag. Each check sends TWO reports:
+
+1. **Individual Result**: Sent to the check's own Uptime Kuma token (if configured)
+2. **Aggregated Result**: Sent to the tag's aggregation token (in addition to individual report)
+
+**Token Priority for Individual Results:**
+1. Check-level `uptime_kuma.token` (if configured on the check itself)
+2. Global `uptime_kuma.token` (if configured at the top level)
+3. No report sent (if neither is configured)
+
+This means checks can have NO explicit token configured and still send results to the global token, which will also be aggregated by tag.
+
+**Aggregation Logic:**
+- **Status**: "down" if ANY check in the tag is "down", otherwise "up"
+- **Message**: Combined summary of all checks in the tag with their individual statuses
+- **Duration**: Sum of all check durations in the tag (milliseconds)
+
+**Example Flow - Dual Reporting:**
+```bash
+# Configuration
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: DEFAULT_GLOBAL_TOKEN    # Default token for all checks
+
+tags:
+  network:
+    token: NETWORK_AGGREGATION_TOKEN
+
+checks:
+  - name: internet-check
+    type: cmdcheck
+    command: "curl -f https://example.com"
+    tags: [network]
+    # No check-level token, will use global token
+
+  - name: lan-ports
+    type: portscan
+    targets: "192.168.1.0/24"
+    tags: [network]
+    uptime_kuma:
+      token: PORTSCAN_CUSTOM_TOKEN   # Specific token for this check
+
+# Results sent to:
+# 1. internet-check result:
+#    - DEFAULT_GLOBAL_TOKEN (individual result)
+#    - NETWORK_AGGREGATION_TOKEN (as part of aggregated "network" tag)
+#
+# 2. lan-ports result:
+#    - PORTSCAN_CUSTOM_TOKEN (individual result, overrides global)
+#    - NETWORK_AGGREGATION_TOKEN (as part of aggregated "network" tag)
+#
+# 3. Aggregated "network" tag result:
+#    - NETWORK_AGGREGATION_TOKEN (combined status for both checks)
+```
+
+**Important Notes:**
+- Aggregation happens automatically for all tags present in executed checks
+- No `--tag` filtering required - all results are always aggregated
+- Tag tokens are optional - if a tag has no token configured, aggregation skips that tag (with debug logging)
+- Individual check results are sent immediately after each check completes
+- Aggregated results are sent AFTER all checks complete
 
 **Logging:**
 ```yaml

@@ -43,7 +43,7 @@ Result: ✅ UP (all checks pass) or ⚠️ DOWN (any check fails) in Uptime Kuma
 - **Heartbeat Monitoring**: Send periodic health signals during long operations
 - **Pattern Matching**: Use regex patterns for flexible success/failure detection
 - **Multi-Check Support**: Run multiple checks with per-check configuration and tokens
-- **Tag-Based Filtering**: Group checks by tags for selective execution
+- **Tag-Based Aggregation**: Automatically aggregate check results by tag and report aggregated status to shared tokens
 - **Plugin Architecture**: Extensible system with auto-discovery
 - **Flexible Configuration**: YAML config files, environment variables, CLI arguments
 - **Security First**: Commands executed safely without shell injection; SSH with host key verification
@@ -189,6 +189,18 @@ uptime_kuma:
 logging:
   level: INFO
 
+# Tag-based result aggregation tokens
+tags:
+  web:
+    token: ${WEB_AGGREGATION_TOKEN}
+    description: "Aggregated status for web services"
+  storage:
+    token: ${STORAGE_AGGREGATION_TOKEN}
+    description: "Aggregated status for storage checks"
+  backups:
+    token: ${BACKUP_AGGREGATION_TOKEN}
+    description: "Aggregated status for backup checks"
+
 checks:
   - name: nginx_health
     type: cmdcheck
@@ -212,8 +224,31 @@ checks:
 
 ```bash
 export UPTIME_KUMA_TOKEN=your-push-token
+export WEB_AGGREGATION_TOKEN=your-web-aggregation-token
+export STORAGE_AGGREGATION_TOKEN=your-storage-aggregation-token
+export BACKUP_AGGREGATION_TOKEN=your-backup-aggregation-token
+
+# Run all checks - results aggregate by tag automatically
 kuma-scout run /etc/kuma-scout/config.yaml
 ```
+
+**What happens:**
+
+Each check sends **two reports** automatically:
+
+1. **Individual Result** - to the global or check-specific Uptime Kuma token
+   - `nginx_health` → `${UPTIME_KUMA_TOKEN}` (individual result)
+   - `disk_space` → `${UPTIME_KUMA_TOKEN}` (individual result)
+   - `backup_check` → `${UPTIME_KUMA_TOKEN}` (individual result)
+
+2. **Aggregated Result** - automatically combined by tag and sent to tag tokens
+   - `web` tag → `${WEB_AGGREGATION_TOKEN}` (combined nginx_health + any other web checks)
+   - `storage` tag → `${STORAGE_AGGREGATION_TOKEN}` (combined disk_space + any other storage checks)
+   - `backups` tag → `${BACKUP_AGGREGATION_TOKEN}` (combined backup_check + any other backup checks)
+
+**Result:** 6 total API calls to Uptime Kuma (3 individual + 3 aggregated)
+
+**Why?** You get both granular per-check monitoring AND high-level tag-based monitoring in one run.
 
 Or schedule with cron:
 

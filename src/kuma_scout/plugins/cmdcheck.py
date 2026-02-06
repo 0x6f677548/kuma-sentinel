@@ -49,6 +49,8 @@ class CmdCheckPlugin(Plugin):
         start_time = time.time()
 
         try:
+            self.logger.info("🔍 CmdCheck: Executing...")
+            self.logger.debug(f"Command: {config.command}")
             # Execute the command
             success, stdout, stderr, exit_code = self.run_command(
                 shlex.split(config.command),

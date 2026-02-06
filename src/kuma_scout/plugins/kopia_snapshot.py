@@ -40,7 +40,7 @@ class KopiaSnapshotPlugin(Plugin):
         check_start = time.time()
 
         try:
-            self.logger.info("🔍 Starting Kopia snapshot status check")
+            self.logger.info("🔍 KopiaSnapshotStatus: Starting check")
 
             if not config.path:
                 self.logger.error("❌ No snapshot path configured")
@@ -56,7 +56,7 @@ class KopiaSnapshotPlugin(Plugin):
             try:
                 self._validate_snapshot_path(config.path)
             except ValueError as e:
-                self.logger.error(f"❌ Invalid snapshot path configuration: {str(e)}")
+                self.logger.error(f"❌ KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}")
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -66,14 +66,14 @@ class KopiaSnapshotPlugin(Plugin):
                 )
 
             self.logger.info(
-                f"📋 Checking snapshot path: {config.path} (max age: {config.max_age_hours}h)"
+                f"📋 KopiaSnapshotStatus: Checking snapshot path {config.path} (max age: {config.max_age_hours}h)"
             )
 
             # Get snapshot info
             age_hours, metadata = self._get_snapshot_info(config.path)
 
             if age_hours is None:
-                self.logger.error(f"❌ Failed to get snapshot info for {config.path}")
+                self.logger.error(f"❌ KopiaSnapshotStatus: Failed to get snapshot info for {config.path}")
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -87,7 +87,7 @@ class KopiaSnapshotPlugin(Plugin):
 
             if age_hours <= config.max_age_hours:
                 self.logger.info(
-                    f"✅ OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h"
+                    f"✅ KopiaSnapshotStatus: OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h"
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -102,7 +102,7 @@ class KopiaSnapshotPlugin(Plugin):
                 )
             else:
                 self.logger.warning(
-                    f"⚠️  TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h"
+                    f"⚠️ KopiaSnapshotStatus: TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h"
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -118,7 +118,7 @@ class KopiaSnapshotPlugin(Plugin):
 
         except Exception as e:
             check_duration = int(time.time() - check_start)
-            self.logger.error("❌ Unexpected error during snapshot check", exc_info=True)
+            self.logger.error("❌ KopiaSnapshotStatus: Unexpected error during snapshot check", exc_info=True)
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -161,7 +161,7 @@ class KopiaSnapshotPlugin(Plugin):
 
         if not success or not stdout:
             self.logger.error(
-                f"❌ Failed to list snapshots for {snapshot_path}: {stderr}"
+                f"❌ KopiaSnapshotStatus: Failed to list snapshots for {snapshot_path}: {stderr}"
             )
             return None, None
 
@@ -172,7 +172,7 @@ class KopiaSnapshotPlugin(Plugin):
                 snapshots = [snapshots]
 
             if not snapshots:
-                self.logger.warning(f"⚠️  No snapshots found for {snapshot_path}")
+                self.logger.warning(f"⚠️ KopiaSnapshotStatus: No snapshots found for {snapshot_path}")
                 return None, None
 
             latest_snapshot = snapshots[0]
@@ -182,7 +182,7 @@ class KopiaSnapshotPlugin(Plugin):
             error_count = stats.get("errorCount", 0)
             if error_count > 0:
                 self.logger.error(
-                    f"❌ Snapshot for {snapshot_path} has {error_count} error(s)"
+                    f"❌ KopiaSnapshotStatus: Snapshot for {snapshot_path} has {error_count} error(s)"
                 )
                 return None, None
 
@@ -190,7 +190,7 @@ class KopiaSnapshotPlugin(Plugin):
             end_time_str = latest_snapshot.get("endTime")
             if not end_time_str:
                 self.logger.error(
-                    f"❌ Missing endTime in snapshot data for {snapshot_path}"
+                    f"❌ KopiaSnapshotStatus: Missing endTime in snapshot data for {snapshot_path}"
                 )
                 return None, None
 
@@ -209,6 +209,6 @@ class KopiaSnapshotPlugin(Plugin):
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             self.logger.error(
-                f"❌ Failed to parse snapshot data for {snapshot_path}: {str(e)}"
+                f"❌ KopiaSnapshotStatus: Failed to parse snapshot data for {snapshot_path}: {str(e)}"
             )
             return None, None

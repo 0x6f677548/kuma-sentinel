@@ -37,10 +37,10 @@ class ZfsPoolPlugin(Plugin):
         check_start = time.time()
 
         try:
-            self.logger.info("🔍 Starting ZFS pool status check")
+            self.logger.info("🔍  ZfsPoolStatus: Starting ZFS pool status check")
 
             if not config.pool:
-                self.logger.error("❌ No ZFS pool configured")
+                self.logger.error("❌ ZfsPoolStatus: No ZFS pool configured")
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -50,7 +50,7 @@ class ZfsPoolPlugin(Plugin):
                 )
 
             self.logger.info(
-                f"📋 Checking pool '{config.pool}' (min free space: {config.min_free_percent}%)"
+                f"📋 ZfsPoolStatus: Checking pool '{config.pool}' (min free space: {config.min_free_percent}%)"
             )
 
             health, free_percent = self._get_pool_status(config.pool)
@@ -70,7 +70,7 @@ class ZfsPoolPlugin(Plugin):
             # Check health status
             if health != "ONLINE":
                 self.logger.warning(
-                    f"⚠️  Pool '{config.pool}' health is {health} (not ONLINE)"
+                    f"⚠️ ZfsPoolStatus: Pool '{config.pool}' health is {health} (not ONLINE)"
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -87,7 +87,7 @@ class ZfsPoolPlugin(Plugin):
             # Check free space threshold
             if free_percent < config.min_free_percent:
                 self.logger.warning(
-                    f"⚠️  Pool '{config.pool}' low on space: {free_percent:.1f}% free < {config.min_free_percent}% threshold"
+                    f"⚠️ ZfsPoolStatus: Pool '{config.pool}' low on space: {free_percent:.1f}% free < {config.min_free_percent}% threshold"
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -103,7 +103,7 @@ class ZfsPoolPlugin(Plugin):
                 )
             else:
                 self.logger.info(
-                    f"✅ Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%"
+                    f"✅ ZfsPoolStatus: Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%"
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -120,7 +120,7 @@ class ZfsPoolPlugin(Plugin):
 
         except Exception as e:
             duration = int(time.time() - check_start)
-            self.logger.error(f"❌ Unexpected error during ZFS pool check: {str(e)}")
+            self.logger.error(f"❌ ZfsPoolStatus: Unexpected error during ZFS pool check: {str(e)}")
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -145,14 +145,14 @@ class ZfsPoolPlugin(Plugin):
 
             if not success:
                 self.logger.error(
-                    f"❌ zpool list failed for pool '{pool_name}': {stderr}"
+                    f"❌ ZfsPoolStatus: zpool list failed for pool '{pool_name}': {stderr}"
                 )
                 return None, None
 
             output = stdout.strip()
             if not output:
                 self.logger.error(
-                    f"❌ No output from zpool list for pool '{pool_name}'"
+                    f"❌ ZfsPoolStatus: No output from zpool list for pool '{pool_name}'"
                 )
                 return None, None
 
@@ -160,7 +160,7 @@ class ZfsPoolPlugin(Plugin):
             parts = output.split("\t")
             if len(parts) != 6:
                 self.logger.error(
-                    f"❌ Unexpected zpool output format for '{pool_name}': {output}"
+                    f"❌ ZfsPoolStatus: Unexpected zpool output format for '{pool_name}': {output}"
                 )
                 return None, None
 
@@ -168,7 +168,7 @@ class ZfsPoolPlugin(Plugin):
 
             if name != pool_name:
                 self.logger.error(
-                    f"❌ Pool name mismatch: expected '{pool_name}', got '{name}'"
+                    f"❌ ZfsPoolStatus: Pool name mismatch: expected '{pool_name}', got '{name}'"
                 )
                 return None, None
 
@@ -178,13 +178,13 @@ class ZfsPoolPlugin(Plugin):
                 cap_percent = float(cap_str)
                 free_percent = 100.0 - cap_percent
             except ValueError:
-                self.logger.error(f"❌ Could not parse capacity percentage: '{cap}'")
+                self.logger.error(f"❌ ZfsPoolStatus: Could not parse capacity percentage: '{cap}'")
                 return None, None
 
             return health, free_percent
 
         except Exception as e:
             self.logger.error(
-                f"❌ Error getting pool status for '{pool_name}': {str(e)}"
+                f"❌ ZfsPoolStatus: Error getting pool status for '{pool_name}': {str(e)}"
             )
             return None, None

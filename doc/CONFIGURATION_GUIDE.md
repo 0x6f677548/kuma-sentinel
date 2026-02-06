@@ -5,20 +5,21 @@
 ## Overview: How Configuration Works
 
 Kuma Scout supports multiple configuration sources that work together with a clear priority order. This flexibility allows you to:
-- Store sensitive authentication tokens in environment variables
+- Use environment variable expansion throughout your config (via `${VAR}` syntax)
 - Use YAML files for detailed, reusable configurations
 - Override settings via command-line arguments for one-off executions
 
-**Important:** Only authentication tokens (variables ending in `_TOKEN`) are supported via environment variables. All other configuration must use YAML files or CLI arguments.
+**Important:** All configuration values in YAML support variable expansion using `${VARIABLE_NAME}` syntax. CLI tokens also support this syntax when quoted: `--token "${MY_TOKEN}"`.
 
 ### Configuration Priority (Highest to Lowest)
 
 1. **CLI Arguments** - Command-line flags override everything
-2. **YAML Config File** - Settings in `/etc/kuma-scout/config.yaml` (or custom path via `--config`)
-3. **Token Environment Variables** - Authentication tokens prefixed with `KUMA_SCOUT_*_TOKEN`
-4. **Hardcoded Defaults** - Built-in fallback values
+2. **YAML Config File** - Settings in `/etc/kuma-scout/config.yaml` (or custom path via `kuma-scout run /path/to/config.yaml`)
+3. **Hardcoded Defaults** - Built-in fallback values
 
-This means if you set a value in multiple places, CLI arguments win, followed by YAML, then token environment variables.
+This means if you set a value in multiple places, CLI arguments win, followed by YAML, then defaults.
+
+**Note:** Configuration files do not automatically read environment variables by name. Instead, use `${VAR}` syntax in YAML config to expand environment variables at runtime. This works for all configuration values, not just tokens.
 
 **Example Priority in Action:**
 ```bash
@@ -35,20 +36,33 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 - Easy to version control and audit
 - Supports complex scenarios (multiple paths, pools, snapshots)
 - Default location: `/etc/kuma-scout/config.yaml`
-- Override location: `kuma-scout COMMAND --config /path/to/config.yaml`
+- Usage: `kuma-scout run /path/to/config.yaml`
+- Supports variable expansion in tokens: `${VAR_NAME}`
+- Filter checks by name, type, or tag:
 
-**Method 2: Token Environment Variables (For authentication tokens only)**
-- Secure token storage
-- CI/CD friendly
-- Container-friendly (no files to mount)
-- All token variables suffixed with `_TOKEN`
+```bash
+# Run all checks
+kuma-scout run config.yaml
 
-**Method 3: CLI Arguments (Recommended for testing/one-off runs)**
+# Filter by tag
+kuma-scout run config.yaml --tag critical
+kuma-scout run config.yaml --tag backup
+
+# Filter by check name
+kuma-scout run config.yaml --name nginx-health
+
+# Filter by check type
+kuma-scout run config.yaml --type cmdcheck
+kuma-scout run config.yaml --type portscan
+```
+
+**Method 2: CLI Arguments (Recommended for testing/one-off runs)**
 - Quick testing and debugging
 - No files needed
 - Perfect for cron jobs with inline parameters
+- Tokens support variable expansion: `--token "${MY_TOKEN}"`
 
-**Method 4: Defaults**
+**Method 3: Defaults**
 - Built-in fallback values
 - Minimal required configuration
 
@@ -128,45 +142,9 @@ checks:
 4. SSH config file (`~/.ssh/config`)
 5. Defaults (local execution) - lowest priority
 
-**Important:** SSH settings are NOT supported via environment variables. Use CLI args or YAML config. Environment variables are reserved for tokens and passwords only.
+**Note:** SSH settings in YAML config support variable expansion just like all other config values. For sensitive data like SSH passwords, use `${VAR}` syntax (though keys are recommended over passwords).
 
-### Global CLI Options
-
-All commands support these common CLI options for configuration:
-
-```bash
-# Core configuration
---config /etc/kuma-scout/config.yaml          # YAML config file path
---uptime-kuma-url http://uptimekuma:3001/api/push  # Uptime Kuma API URL
---heartbeat-token your-heartbeat-token        # Heartbeat token
---token your-command-token                    # Command-specific token
-
-# Retry configuration
---retry-count 3                               # Number of retry attempts (default: 0)
---retry-delay 5                               # Delay in seconds between retries (default: 0)
-
-# SSH remote execution
---ssh user@host                               # SSH connection string
---ssh-key-file /path/to/key                    # SSH private key path
---ssh-password your-password                  # SSH password (discouraged)
---ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking  # Host key checking
-
-# Logging
---log-file /var/log/kuma-scout.log            # Log file path
---log-level INFO                              # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-# Development
---ignore-file-permissions                     # Skip config and key file permission validation
-```
-
-**Example with retry options:**
-```bash
-kuma-scout cmdcheck "curl -s https://api.example.com/health" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-token \
-  --retry-attempts 3 \
-  --retry-delay-seconds 5
-```
+**For CLI options and usage examples, see [CLI.md](CLI.md)**
 
 ---
 
@@ -270,12 +248,27 @@ kuma-scout cmdcheck "systemctl status myapp" \
 
 #### Authentication Token
 
-**Environment Variable:**
+**Using variable expansion:**
 ```bash
-KUMA_SCOUT_CMDCHECK_TOKEN=your-cmdcheck-token
+# Set your token in environment
+export MY_CMDCHECK_TOKEN=your-token
+
+# Use in YAML with variable expansion
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: ${MY_CMDCHECK_TOKEN}
 ```
 
-**Or in YAML:**
+**Or on CLI:**
+```bash
+export MY_TOKEN=your-cmdcheck-token
+kuma-scout cmdcheck "command" \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token "${MY_TOKEN}" \
+  --name "my-check"
+```
+
+**Or directly in YAML:**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
@@ -606,7 +599,8 @@ checks:
       token: "app-monitor-token"
 ```
 
-# Example 7: Mixed Local + SSH Commands with Per-Command Tokens
+#### 9. Mixed Local + SSH Commands with Per-Command Tokens
+```yaml
 # Monitor services across multiple servers with individual monitors for critical services
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
@@ -911,7 +905,7 @@ checks:
 1. Install `speedtest-cli`: `pip install speedtest-cli` or `apt install speedtest-cli`
 2. Run initial test to ensure it works: `speedtest-cli --simple`
 3. Adjust failure patterns based on your acceptable minimum speeds
-4. Schedule via cron: `*/30 * * * * /usr/local/bin/kuma-scout run --config /etc/kuma-scout/config.yaml`
+4. Schedule via cron: `*/30 * * * * /usr/local/bin/kuma-scout run /etc/kuma-scout/config.yaml`
 
 **Pattern Explanation:**
 - `Download: [0-9][0-9]\.[0-9][0-9] Mbit/s` matches download speeds below 100 Mbit/s (00.00-99.99)
@@ -922,659 +916,17 @@ checks:
 
 ### Security Considerations
 
-⚠️ **SECURITY FIRST**: Kuma Scout is designed with security as a primary concern.
-
-#### Command Execution Security
-
-Commands are executed **without shell interpretation** (`shell=False`) to prevent command injection vulnerabilities. This means:
-
-- ✅ Shell metacharacters cannot be injected through input
-- ✅ Safe against semicolon-separated command chaining
-- ✅ Safe against pipe injection attacks
-- ✅ Safe against command substitution attacks
-
-#### Configuration Security
-
-Kuma Scout assumes **configuration is admin-controlled** (YAML files, CLI arguments, environment variables are set by administrators only).
-
-If you need complex shell logic:
-1. Create a dedicated shell script (stored securely with 755 permissions)
-2. Call the script from your configuration
-3. Keep the script under version control with your infrastructure code
-
-This separates data (configuration) from logic (scripts) and enables proper code review and auditing.
-
-#### Attack Vectors & Mitigations
-
-| Vector | Risk | Mitigation |
-|--------|------|-----------|
-| Config File Tampering | Malicious commands in config | File permissions (600), access control |
-| PATH Manipulation | Malicious binary substitution | Use absolute paths; dedicated service user |
-| Privilege Escalation | Commands running as root | Run as dedicated low-privilege user |
-| Resource Exhaustion | Fork bombs, infinite loops | Timeout (default 30s) + cgroup limits |
-| Output Leakage | Sensitive data in command output | Output truncated to 500 chars; sanitize scripts |
-
-#### Dangerous Command Pattern Detection
-
-Kuma Scout monitors for and **warns about dangerous commands** that could modify system state when executed with elevated privileges (via sudo). This is a **non-blocking security feature** that helps prevent accidental or malicious system modifications.
-
-**Detection is automatic** - dangerous patterns trigger warning messages in logs but commands still execute. This allows administrators to review and audit commands while maintaining operational continuity.
-
-**Commands that trigger warnings:**
-
-| Category | Tools | Examples |
-|----------|-------|----------|
-| **Package Managers** | `apt`, `apt-get`, `yum`, `dnf`, `pacman`, `brew`, `pip`, `npm`, `gem`, `cargo` | Installing/removing/upgrading packages |
-| **System Services** | `systemctl`, `service` | Starting, stopping, restarting, enabling/disabling services |
-| **File System** | `rm`, `mkfs`, `dd`, `fdisk`, `parted` | Deleting files, formatting disks, modifying partitions |
-| **User Management** | `useradd`, `userdel`, `usermod`, `passwd`, `chmod`, `chown` | Creating/modifying users, changing permissions |
-| **System Control** | `reboot`, `shutdown`, `halt`, `poweroff` | Shutting down or rebooting the system |
-| **Process Management** | `kill`, `killall` | Terminating processes |
-| **ZFS Storage** | `zpool`, `zfs` | Creating/destroying pools or datasets, snapshots, rollbacks |
-
-**Example Warning Messages:**
-
-```
-⚠️  Command 'check_nginx' may modify system state: systemctl start detected. Ensure this is authorized and runs with read-only intent.
-⚠️  Command 'update_packages' may install/remove packages: apt install detected. Ensure this is authorized and runs with read-only intent.
-⚠️  Command 'cleanup' may delete files: rm detected. Ensure this is authorized and runs with read-only intent.
-```
-
-**Recommended Sudoers Configuration**
-
-Only grant sudo access to **read-only** commands that your monitoring actually needs:
-
-```sudoers
-# /etc/sudoers.d/kuma-scout
-# Allow monitoring user to check service status (read-only)
-kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl status *
-kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl is-active *
-
-# Allow checking ZFS pool status (read-only)
-kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool list
-kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool status
-
-# Do NOT grant write permissions to ANY tools
-# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl *  (too broad)
-# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /usr/bin/apt *        (package manager)
-# ❌ AVOID: kuma-scout ALL=(root) NOPASSWD: /bin/rm *             (destructive)
-```
-
-**Safe Monitoring Patterns:**
-
-✅ **Good - Read-only checks:**
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: nginx_status
-    type: cmdcheck
-    command: "systemctl is-active nginx"        # Status check
-    uptime_kuma:
-      token: your-token
-  
-  - name: app_pid_check
-    type: cmdcheck
-    command: "test -f /var/run/app.pid"         # File existence
-    uptime_kuma:
-      token: your-token
-  
-  - name: disk_usage
-    type: cmdcheck
-    command: "/usr/local/bin/check-disk-usage.sh" # Disk usage
-    uptime_kuma:
-      token: your-token
-  
-  - name: zfs_pool_status
-    type: cmdcheck
-    command: "zpool status tank"                # ZFS pool status
-    uptime_kuma:
-      token: your-token
-  
-  - name: app_health
-    type: cmdcheck
-    command: "curl -s http://app:8080/health"   # Health endpoint
-    uptime_kuma:
-      token: your-token
-```
-
-❌ **Dangerous - System modification:**
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: nginx_restart
-    type: cmdcheck
-    command: "systemctl restart nginx"          # Modifies service
-    uptime_kuma:
-      token: your-token
-  
-  - name: package_update
-    type: cmdcheck
-    command: "apt update && apt upgrade"        # Installs packages
-    uptime_kuma:
-      token: your-token
-  
-  - name: cleanup_cache
-    type: cmdcheck
-    command: "rm -rf /tmp/cache"                # Deletes files
-    uptime_kuma:
-      token: your-token
-  
-  - name: destroy_zfs_pool
-    type: cmdcheck
-    command: "zpool destroy tank"               # Destroys storage
-    uptime_kuma:
-      token: your-token
-  
-  - name: system_reboot
-    type: cmdcheck
-    command: "reboot"                           # Reboots system
-    uptime_kuma:
-      token: your-token
-```
-
-**Best Practices:**
-
-1. **Use Read-Only Commands** - Prefer checking status/health instead of modifying systems
-2. **Grant Minimal Sudo** - Only grant access to specific commands you actually need
-3. **Use Full Paths** - Always specify absolute paths (e.g., `/usr/bin/systemctl`) in sudoers
-4. **Enable Audit Logging** - Configure sudo to log all executed commands:
-   ```sudoers
-   Defaults logfile=/var/log/sudo.log
-   ```
-5. **Monitor Warning Messages** - Check logs regularly for dangerous command warnings
-6. **Test in Non-Production** - Always test your monitoring setup in a non-production environment first
-
-#### Configuration File Permission Validation
-
-Kuma Scout **enforces** that your configuration file has **restricted permissions (0o600)** to prevent unauthorized access to sensitive tokens and credentials.
-
-**What it checks:**
-- Config file should only be readable/writable by its owner
-- Typical location: `/etc/kuma-scout/config.yaml` (owner: kuma-scout)
-- Restrictive permissions prevent other users from reading your Uptime Kuma tokens
-
-**If validation fails**, execution **BLOCKS** with an error:
-```
-❌ Security check failed: Config file /etc/kuma-scout/config.yaml has overly permissive mode 0o644.
-Recommended: 0o600. Run: chmod 600 /etc/kuma-scout/config.yaml
-To bypass this check, use --ignore-file-permissions flag or set logging.ignore_file_permissions: true in config.
-```
-
-**To bypass this check** (development or testing only):
-```bash
-# Using CLI flag
-kuma-scout cmdcheck --ignore-file-permissions --config ./config.yaml
-
-# Using YAML configuration
-logging:
-  ignore_file_permissions: true
-```
-
-⚠️ **Security Note**: Only bypass this check during development or testing. Always ensure production configurations have proper permissions (0o600). A config file with world-readable permissions exposes your Uptime Kuma authentication tokens.
-
-#### SSH Security
-
-When using SSH remote execution (`--ssh` option), Kuma Scout enforces security best practices:
-
-**Host Key Verification:**
-- Strict host key checking is **enabled by default** (`StrictHostKeyChecking=yes`)
-- This prevents MITM attacks by verifying the remote host's identity
-- Host keys must be in `~/.ssh/known_hosts` before connecting
-
-**To bypass host key checking** (development/testing only):
-```bash
-kuma-scout cmdcheck \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-uptime-kuma-token \
-  --ssh root@dev-server \
-  --ssh-no-strict-host-key-checking \
-  "uptime"
-```
-
-⚠️ **Warning**: Disabling host key checking makes you vulnerable to MITM attacks. Never use in production.
-
-**SSH Key File Permissions:**
-- SSH private key files must have **restricted permissions (0o600)**
-- Kuma Scout validates key file permissions before use
-- This prevents unauthorized users from reading your private keys
-
-**If validation fails**, execution **BLOCKS** with an error:
-```
-❌ Security check failed: SSH key file /root/.ssh/id_rsa has overly permissive mode 0o644.
-Recommended: 0o600. Run: chmod 600 /root/.ssh/id_rsa
-To bypass this check, use --ignore-file-permissions flag.
-```
-
-**To bypass SSH key permission validation** (development/testing only):
-```bash
-kuma-scout kopiasnapshotstatus \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-uptime-kuma-token \
-  --ssh root@backup-server \
-  --ssh-key-file /shared/key \
-  --ignore-file-permissions \
-  /data
-```
-
-Note: The `--ignore-file-permissions` flag applies to both config files and SSH key files.
-
-**SSH Authentication Methods:**
-
-1. **SSH Key (Recommended)** - Most secure, no passwords in config:
-   ```yaml
-   ssh:
-     connection: "root@backup-server"        # SSH connection string
-     key_file: /root/.ssh/id_rsa             # Path to SSH private key
-   ```
-
-2. **SSH Password (Discouraged)** - Use only when keys are not possible:
-   ```yaml
-   ssh:
-     connection: "admin@legacy-server"       # SSH connection string
-     password: "${SSH_PASSWORD}"             # SSH password (use env var)
-   ```
-   ⚠️ Passwords are less secure than keys and may appear in process lists.
-
-**SSH Best Practices:**
-- ✅ Use SSH keys instead of passwords
-- ✅ Keep private keys in `~/.ssh/` with 600 permissions
-- ✅ Use a dedicated SSH key pair for monitoring (not your personal key)
-- ✅ Add monitoring host keys to `~/.ssh/known_hosts` in advance
-- ✅ Use `~/.ssh/config` for host-specific settings (aliases, jump hosts)
-- ✅ Restrict SSH user permissions on remote hosts (read-only access)
-- ❌ Never disable host key checking in production
-- ❌ Never commit SSH private keys to version control
-- ❌ Never use root SSH keys for monitoring (create dedicated user)
-
-**Example SSH Config (`~/.ssh/config`):**
-```
-Host backup-server
-    HostName 192.168.1.10
-    User kuma-scout
-    IdentityFile ~/.ssh/kuma-scout_key
-    StrictHostKeyChecking yes
-
-Host nas-server
-    HostName 192.168.1.20
-    User monitoring
-    IdentityFile ~/.ssh/nas_monitoring_key
-    Port 2222
-```
-
-Then use host aliases in kuma-scout:
-```bash
-kuma-scout kopiasnapshotstatus \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-uptime-kuma-token \
-  --ssh backup-server \
-  /data
-```
-
-#### SSH Password Authentication Security
-
-⚠️ **SSH password authentication carries security risks**:
-
-**Password Exposure Risk:**
-- Passwords are passed via command line to `sshpass`
-- Passwords may be visible in process lists (`ps`, `top`, `htop`)
-- Other users on the system can potentially see the password
-
-**Example of what's visible:**
-```bash
-# Process list may show:
-sshpass -p mypassword ssh user@host systemctl status nginx
-```
-
-**Security Warning:**
-When using password authentication, Kuma Scout logs a security warning:
-```
-⚠️  SECURITY WARNING: Using SSH password authentication. Password may be exposed in process list (ps/top). Consider using SSH key authentication instead.
-```
-
-**Recommendations:**
-- ✅ **Use SSH key authentication** - More secure and doesn't expose credentials
-- ✅ **Restrict SSH key access** - Use key-specific restrictions if possible
-- ✅ **Monitor for password usage** - Check logs for security warnings
-- ⚠️ **Avoid password auth in production** - Reserve for legacy systems only
-
-**SSH Key Setup (Recommended):**
-```bash
-# Generate SSH key pair
-ssh-keygen -t ed25519 -C "kuma-scout@yourhost"
-
-# Copy public key to remote host
-ssh-copy-id user@remote-host
-
-# Use in Kuma Scout config
-ssh:
-  host: user@remote-host
-  key_file: ~/.ssh/id_ed25519
-```
-
-#### Deployment Best Practices
-
-1. **Run under dedicated user:**
-   ```bash
-   useradd -r -s /bin/false kuma-scout
-   chown kuma-scout:kuma-scout /etc/kuma-scout/config.yaml
-   chmod 600 /etc/kuma-scout/config.yaml
-   ```
-
-2. **Use systemd service with restricted capabilities:**
-   ```ini
-   [Service]
-   User=kuma-scout
-   Group=kuma-scout
-   NoNewPrivileges=yes
-   ProtectSystem=strict
-   ProtectHome=yes
-   ReadWritePaths=/var/log/kuma-scout
-   ```
-
-3. **Enable sudo for specific commands if needed:**
-   ```bash
-   # /etc/sudoers.d/kuma-scout
-   kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl, /usr/bin/zpool
-   ```
-
-4. **Container deployment (recommended):**
-   ```dockerfile
-   FROM python:3.11-slim
-   RUN useradd -r -s /bin/false kuma-scout
-   COPY --chown=kuma-scout:kuma-scout run config.yaml
-   USER kuma-scout
-   ```
-
-
-#### What NOT to Do
-
-- ❌ Don't run commands that output passwords, API keys, or PII (output visible to Uptime Kuma)
-- ❌ Don't allow user-provided commands via web interfaces
-- ❌ Don't run kuma-scout as root unless absolutely necessary
-- ❌ Don't expose Uptime Kuma push tokens in logs or metrics
-- ❌ Don't use shell=True with unchecked user input
-#### Automatic Output Sanitization
-
-⚠️ **SECURITY FEATURE**: Kuma Scout automatically sanitizes command output to prevent accidental exposure of sensitive data.
-
-**By default, the following patterns are masked with `[REDACTED]`:**
-- Passwords and secrets: `password=value`, `secret: value`, `api_key=...`
-- Authentication tokens: Bearer tokens, AWS keys, GitHub tokens
-- Email addresses (masked as `[REDACTED_EMAIL]`)
-- Credit card numbers (masked as `[REDACTED_CARD]`)
-- Database connection strings (masked as `[REDACTED_DB_CONNECTION]`)
-- Exception messages that contain sensitive data
-
-**Example - Automatic Sanitization:**
-
-If your command outputs:
-```
-Connected to mysql://admin:password123@db.local:3306/prod
-User: admin@example.com
-Status: OK
-```
-
-Uptime Kuma will see:
-```
-Connected to [REDACTED_DB_CONNECTION]
-User: [REDACTED_EMAIL]
-Status: OK
-```
-
-**Disable Sanitization (if needed for debugging):**
-
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: myapp_status
-    type: cmdcheck
-    command: "systemctl status myapp"
-    sanitize_output: false  # Default: true
-    uptime_kuma:
-      token: your-token
-```
-
-**⚠️ WARNING**: Only disable sanitization if you're confident the command output won't contain sensitive data.
-
-### Output Sensitivity
-
-Command output is:
-- Truncated to 500 characters (last 500 chars retained)
-- Sent to Uptime Kuma in plaintext
-- Possibly stored in logs and dashboards
-- Visible to anyone with Uptime Kuma access
-
-**Example safe outputs:**
-- ✅ `active (running)` — Service status
-- ✅ `OK` — Health check result
-- ✅ `HEALTHY` — Custom application status
-- ✅ `1` — Database connectivity test
-
-**Example dangerous outputs:**
-- ❌ `password: abc123` — Credentials
-- ❌ `api_key: sk-1234567890` — API keys
-- ❌ `user@example.com` — PII
-- ❌ Database connection strings with passwords
-
-### Common Examples
-
-#### Monitor Multiple Services
-
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: nginx
-    type: cmdcheck
-    command: "systemctl is-active nginx"
-    timeout: 10
-    uptime_kuma:
-      token: your-token
-  
-  - name: postgresql
-    type: cmdcheck
-    command: "systemctl is-active postgresql"
-    timeout: 10
-    uptime_kuma:
-      token: your-token
-  
-  - name: redis
-    type: cmdcheck
-    command: "systemctl is-active redis-server"
-    timeout: 10
-    uptime_kuma:
-      token: your-token
-  
-  - name: app
-    type: cmdcheck
-    command: "systemctl is-active app"
-    timeout: 10
-    uptime_kuma:
-      token: your-token
-```
-
-#### Monitor Backup Completion
-
-Create a monitoring script to check for recent backups:
-```bash
-# Script: /usr/local/bin/check-backup-completion.sh
-#!/bin/bash
-# Check if backups from last 24 hours exist
-find /var/backups -name 'backup-*.tar' -mtime -1 | grep -q .
-```
-
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: backup_check
-    type: cmdcheck
-    command: "/usr/local/bin/check-backup-completion.sh"
-    success_pattern: ""  # Any output = success (files found)
-    timeout: 30
-    uptime_kuma:
-      token: your-token
-```
-
-**Alternative:** Use multiple test commands:
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: recent_backups
-    type: cmdcheck
-    command: "find /var/backups -name 'backup-*.tar' -mtime -1"
-    timeout: 30
-    failure_pattern: "^$"  # Empty output = failure (no backups found)
-    uptime_kuma:
-      token: your-token
-```
-
-#### Check Application via Custom Script
-
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: app_health
-    type: cmdcheck
-    command: "/opt/monitoring/check_app_health.sh"
-    success_pattern: "HEALTHY"
-    failure_pattern: "ERROR|UNHEALTHY|TIMEOUT"
-    timeout: 60
-    uptime_kuma:
-      token: your-token
-```
-
-#### Database Replica Lag Check
-
-Create a monitoring script for replication lag:
-```bash
-# Script: /usr/local/bin/check-replica-lag.sh
-#!/bin/bash
-# Check PostgreSQL replication lag
-LAG=$(psql -h replica.db -U monitoring -d postgres \
-  -c "SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))" \
-  -t 2>/dev/null | tr -d ' ')
-
-# Check if lag is less than 60 seconds
-[ -n "$LAG" ] && [ "${LAG%.*}" -lt 60 ]
-```
-
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: replica_lag
-    type: cmdcheck
-    command: "/usr/local/bin/check-replica-lag.sh"
-    expect_exit_code: 0
-    timeout: 15
-    uptime_kuma:
-      token: your-token
-```
-
-**Alternative:** Use direct command with pattern matching:
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-
-checks:
-  - name: replica_lag
-    type: cmdcheck
-    command: "psql -h replica.db -U monitoring -d postgres -c SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))"
-    failure_pattern: "^\\s*[6-9][0-9]+|^\\s*[1-9][0-9]{2,}"  # Matches >= 60 seconds
-    timeout: 15
-    uptime_kuma:
-      token: your-token
-```
-
-### Result Message Format
-
-Uptime Kuma displays rich status messages with per-command visibility, allowing you to see exactly which commands passed or failed without inspecting logs.
-
-#### Single Command Results
-
-**Success:**
-```
-✓ Success pattern detected: 'healthy' | Output: active (running)
-```
-
-**Failure - Pattern Mismatch:**
-```
-✗ Pattern not found: expected 'OK' in output
-```
-
-**Failure - Exit Code:**
-```
-✗ Command failed (exit 1, expected 0)
-```
-
-**Failure - Timeout:**
-```
-✗ Command timeout after 30 seconds
-```
-
-#### Multiple Command Results
-
-**All Pass:**
-```
-✓ 3/3 commands succeeded: nginx ✓, postgresql ✓, redis ✓
-```
-
-**Some Fail:**
-```
-✗ 1/3 passed, 2/3 failed: nginx (exit 1); postgresql (pattern not found); redis ✓
-```
-
-**All Fail:**
-```
-✗ 0/3 passed, 3/3 failed: nginx (exit 1); postgresql (timeout); redis (error)
-```
-
-#### Reading Results in Uptime Kuma Dashboard
-
-The message field shows:
-- **Status symbol** — ✓ (UP) or ✗ (DOWN) at a glance
-- **Pass/fail ratio** — For multiple commands, see how many passed
-- **Failure reasons** — Top 3 failures with specific error reasons
-- **Command names** — When using named commands in multiple mode
-
-**Example workflow:**
-1. Uptime Kuma shows ✗ DOWN status in dashboard
-2. Click on the heartbeat to see the message
-3. Read "✗ 2/5 passed, 3/5 failed: database (exit 1); cache (timeout); backup (pattern not found)"
-4. Immediately know which 3 services have issues and why
-5. No need to SSH and inspect logs to diagnose the problem
-
-#### Logging for Detailed Debugging
-
-Full per-command breakdown is logged locally for detailed debugging:
-```
-[2024-01-15 14:32:15] cmdcheck executing 3 commands
-[2024-01-15 14:32:15] [nginx: ✓] [database: ✗ exit 1] [cache: ✗ timeout] 
-[2024-01-15 14:32:15] Result: 1/3 passed, 2/3 failed
-```
-
-Check logs with:
-```bash
-# All kuma-scout logs
-docker logs kuma-scout
-
-# Or journalctl if running as systemd service
-journalctl -u kuma-scout -n 100
-```
+**For comprehensive security guidance, see [SECURITY.md](SECURITY.md)**
+
+This configuration guide focuses on the configuration aspects of security. For detailed information on:
+- Attack vectors and mitigations
+- Dangerous command pattern detection
+- Safe vs dangerous monitoring patterns
+- Sudoers configuration examples
+- SSH key and config file permission validation
+- Best practices for command design and network security
+
+See the [Security Guide](SECURITY.md).
 
 ---
 
@@ -1622,8 +974,20 @@ kuma-scout kopiasnapshotstatus \
 ```
 
 ### Authentication Token
+
+Use environment variable expansion in YAML config or CLI:
+
 ```bash
-KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+# In YAML config
+uptime_kuma:
+  token: ${MY_KOPIA_TOKEN}
+
+# Or on CLI
+export MY_KOPIA_TOKEN=your-kopia-token
+kuma-scout kopiasnapshotstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token "${MY_KOPIA_TOKEN}" \
+  /data
 ```
 
 ## Key Features
@@ -1683,10 +1047,19 @@ checks:
 
 ### Authentication Token
 
-Only the token environment variable is supported:
+Use environment variable expansion in YAML config or CLI:
 
 ```bash
-KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
+# In YAML config
+uptime_kuma:
+  token: ${MY_KOPIA_TOKEN}
+
+# Or on CLI
+export MY_KOPIA_TOKEN=your-kopia-token
+kuma-scout kopiasnapshotstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token "${MY_KOPIA_TOKEN}" \
+  /data
 ```
 
 ### CLI Arguments
@@ -1714,19 +1087,18 @@ kuma-scout kopiasnapshotstatus \
 
 # Multiple snapshots (not supported in CLI - use config file)
 
-# With config file and additional settings
-kuma-scout kopiasnapshotstatus \
-  --config /etc/kuma-scout/config.yaml \
-  --max-age-hours 24
-
-# With Uptime Kuma options
+# Single snapshot with custom age threshold
 kuma-scout kopiasnapshotstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --token your-kopia-token \
   /data
-  --snapshot /backups,48 \
+
+# With heartbeat
+kuma-scout kopiasnapshotstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
   --heartbeat-token your-heartbeat-token \
+  /data
   --token your-kopia-token \
   --max-age-hours 24
 ```
@@ -1857,23 +1229,22 @@ kuma-scout kopiasnapshotstatus \
 # Multiple snapshots not supported in CLI - use config file
 ```
 
-### Override config file
+### Quick CLI Check
+
 ```bash
-kuma-scout kopiasnapshotstatus \
-  --config /etc/kuma-scout/config.yaml \
-  /data
+kuma-scout kopiasnapshotstatus /data \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token
 ```
 
 ### With full Uptime Kuma integration
+
 ```bash
 kuma-scout kopiasnapshotstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --token your-kopia-token \
   --heartbeat-token your-heartbeat-token \
   /data
-```
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
 ```
 
 ## Alert Messages
@@ -1952,9 +1323,10 @@ checks:
 ### Command Line
 ```bash
 # Basic port scan
+export MY_PORTSCAN_TOKEN=your-token
 kuma-scout portscan \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-portscan-token \
+  --token "${MY_PORTSCAN_TOKEN}" \
   192.168.1.0/24
 
 # With custom ports and timing
@@ -1962,13 +1334,25 @@ kuma-scout portscan \
   --ports 22,80,443,3389 \
   --timing T4 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-portscan-token \
+  --token "${MY_PORTSCAN_TOKEN}" \
   192.168.1.0/24
 ```
 
 ### Authentication Token
+
+Use variable expansion in YAML config or CLI:
+
 ```bash
-KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token
+# In YAML
+uptime_kuma:
+  token: ${MY_PORTSCAN_TOKEN}
+
+# Or on CLI
+export MY_PORTSCAN_TOKEN=your-portscan-token
+kuma-scout portscan \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token "${MY_PORTSCAN_TOKEN}" \
+  192.168.1.0/24
 ```
 
 ## Configuration Reference
@@ -2178,27 +1562,35 @@ checks:
 ### Command Line
 ```bash
 # Monitor single pool with default threshold (10%)
+export MY_ZFS_TOKEN=your-zfs-token
 kuma-scout zfspoolstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-zfs-token \
-  tank
-```
-  --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token \
+  --token "${MY_ZFS_TOKEN}" \
   tank
 
 # Monitor single pool with custom threshold
 kuma-scout zfspoolstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token \
+  --token "${MY_ZFS_TOKEN}" \
   --min-free-percent 20 \
   tank
 ```
 
 ### Authentication Token
+
+Use variable expansion in YAML config or CLI:
+
 ```bash
-KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+# In YAML
+uptime_kuma:
+  token: ${MY_ZFS_TOKEN}
+
+# Or on CLI
+export MY_ZFS_TOKEN=your-zfs-token
+kuma-scout zfspoolstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token "${MY_ZFS_TOKEN}" \
+  tank
 ```
 
 ## Key Features
@@ -2261,7 +1653,8 @@ kuma-scout zfspoolstatus \
 
 # With config file
 kuma-scout zfspoolstatus \
-  --config /etc/kuma-scout/config.yaml \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-zfs-token \
   tank
 
 # Override global default with CLI
@@ -2407,24 +1800,33 @@ A: Yes, but pools must have >0% free space. A value of 0 means the pool must nev
 
 All commands support these shared settings:
 
-### Authentication Tokens (Environment Variables Only)
+### Authentication Tokens (Variable Expansion Support)
 
-Only authentication tokens are supported via environment variables. All other configuration must use YAML files or CLI arguments.
+All configuration values support environment variable expansion using `${VARIABLE_NAME}` syntax. This includes tokens, URLs, file paths, SSH passwords, and any other configuration setting.
 
-**Supported token environment variables:**
-- `KUMA_SCOUT_HEARTBEAT_TOKEN` - Shared heartbeat notifications token
-- `KUMA_SCOUT_CMDCHECK_TOKEN` - Command execution monitoring token
-- `KUMA_SCOUT_PORTSCAN_TOKEN` - Port scan results token
-- `KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN` - Backup snapshot monitoring token
-- `KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN` - ZFS pool monitoring token
+**Example - In YAML config (all values can use expansion):**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: ${MY_UPTIME_KUMA_TOKEN}  # Any variable name you choose
 
-**Example:**
+heartbeat:
+  enabled: true
+  token: ${MY_HEARTBEAT_TOKEN}    # Any variable name you choose
+
+ssh:
+  key_file: ${SSH_KEY_PATH}       # Paths support expansion too
+  password: ${SSH_PASSWORD}       # So do sensitive values
+```
+
+**Example - On CLI:**
 ```bash
-export KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token
-export KUMA_SCOUT_CMDCHECK_TOKEN=your-cmdcheck-token
-export KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token
-export KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
-export KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
+export MY_TOKEN=my-secure-token
+export MY_HEARTBEAT=heartbeat-token
+
+kuma-scout run config.yaml \
+  --token "${MY_TOKEN}" \
+  --heartbeat-token "${MY_HEARTBEAT}"
 ```
 
 **Or in YAML:**
@@ -2518,14 +1920,23 @@ export DB_TOKEN=db_monitor_token
 
 **Note:** Environment variable expansion is only supported for token fields. Other configuration values must still use YAML literals or CLI arguments.
 
-### Logging (YAML Only)
+### Logging
 ```yaml
 logging:
   log_file: /var/log/kuma-scout.log
   log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
-**Note:** Logging configuration can only be set via YAML files or CLI arguments, not environment variables.
+**CLI Options:**
+```bash
+# Set log level via CLI
+kuma-scout run config.yaml --log-level DEBUG
+
+# Set log file via CLI
+kuma-scout run config.yaml --log-file /var/log/custom.log
+```
+
+**Note:** Logging configuration supports variable expansion (e.g., `${LOG_LEVEL}`) in YAML files.
 
 ### Heartbeat (Uptime Kuma monitoring)
 ```yaml
@@ -2536,37 +1947,51 @@ heartbeat:
     token: your-heartbeat-token
 ```
 
-**Note:** Enable/disable and interval settings can only be configured via YAML files or CLI arguments.
+**CLI Options:**
+```bash
+# Enable heartbeat with custom token via CLI
+kuma-scout run config.yaml --heartbeat-token your-heartbeat-token
+```
+
+**Note:** Enable/disable and interval settings can only be configured via YAML files, but the heartbeat token can be overridden via CLI `--heartbeat-token`.
 
 ### Uptime Kuma URL
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+  token: your-uptime-kuma-token
 ```
 
-**Note:** The base URL must be configured via YAML file or CLI arguments.
+**CLI Options:**
+```bash
+# Override URL and token via CLI
+kuma-scout run config.yaml \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-uptime-kuma-token
+```
+
+**Note:** Both the URL and token can be configured via YAML file or overridden via CLI arguments `--uptime-kuma-url` and `--token`.
 
 ## Configuration Priority
 
 Configuration is loaded in the following priority order (highest to lowest):
 
 1. **CLI arguments** - Command-line flags (highest priority)
-2. **YAML file** - Configuration from `--config` file
-3. **Token Environment Variables** - Only `KUMA_SCOUT_*_TOKEN` variables
-4. **Defaults** - Built-in default values (lowest priority)
+2. **YAML file** - Configuration from config file passed to `run` command
+3. **Defaults** - Built-in default values (lowest priority)
+
+**Variable Expansion:** All configuration values support `${VAR}` syntax for environment variable expansion. Use any variable name you choose.
 
 **Loading order in code:**
 ```
 Defaults (in __init__)
   ↓
-Token environment variables (load_from_env)
+YAML file (load_from_yaml, with ${VAR} expansion for all values)
   ↓
-YAML file (load_from_yaml)
-  ↓
-CLI arguments (load_from_args) ← Final value wins
+CLI arguments (load_from_args, with ${VAR} expansion for all values) ← Final value wins
 ```
 
-**Note:** Each layer completely replaces the previous one—values don't merge. Only authentication tokens are supported via environment variables.
+**Note:** Each layer completely replaces the previous one—values don't merge.
 
 ### Example Priority
 
@@ -2599,199 +2024,5 @@ kuma-scout portscan
 # Result: Scans ports 1-1000 (YAML file wins)
 ```
 
-**Note:** Non-token settings can only be configured via YAML files or CLI arguments. Environment variables are reserved for authentication tokens only.
-
 ---
 
-## Input Validation
-
-Kuma Scout performs comprehensive validation on all configuration inputs to prevent invalid configurations and security issues. This section describes the validation rules for key configuration fields.
-
-### Uptime Kuma URL Validation
-
-The `uptime_kuma.url` field is validated to ensure it points to a valid, secure Uptime Kuma instance.
-
-**Validation Rules:**
-- **Scheme:** Must be `http` or `https` (no `ftp://`, `file://`, etc.)
-- **Hostname:** Must be present (e.g., `localhost`, `uptimekuma`, `192.168.1.1`)
-- **Format:** No spaces allowed
-- **Trailing Slashes:** Not allowed (e.g., `http://uptimekuma:3001/` is invalid, use `http://uptimekuma:3001` instead)
-
-**Valid Examples:**
-```yaml
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push
-  url: https://monitoring.example.com:8080/api/push
-  url: http://192.168.1.1:3001/api/push
-  url: https://uptimekuma.example.com
-```
-
-**Invalid Examples and Errors:**
-```yaml
-uptime_kuma:
-  url: ftp://uptimekuma:3001/api/push
-  # Error: URL scheme must be 'http' or 'https'
-
-uptime_kuma:
-  url: http://
-  # Error: URL must include a hostname
-
-uptime_kuma:
-  url: http://uptimekuma:3001/api/push/
-  # Error: URL must not have a trailing slash
-
-uptime_kuma:
-  url: http://uptime kuma:3001
-  # Error: URL contains invalid characters (spaces)
-```
-
-### Port Range Validation (portscan command)
-
-The `portscan.portscan_nmap_ports` field accepts multiple formats for specifying ports to scan.
-
-**Supported Formats:**
-
-1. **Single Port:**
-   ```yaml
-   portscan:
-     portscan_nmap_ports: "80"
-     portscan_nmap_ports: "443"
-     portscan_nmap_ports: "8080"
-   ```
-
-2. **Port Range:**
-   ```yaml
-   portscan:
-     portscan_nmap_ports: "1-1000"        # Ports 1 through 1000
-     portscan_nmap_ports: "20-25"         # Common SMTP range
-     portscan_nmap_ports: "8000-9000"     # Web services range
-   ```
-
-3. **Multiple Ports (Comma-separated):**
-   ```yaml
-   portscan:
-     portscan_nmap_ports: "22,80,443"     # SSH, HTTP, HTTPS
-     portscan_nmap_ports: "3306,5432"     # MySQL, PostgreSQL
-   ```
-
-4. **Mixed Format:**
-   ```yaml
-   portscan:
-     portscan_nmap_ports: "22,80,443-445,8000-8100"
-     # SSH (22), HTTP (80), HTTPS/SMB (443-445), Custom web (8000-8100)
-   ```
-
-5. **Common Presets:**
-   ```yaml
-   portscan:
-     portscan_nmap_ports: "1-65535"       # All ports (slow!)
-     portscan_nmap_ports: "1-1000"        # Common ports
-     portscan_nmap_ports: "20-25,53,80,110,143,443,465,993,995"  # Common services
-   ```
-
-**Validation Rules:**
-- **Port Range:** Each port must be between 1 and 65535
-- **Range Format:** Must be in format `start-end` where `start < end`
-- **No Spaces:** Port specifications cannot contain spaces
-- **Numeric Values:** All port numbers must be numeric (no letters or special characters)
-- **Range Direction:** Cannot have reversed ranges (e.g., `1000-100` is invalid)
-
-**Valid Examples:**
-```yaml
-portscan:
-  portscan_nmap_ports: "22"               # Single port
-  portscan_nmap_ports: "1-1000"           # Range
-  portscan_nmap_ports: "80,443"           # Multiple ports
-  portscan_nmap_ports: "22,80,443-445"    # Mixed
-```
-
-**Invalid Examples and Errors:**
-```yaml
-portscan:
-  portscan_nmap_ports: "0"
-  # Error: Port must be between 1 and 65535
-
-portscan:
-  portscan_nmap_ports: "65536"
-  # Error: Port must be between 1 and 65535
-
-portscan:
-  portscan_nmap_ports: "1000-100"
-  # Error: Port range start must be less than end (range inverted)
-
-portscan:
-  portscan_nmap_ports: "80 443"
-  # Error: Port specification contains spaces
-
-portscan:
-  portscan_nmap_ports: "80-"
-  # Error: Invalid port specification (incomplete range)
-
-portscan:
-  portscan_nmap_ports: "ssh,http,https"
-  # Error: Port specification must contain numeric values only
-```
-
-### Configuration Validation on Startup
-
-All configuration is validated when you start Kuma Scout. If validation fails, the application will:
-
-1. **Log a detailed error message** showing exactly what failed
-2. **Refuse to start** the monitoring service
-3. **Exit with an error code** (exit code 1)
-
-**Example error output:**
-```
-ERROR: Configuration validation failed
-  - Invalid Uptime Kuma URL: URL scheme must be 'http' or 'https'
-  - Invalid port specification in portscan: Port must be between 1 and 65535
-```
-
-### Handling Validation Errors
-
-**If you get a validation error:**
-
-1. **Read the error message** - It will tell you exactly what's wrong
-2. **Check the CONFIGURATION_GUIDE.md** - See valid examples for that field
-3. **Validate URL format** - Ensure scheme is http/https, hostname is present, no trailing slashes
-4. **Validate port ranges** - Ensure all ports are 1-65535 and ranges are in format start-end
-5. **Test with dry-run** - Use `--log-level DEBUG` to see configuration details
-
-**Example debug workflow:**
-```bash
-# Check if URL is valid
-# - Must start with http:// or https://
-# - Must have a hostname
-# - No trailing slashes
-
-# Check if ports are valid
-# - Single: 1-65535
-# - Range: start-end (start < end)
-# - Multiple: comma-separated, no spaces
-# - Examples: "22", "80-443", "22,80,443-445"
-
-# Use verbose logging to see what's being validated
-kuma-scout portscan --log-level DEBUG --config config.yaml
-```
-
----
-
-## Testing Your Configuration
-
-### Validate YAML syntax
-```bash
-# Python can validate YAML
-python -c "import yaml; yaml.safe_load(open('config.yaml'))"
-```
-
-### Dry run with verbose logging
-```bash
-kuma-scout portscan --log-level DEBUG --config config.yaml
-```
-
-### Run configuration tests
-```bash
-hatch run test tests/test_config_loading.py -v
-hatch run test tests/checkers/test_port_checker.py -v
-hatch run test tests/checkers/test_kopia_snapshot_checker.py -v
-```

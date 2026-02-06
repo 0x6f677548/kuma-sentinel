@@ -34,7 +34,7 @@ uv build
 **Total: ~60-80 lines** (vs ~525 lines in old architecture)
 
 ## Configuration Patterns
-**Priority**: CLI args > YAML config > env vars (tokens only) > defaults
+**Priority**: CLI args > YAML config > defaults (variable expansion via `${VAR}` supported for all values)
 
 **YAML Structure**:
 ```yaml

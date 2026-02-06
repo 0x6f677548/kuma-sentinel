@@ -22,7 +22,7 @@ class PortscanConfig(CheckConfig):
     targets: List[str] = Field(description="IP ranges to scan")
     ports: str = Field(default="1-1000", description="Ports to scan (nmap format)")
     timeout: int = Field(default=3600, ge=1, description="Scan timeout in seconds")
-    exclude: List[str] = Field(default_factory=list, description="Hosts to exclude")
+    exclude: List[str] = Field(default_factory=list, description="Hosts to exclude (can be repeated)")
     timing: str = Field(default="T3", description="Nmap timing template")
     arguments: List[str] = Field(
         default_factory=list, description="Additional nmap arguments"

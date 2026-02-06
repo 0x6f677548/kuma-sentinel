@@ -2,7 +2,136 @@
 
 This guide helps you upgrade between major versions of Kuma-Scout. Each section documents breaking changes and how to migrate your configurations.
 
-## v0.1.0 → v0.2.0
+## v0.1.x → v0.2.0 (Major Architecture Change)
+
+### Breaking Changes
+
+#### 1. Complete Architecture Overhaul: Commands → Plugins
+
+**What changed:** Kuma-Scout has been completely rewritten with a plugin-based architecture that reduces boilerplate by ~70% and simplifies configuration.
+
+**Impact:** All existing configurations, scripts, and usage patterns must be updated.
+
+**Before (v0.1.x) - Command-based:**
+```bash
+# Individual commands with complex nested config
+kuma-scout cmdcheck --config config.yaml
+kuma-scout portscan --ip-range 192.168.1.0/24 --uptime-kuma-url http://uptime:3001/api/push --token token
+
+# Nested YAML structure
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      name: "web-server"
+      token: "web-token"
+portscan:
+  ip_range: "192.168.1.0/24"
+  token: "port-token"
+```
+
+**After (v0.2.0) - Plugin-based:**
+```bash
+# Unified run command or individual check commands
+kuma-scout run --config config.yaml
+kuma-scout cmdcheck "systemctl is-active nginx" --uptime-kuma-url http://uptime:3001/api/push --token token --name "web-server"
+
+# Flat YAML structure with checks list
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: "web-server"
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    uptime_kuma:
+      token: "web-token"
+    tags: [web, critical]
+  - name: "lan-ports"
+    type: portscan
+    ip_range: "192.168.1.0/24"
+    tags: [network]
+```
+
+#### 2. Configuration Structure Changes
+
+**YAML Structure Migration:**
+
+Old nested structure:
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+cmdcheck:
+  commands:
+    - command: "systemctl is-active nginx"
+      token: "token1"
+      
+portscan:
+  ip_range: "192.168.1.0/24"
+  token: "token2"
+```
+
+New flat structure:
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: "nginx-check"
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    uptime_kuma:
+      token: "token1"
+    tags: [web]
+    
+  - name: "port-scan"
+    type: portscan
+    ip_range: "192.168.1.0/24"
+    tags: [network]
+```
+
+#### 3. CLI Command Changes
+
+**Command Migration:**
+
+| Old Command | New Command |
+|-------------|-------------|
+| `kuma-scout cmdcheck --config config.yaml` | `kuma-scout run --config config.yaml` |
+| `kuma-scout cmdcheck --command "cmd"` | `kuma-scout cmdcheck "cmd"` |
+| `kuma-scout portscan --ip-range 192.168.1.0/24` | `kuma-scout portscan 192.168.1.0/24` |
+| `kuma-scout kopiasnapshotstatus --snapshot /data,24` | `kuma-scout kopiasnapshotstatus "/data"` |
+| `kuma-scout zfspoolstatus --pool tank,10` | `kuma-scout zfspoolstatus "tank"` |
+
+#### 4. Migration Steps
+
+1. **Update Configuration Files:**
+   - Change nested command configs to flat `checks:` list
+   - Add `type:` field to specify plugin type
+   - Move command-specific settings under each check
+   - Add `name:` and `tags:` fields for better organization
+
+2. **Update Scripts and Cron Jobs:**
+   - Replace individual command calls with `kuma-scout run --config config.yaml`
+   - Or update to use `kuma-scout check <plugin> --name "check-name" ...`
+
+3. **Update Environment Variables:**
+   - Token variables remain the same: `KUMA_SCOUT_*_TOKEN`
+   - But now apply globally or per-check
+
+4. **Test Thoroughly:**
+   - The new architecture maintains the same monitoring capabilities
+   - All plugins support SSH remote execution
+   - Tag-based filtering allows running subsets of checks
+
+#### 5. Benefits of the New Architecture
+
+- **70% Less Code**: ~60-80 lines per plugin vs ~525 lines per command
+- **Auto-Discovery**: Drop a plugin file and it's automatically available
+- **Tag-Based Filtering**: Run checks by tags: `--tag critical`, `--tag web`
+- **Consistent Patterns**: All plugins follow the same structure
+- **Flat Config**: Simple YAML that's easy to read and maintain
+
+## v0.1.0 → v0.2.0 (Pre-architecture changes)
 
 ### Breaking Changes
 

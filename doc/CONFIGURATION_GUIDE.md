@@ -54,12 +54,13 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 
 ### Global Configuration
 
-These settings apply to all monitoring commands:
+These settings apply to all monitoring checks:
 
 **Uptime Kuma Integration:**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push  # Where to send push notifications
+  token: ${UPTIME_KUMA_TOKEN}          # Global token (can be overridden per check)
 ```
 
 **Heartbeat Service:**
@@ -67,37 +68,56 @@ uptime_kuma:
 heartbeat:
   enabled: true                          # Enable/disable heartbeat pings
   interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
-  uptime_kuma:
-    token: your-heartbeat-token          # Shared across all commands
+  token: ${HEARTBEAT_TOKEN}              # Uptime Kuma token for heartbeat
 ```
 
 **Logging:**
 ```yaml
 logging:
-  log_file: /var/log/kuma-scout.log  # Log file path
-  log_level: INFO                        # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: /var/log/kuma-scout.log          # Log file path
+  level: INFO                            # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
 **SSH Remote Execution:**
 ```yaml
-# Global SSH settings for all commands
+# Global SSH settings for all checks
 ssh:
   # SSH connection string (recommended approach)
   # Supported formats: ssh://user@host:port, user@host:port, user@host, host:port, host
-  connection: backup-server.example.com
+  host: backup-server.example.com
   
-  key_file: /root/.ssh/id_rsa         # Path to SSH private key
-  password: "${SSH_PASSWORD}"         # SSH password (discouraged, use keys)
-  strict_host_key_checking: true      # Verify host keys (default: true)
+  user: root                             # SSH username
+  port: 22                               # SSH port
+  key_file: /root/.ssh/id_rsa            # Path to SSH private key
+  password: "${SSH_PASSWORD}"            # SSH password (discouraged, use keys)
+  strict_host_key_checking: true         # Verify host keys (default: true)
+```
 
-# Command-specific SSH override
-kopiasnapshotstatus:
-  ssh:
-    # Command-specific connection string overrides global settings
-    connection: kopia-server.local
-    key_file: /etc/kopia/ssh_key      # Command-specific key
-  snapshots:
-    - path: /data
+### Checks Configuration
+
+Individual checks are defined in the `checks:` list. Each check can override global settings:
+
+```yaml
+checks:
+  # Example check with global settings
+  - name: "nginx-health"
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    tags: [web, critical]
+    
+  # Example check with overrides
+  - name: "remote-backup"
+    type: kopia_snapshot
+    snapshot: /data,24
+    tags: [backup]
+    # Override global SSH settings for this check
+    ssh:
+      host: backup-server.local
+      key_file: /etc/kopia/ssh_key
+    # Override global Uptime Kuma settings for this check
+    uptime_kuma:
+      token: backup-specific-token
+```
       max_age_hours: 24
 ```
 
@@ -141,12 +161,11 @@ All commands support these common CLI options for configuration:
 
 **Example with retry options:**
 ```bash
-kuma-scout cmdcheck \
-  --command "curl -s https://api.example.com/health" \
-  --retry-count 3 \
-  --retry-delay 5 \
+kuma-scout cmdcheck "curl -s https://api.example.com/health" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-token
+  --token your-token \
+  --retry-attempts 3 \
+  --retry-delay-seconds 5
 ```
 
 ---
@@ -163,24 +182,27 @@ Execute arbitrary shell commands on remote systems and monitor ANY condition. Th
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+
 heartbeat:
+  enabled: true
   uptime_kuma:
     token: your-heartbeat-token
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-  timeout: 10
-  uptime_kuma:
-    token: your-cmdcheck-token
+
+checks:
+  - name: nginx-health
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: your-cmdcheck-token
 ```
 
 **CLI (Single Command Only):**
 ```bash
-kuma-scout cmdcheck \
-  --command "systemctl is-active nginx" \
+kuma-scout cmdcheck "systemctl is-active nginx" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-cmdcheck-token
+  --token your-cmdcheck-token \
+  --heartbeat-token your-heartbeat-token
 ```
 
 #### Multiple Commands - All Must Pass
@@ -189,26 +211,29 @@ kuma-scout cmdcheck \
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+
 heartbeat:
+  enabled: true
   uptime_kuma:
     token: your-heartbeat-token
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: web_server
-      timeout: 10
+
+checks:
+  - name: web_server
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
     
-    - command: "systemctl is-active postgresql"
-      name: database
-      timeout: 10
-      uptime_kuma:
-        token: specific-token-for-postgresql
+  - name: database
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 10
+    uptime_kuma:
+      token: specific-token-for-postgresql
     
-    - command: "test -f /var/run/app.pid"
-      name: app_running
-      timeout: 5
-  uptime_kuma:
-    token: your-cmdcheck-token
+  - name: app_running
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"
+    timeout: 5
 ```
 
 **Result**: DOWN if ANY command fails, UP only if ALL succeed. Individual commands with per-token configuration send separate push notifications to their respective Uptime Kuma monitors, plus an aggregated push to the global monitor if configured.
@@ -219,25 +244,28 @@ cmdcheck:
 
 **YAML Configuration:**
 ```yaml
-cmdcheck:
-  commands:
-    - command: "tail -n 100 /var/log/app.log"
-  failure_pattern: "ERROR|CRITICAL|PANIC"  # Detected → DOWN
-  success_pattern: "^healthy"              # Not detected (with failure) → DOWN
-  timeout: 10
-  uptime_kuma:
-    token: your-cmdcheck-token
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: log_errors
+    type: cmdcheck
+    command: "tail -n 100 /var/log/app.log"
+    failure_pattern: "ERROR|CRITICAL|PANIC"  # Detected → DOWN
+    success_pattern: "^healthy"              # Not detected (with failure) → DOWN
+    timeout: 10
+    uptime_kuma:
+      token: your-cmdcheck-token
 ```
 
 **CLI with Pattern:**
 ```bash
-kuma-scout cmdcheck \
-  --command "systemctl status myapp" \
-  --failure-pattern "failed|error" \
-  --success-pattern "active.*running" \
+kuma-scout cmdcheck "systemctl status myapp" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-cmdcheck-token \
   --heartbeat-token your-heartbeat-token \
-  --token your-cmdcheck-token
+  --failure-pattern "failed|error" \
+  --success-pattern "active.*running"
 ```
 
 #### Authentication Token
@@ -249,35 +277,40 @@ KUMA_SCOUT_CMDCHECK_TOKEN=your-cmdcheck-token
 
 **Or in YAML:**
 ```yaml
-cmdcheck:
-  uptime_kuma:
-    token: your-cmdcheck-token
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: cmdcheck-service
+    type: cmdcheck
+    command: "your-command-here"
+    uptime_kuma:
+      token: your-cmdcheck-token
 ```
 
 #### Retry Logic - Handle Transient Failures
 
 **YAML Configuration:**
 ```yaml
-cmdcheck:
-  retry:
-    attempts: 3                              # Global retry attempts for all commands
-    delay_seconds: 5                         # Delay in seconds between retries
-  commands:
-    - command: "curl -s https://api.example.com/health"
-      name: api_check
-      retry:
-        attempts: 5                          # Per-command override
-        delay_seconds: 10                    # Per-command delay override
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: api_check
+    type: cmdcheck
+    command: "curl -s https://api.example.com/health"
+    retry:
+      attempts: 5                          # Per-command override
+      delay_seconds: 10                    # Per-command delay override
 ```
 
 **CLI Configuration:**
 ```bash
-kuma-scout cmdcheck \
-  --command "curl -s https://api.example.com/health" \
-  --retry-count 3 \
-  --retry-delay 5 \
+kuma-scout cmdcheck "curl -s https://api.example.com/health" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-token
+  --token your-token \
+  --retry-attempts 3 \
+  --retry-delay-seconds 5
 ```
 
 **Result**: Failed commands are retried up to the specified count with delays between attempts. Only failed commands are retried; successful commands proceed normally. SSH connections are re-established for each retry attempt.
@@ -376,10 +409,15 @@ chmod 755 /usr/local/bin/check-nginx.sh
 
 3. Update config:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/check-nginx.sh"
-      name: "nginx_check"
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: nginx_check
+    type: cmdcheck
+    command: "/usr/local/bin/check-nginx.sh"
+    uptime_kuma:
+      token: your-token
 ```
 
 **Complex Example with Multiple Conditions:**
@@ -412,14 +450,19 @@ fi
 
 Config:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/check-system-health.sh"
-      name: "system_health"
-      timeout: 10
-      expect_exit_code: 0
-      success_pattern: "All systems healthy"
-      failure_pattern: "failed"
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: system_health
+    type: cmdcheck
+    command: "/usr/local/bin/check-system-health.sh"
+    timeout: 10
+    expect_exit_code: 0
+    success_pattern: "All systems healthy"
+    failure_pattern: "failed"
+    uptime_kuma:
+      token: your-token
 ```
 
 ### Configuration Reference
@@ -429,33 +472,22 @@ cmdcheck:
 Commands are **always stored as a list**, even for a single command. This provides consistency and enables per-command configuration:
 
 ```yaml
-cmdcheck:
-  # Commands list (required) - always a list
-  commands:
-    - command: "shell command to execute"    # Required: the actual shell command
-      name: "optional_name"                  # Optional: name for reporting (auto-generated if omitted)
-      timeout: 30                            # Optional: per-command timeout (inherits from defaults if omitted)
-      expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
-      success_pattern: null                  # Optional: per-command success pattern
-      failure_pattern: null                  # Optional: per-command failure pattern
-      retry:
-        attempts: 0                             # Optional: per-command retry attempts (inherits from defaults if omitted)
-        delay_seconds: 0                        # Optional: per-command retry delay (inherits from defaults if omitted)
-      uptime_kuma:
-        token: "per-command-token"           # Optional: per-command token (overrides global token)
-  
-  # Default values (applied to all commands unless overridden)
-  timeout: 30                                # Default timeout in seconds (1-300, default 30)
-  expect_exit_code: 0                        # Default expected exit code (0-255, default 0)
-  success_pattern: null                      # Default success pattern (optional)
-  failure_pattern: null                      # Default failure pattern (optional, takes precedence)
-  retry:
-    attempts: 0                                 # Default number of retries (0 = no retries)
-    delay_seconds: 0                            # Default delay between retries in seconds
-  sanitize_output: true                      # Sanitize sensitive data from output (default true, prevents credential leakage)
-  
-  uptime_kuma:
-    token: "your-cmdcheck-token"             # Optional: global push token (used when per-command token not specified)
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: my-command
+    type: cmdcheck
+    command: "shell command to execute"    # Required: the actual shell command
+    timeout: 30                            # Optional: per-command timeout (inherits from defaults if omitted)
+    expect_exit_code: 0                    # Optional: per-command exit code (inherits from defaults if omitted)
+    success_pattern: null                  # Optional: per-command success pattern
+    failure_pattern: null                  # Optional: per-command failure pattern
+    retry:
+      attempts: 0                             # Optional: per-command retry attempts (inherits from defaults if omitted)
+      delay_seconds: 0                        # Optional: per-command retry delay (inherits from defaults if omitted)
+    uptime_kuma:
+      token: "per-command-token"           # Optional: per-command token (overrides global token)
 ```
 
 #### Pattern Matching Logic
@@ -470,134 +502,178 @@ cmdcheck:
 **Examples:**
 ```yaml
 # Example 1: Single command (simplest form)
-cmdcheck:
-  commands:
-    - command: "systemctl is-active myapp"
-  expect_exit_code: 0
-  timeout: 5
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: myapp-check
+    type: cmdcheck
+    command: "systemctl is-active myapp"
+    expect_exit_code: 0
+    timeout: 5
+    uptime_kuma:
+      token: your-token
 
 # Example 2: Named single command
-cmdcheck:
-  commands:
-    - command: "test -f /var/run/app.pid"
-      name: "app_pid_file"
-  timeout: 5
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_pid_file
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"
+    timeout: 5
+    uptime_kuma:
+      token: your-token
 
 # Example 3: Log error detection (failure pattern)
-cmdcheck:
-  commands:
-    - command: "tail -n 500 /var/log/app.log"
-  failure_pattern: "ERROR|CRITICAL|PANIC"
-  timeout: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_logs
+    type: cmdcheck
+    command: "tail -n 500 /var/log/app.log"
+    failure_pattern: "ERROR|CRITICAL|PANIC"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 
 # Example 4: Health endpoint with status line (success pattern)
-cmdcheck:
-  commands:
-    - command: "curl -s http://localhost:8080/health"
-  success_pattern: '"status":\s*"healthy"'
-  timeout: 5
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_health
+    type: cmdcheck
+    command: "curl -s http://localhost:8080/health"
+    success_pattern: '"status":\s*"healthy"'
+    timeout: 5
+    uptime_kuma:
+      token: your-token
 
 # Example 5: Multiple independent checks (all must pass)
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: nginx
-      timeout: 10
-    - command: "systemctl is-active postgresql"
-      name: postgresql
-      timeout: 10
-    - command: "curl -sf http://app.local/health"
-      name: app_health
-      timeout: 5
-      success_pattern: "OK"
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: nginx
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: postgresql
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: app_health
+    type: cmdcheck
+    command: "curl -sf http://app.local/health"
+    timeout: 5
+    success_pattern: "OK"
+    uptime_kuma:
+      token: your-token
 
 # Example 6: Per-command tokens (separate Uptime Kuma monitors)
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: web_server
-      timeout: 10
-    - command: "systemctl is-active postgresql"
-      name: database
-      timeout: 10
-      uptime_kuma:
-        token: "postgres-monitor-token"
-    - command: "test -f /var/run/app.pid"
-      name: app_process
-      timeout: 5
-      uptime_kuma:
-        token: "app-monitor-token"
-  uptime_kuma:
-    token: "global-cmdcheck-token"  # Used for commands without per-token, and aggregated results
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
 
-# Notification Behavior:
-# - Commands WITH per-command tokens send individual notifications to their specific monitors
-# - Commands WITHOUT per-command tokens do NOT send individual notifications (avoid alert spam)
-# - All commands participate in the aggregated notification sent to the global monitor
-# - Result: web_server → no individual alert, database → alert to postgres-monitor, 
-#   app_process → alert to app-monitor, plus aggregated alert to global-cmdcheck-token
+checks:
+  - name: web_server
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: database
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 10
+    uptime_kuma:
+      token: "postgres-monitor-token"
+  
+  - name: app_process
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"
+    timeout: 5
+    uptime_kuma:
+      token: "app-monitor-token"
 ```
 
 # Example 7: Mixed Local + SSH Commands with Per-Command Tokens
 # Monitor services across multiple servers with individual monitors for critical services
-cmdcheck:
-  uptime_kuma:
-    token: "infrastructure-aggregate-token"  # For aggregated results
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: "infrastructure-aggregate-token"  # For aggregated results
 
-  # Global SSH config (used by local commands)
-  ssh:
-    connection: infrastructure-server.local
+# Global SSH config (used by local commands)
+ssh:
+  host: infrastructure-server.local
 
-  commands:
-    # Local critical services (individual monitors)
-    - command: "systemctl is-active nginx"
-      name: "local_web"
-      timeout: 10
-      uptime_kuma:
-        token: "web-monitor-token"
+checks:
+  # Local critical services (individual monitors)
+  - name: local_web
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: "web-monitor-token"
 
-    - command: "systemctl is-active postgresql"
-      name: "local_db"
-      timeout: 15
-      uptime_kuma:
-        token: "database-monitor-token"
+  - name: local_db
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 15
+    uptime_kuma:
+      token: "database-monitor-token"
 
-    # Remote critical services (per-command SSH + individual monitors)
-    - command: "systemctl is-active apache2"
-      name: "remote_web"
-      timeout: 10
-      ssh:
-        connection: web-server.prod.example.com
-      uptime_kuma:
-        token: "remote-web-monitor-token"
+  # Remote critical services (per-command SSH + individual monitors)
+  - name: remote_web
+    type: cmdcheck
+    command: "systemctl is-active apache2"
+    timeout: 10
+    ssh:
+      host: web-server.prod.example.com
+    uptime_kuma:
+      token: "remote-web-monitor-token"
 
-    - command: "systemctl is-active mysql"
-      name: "remote_db"
-      timeout: 15
-      ssh:
-        connection: db-server.prod.example.com
-        key_file: /etc/kuma-scout/prod_db_key
-      uptime_kuma:
-        token: "remote-db-monitor-token"
+  - name: remote_db
+    type: cmdcheck
+    command: "systemctl is-active mysql"
+    timeout: 15
+    ssh:
+      host: db-server.prod.example.com
+      key_file: /etc/kuma-scout/prod_db_key
+    uptime_kuma:
+      token: "remote-db-monitor-token"
 
-    # Backup verification (different SSH config + individual monitor)
-    - command: "test -f /backups/latest.tar.gz"
-      name: "backup_check"
-      timeout: 30
-      ssh:
-        connection: backup@nas.prod.example.com:2222
-        key_file: /etc/kuma-scout/backup_key
-      uptime_kuma:
-        token: "backup-monitor-token"
+  # Backup verification (different SSH config + individual monitor)
+  - name: backup_check
+    type: cmdcheck
+    command: "test -f /backups/latest.tar.gz"
+    timeout: 30
+    ssh:
+      host: backup@nas.prod.example.com
+      port: 2222
+      key_file: /etc/kuma-scout/backup_key
+    uptime_kuma:
+      token: "backup-monitor-token"
 
-    # Routine monitoring (no individual alerts, only aggregated)
-    - command: "test -d /var/log"
-      name: "log_directory"
-      timeout: 5
+  # Routine monitoring (no individual alerts, only aggregated)
+  - name: log_directory
+    type: cmdcheck
+    command: "test -d /var/log"
+    timeout: 5
 
-    - command: "uptime"
-      name: "system_load"
-      timeout: 5
+  - name: system_load
+    type: cmdcheck
+    command: "uptime"
+    timeout: 5
 
 # Result: 5 individual alerts (web, db, remote-web, remote-db, backup) + 1 aggregated alert
 # Routine checks (disk_space, system_load) only appear in aggregated results
@@ -609,46 +685,77 @@ cmdcheck:
 
 Check if critical services are running:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: web_server
-      timeout: 10
-    - command: "systemctl is-active postgresql"
-      name: database
-      timeout: 10
-    - command: "systemctl is-active redis-server"
-      name: cache
-      timeout: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: web_server
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: database
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: cache
+    type: cmdcheck
+    command: "systemctl is-active redis-server"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 2. Custom Health Endpoints
 
 Monitor application health endpoints:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "curl -s http://localhost:8080/api/health"
-      name: "app_health"
-      success_pattern: '"status":\s*"healthy"'
-      timeout: 5
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_health
+    type: cmdcheck
+    command: "curl -s http://localhost:8080/api/health"
+    success_pattern: '"status":\s*"healthy"'
+    timeout: 5
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 3. File Existence Checks
 
 Alert if critical files are missing (multiple independent checks):
 ```yaml
-cmdcheck:
-  commands:
-    - command: "test -f /var/run/app.pid"
-      name: "app_pid_file"
-      timeout: 5
-    - command: "test -f /var/spool/lock"
-      name: "lock_file"
-      timeout: 5
-    - command: "test -f /etc/app/config.yaml"
-      name: "config_file"
-      timeout: 5
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_pid_file
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"
+    timeout: 5
+    uptime_kuma:
+      token: your-token
+  
+  - name: lock_file
+    type: cmdcheck
+    command: "test -f /var/spool/lock"
+    timeout: 5
+    uptime_kuma:
+      token: your-token
+  
+  - name: config_file
+    type: cmdcheck
+    command: "test -f /etc/app/config.yaml"
+    timeout: 5
+    uptime_kuma:
+      token: your-token
 ```
 
 **Result**: DOWN if ANY file is missing, UP only if ALL files exist
@@ -664,47 +771,68 @@ test "$AVAILABLE" -gt 5000000
 ```
 
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/check-disk-space.sh"
-      timeout: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: disk_space
+    type: cmdcheck
+    command: "/usr/local/bin/check-disk-space.sh"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 5. Log Pattern Detection
 
 Alert on error patterns in logs:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "journalctl -u myapp -n 1000 --no-pager"
-      name: "app_logs"
-      failure_pattern: "ERROR|CRITICAL|FATAL"
-      success_pattern: "Running normally"
-      timeout: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_logs
+    type: cmdcheck
+    command: "journalctl -u myapp -n 1000 --no-pager"
+    failure_pattern: "ERROR|CRITICAL|FATAL"
+    success_pattern: "Running normally"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 6. Database Connectivity
 
 Verify database health:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "psql -h db.example.com -U monitoring -d health_check -c SELECT 1"
-      name: "db_health"
-      expect_exit_code: 0
-      timeout: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: db_health
+    type: cmdcheck
+    command: "psql -h db.example.com -U monitoring -d health_check -c SELECT 1"
+    expect_exit_code: 0
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 7. Custom Script Execution
 
 Run custom monitoring scripts:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/custom-health-check.sh"
-      name: "custom_check"
-      success_pattern: "^HEALTHY"
-      timeout: 30
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: custom_check
+    type: cmdcheck
+    command: "/usr/local/bin/custom-health-check.sh"
+    success_pattern: "^HEALTHY"
+    timeout: 30
+    uptime_kuma:
+      token: your-token
 ```
 
 #### 8. ISP Speed Test Monitoring (Real-World Example)
@@ -714,70 +842,76 @@ Monitor your internet connection speed and alert when it drops below acceptable 
 **CLI Examples:**
 ```bash
 # Monitor download speed - alert if below 100 Mbit/s
-kuma-scout cmdcheck \
-  --command "speedtest-cli --simple --no-upload" \
-  --failure-pattern "Download: [0-9][0-9]\.[0-9][0-9] Mbit/s" \
+kuma-scout cmdcheck "speedtest-cli --simple --no-upload" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-speedtest-token \
   --heartbeat-token your-heartbeat-token \
-  --token your-speedtest-token
+  --failure-pattern "Download: [0-9][0-9]\.[0-9][0-9] Mbit/s"
 
 # Monitor upload speed - alert if below 50 Mbit/s  
-kuma-scout cmdcheck \
-  --command "speedtest-cli --simple --no-download" \
-  --failure-pattern "Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s" \
+kuma-scout cmdcheck "speedtest-cli --simple --no-download" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-upload-speedtest-token \
   --heartbeat-token your-heartbeat-token \
-  --token your-upload-speedtest-token
+  --failure-pattern "Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s"
 ```
 
 **YAML Configuration (Recommended for production):**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+
 heartbeat:
+  enabled: true
   uptime_kuma:
     token: your-heartbeat-token
-cmdcheck:
-  commands:
-    - name: 'Download speed test'
-      command: 'speedtest-cli --simple --no-upload'
-      failure_pattern: 'Download: [0-9][0-9]\.[0-9][0-9] Mbit/s'
-      timeout: 300
-      uptime_kuma:
-        token: KumaScoutSpeedtestDownloadToken
-    - name: 'Upload speed test'
-      command: 'speedtest-cli --simple --no-download'
-      failure_pattern: 'Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s'
-      timeout: 300
-      uptime_kuma:
-        token: KumaScoutSpeedtestUploadToken
+
+checks:
+  - name: download_speed_test
+    type: cmdcheck
+    command: 'speedtest-cli --simple --no-upload'
+    failure_pattern: 'Download: [0-9][0-9]\.[0-9][0-9] Mbit/s'
+    timeout: 300
+    uptime_kuma:
+      token: KumaScoutSpeedtestDownloadToken
+  
+  - name: upload_speed_test
+    type: cmdcheck
+    command: 'speedtest-cli --simple --no-download'
+    failure_pattern: 'Upload: [0-4][0-9]\.[0-9][0-9] Mbit/s'
+    timeout: 300
+    uptime_kuma:
+      token: KumaScoutSpeedtestUploadToken
 ```
 
 **Alternative YAML Configuration (Combined Speed Test with Retries):**
 ```yaml
 uptime_kuma:
   url: http://uptimekuma:3001/api/push
+
 heartbeat:
+  enabled: true
   uptime_kuma:
     token: your-heartbeat-token
-cmdcheck:
-  commands:
-    - name: 'Internet speed test'
-      command: 'speedtest-cli --simple --secure'
-      failure_pattern: '(Download:\ [0-4][0-9][0-9]\.[0-9][0-9]\ Mbit/s|Upload:\ [0-3][0-9][0-9]\.[0-9][0-9]\ Mbit/s)'
-      timeout: 300
-      retry:
-        attempts: 3
-        delay_seconds: 30
-      uptime_kuma:
-        token: KumaScoutSpeedtestCombinedToken
+
+checks:
+  - name: internet_speed_test
+    type: cmdcheck
+    command: 'speedtest-cli --simple --secure'
+    failure_pattern: '(Download:\ [0-4][0-9][0-9]\.[0-9][0-9]\ Mbit/s|Upload:\ [0-3][0-9][0-9]\.[0-9][0-9]\ Mbit/s)'
+    timeout: 300
+    retry:
+      attempts: 3
+      delay_seconds: 30
+    uptime_kuma:
+      token: KumaScoutSpeedtestCombinedToken
 ```
 
 **Setup Requirements:**
 1. Install `speedtest-cli`: `pip install speedtest-cli` or `apt install speedtest-cli`
 2. Run initial test to ensure it works: `speedtest-cli --simple`
 3. Adjust failure patterns based on your acceptable minimum speeds
-4. Schedule via cron: `*/30 * * * * /usr/local/bin/kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml`
+4. Schedule via cron: `*/30 * * * * /usr/local/bin/kuma-scout run --config /etc/kuma-scout/config.yaml`
 
 **Pattern Explanation:**
 - `Download: [0-9][0-9]\.[0-9][0-9] Mbit/s` matches download speeds below 100 Mbit/s (00.00-99.99)
@@ -870,24 +1004,76 @@ kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool status
 
 ✅ **Good - Read-only checks:**
 ```yaml
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"        # Status check
-    - command: "test -f /var/run/app.pid"         # File existence
-    - command: "df / | tail -1 | awk '{print $5}'" # Disk usage
-    - command: "zpool status tank"                # ZFS pool status
-    - command: "curl -s http://app:8080/health"   # Health endpoint
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: nginx_status
+    type: cmdcheck
+    command: "systemctl is-active nginx"        # Status check
+    uptime_kuma:
+      token: your-token
+  
+  - name: app_pid_check
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"         # File existence
+    uptime_kuma:
+      token: your-token
+  
+  - name: disk_usage
+    type: cmdcheck
+    command: "/usr/local/bin/check-disk-usage.sh" # Disk usage
+    uptime_kuma:
+      token: your-token
+  
+  - name: zfs_pool_status
+    type: cmdcheck
+    command: "zpool status tank"                # ZFS pool status
+    uptime_kuma:
+      token: your-token
+  
+  - name: app_health
+    type: cmdcheck
+    command: "curl -s http://app:8080/health"   # Health endpoint
+    uptime_kuma:
+      token: your-token
 ```
 
 ❌ **Dangerous - System modification:**
 ```yaml
-cmdcheck:
-  commands:
-    - command: "systemctl restart nginx"          # Modifies service
-    - command: "apt update && apt upgrade"        # Installs packages
-    - command: "rm -rf /tmp/cache"                # Deletes files
-    - command: "zpool destroy tank"               # Destroys storage
-    - command: "reboot"                           # Reboots system
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: nginx_restart
+    type: cmdcheck
+    command: "systemctl restart nginx"          # Modifies service
+    uptime_kuma:
+      token: your-token
+  
+  - name: package_update
+    type: cmdcheck
+    command: "apt update && apt upgrade"        # Installs packages
+    uptime_kuma:
+      token: your-token
+  
+  - name: cleanup_cache
+    type: cmdcheck
+    command: "rm -rf /tmp/cache"                # Deletes files
+    uptime_kuma:
+      token: your-token
+  
+  - name: destroy_zfs_pool
+    type: cmdcheck
+    command: "zpool destroy tank"               # Destroys storage
+    uptime_kuma:
+      token: your-token
+  
+  - name: system_reboot
+    type: cmdcheck
+    command: "reboot"                           # Reboots system
+    uptime_kuma:
+      token: your-token
 ```
 
 **Best Practices:**
@@ -942,9 +1128,11 @@ When using SSH remote execution (`--ssh` option), Kuma Scout enforces security b
 **To bypass host key checking** (development/testing only):
 ```bash
 kuma-scout cmdcheck \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-uptime-kuma-token \
   --ssh root@dev-server \
   --ssh-no-strict-host-key-checking \
-  --command "uptime"
+  "uptime"
 ```
 
 ⚠️ **Warning**: Disabling host key checking makes you vulnerable to MITM attacks. Never use in production.
@@ -964,10 +1152,12 @@ To bypass this check, use --ignore-file-permissions flag.
 **To bypass SSH key permission validation** (development/testing only):
 ```bash
 kuma-scout kopiasnapshotstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-uptime-kuma-token \
   --ssh root@backup-server \
   --ssh-key-file /shared/key \
   --ignore-file-permissions \
-  --snapshot /data,24
+  /data
 ```
 
 Note: The `--ignore-file-permissions` flag applies to both config files and SSH key files.
@@ -1017,7 +1207,11 @@ Host nas-server
 
 Then use host aliases in kuma-scout:
 ```bash
-kuma-scout kopiasnapshotstatus --ssh backup-server --snapshot /data,24
+kuma-scout kopiasnapshotstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-uptime-kuma-token \
+  --ssh backup-server \
+  /data
 ```
 
 #### SSH Password Authentication Security
@@ -1057,7 +1251,7 @@ ssh-copy-id user@remote-host
 
 # Use in Kuma Scout config
 ssh:
-  connection: user@remote-host
+  host: user@remote-host
   key_file: ~/.ssh/id_ed25519
 ```
 
@@ -1091,16 +1285,10 @@ ssh:
    ```dockerfile
    FROM python:3.11-slim
    RUN useradd -r -s /bin/false kuma-scout
-   COPY --chown=kuma-scout:kuma-scout config.yaml /etc/kuma-scout/
+   COPY --chown=kuma-scout:kuma-scout run config.yaml
    USER kuma-scout
    ```
 
-5. **Centralized logging:**
-   ```bash
-   # Send all command output and errors to centralized logging
-   kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml 2>&1 | \
-     logger -t kuma-scout -s
-   ```
 
 #### What NOT to Do
 
@@ -1140,12 +1328,16 @@ Status: OK
 **Disable Sanitization (if needed for debugging):**
 
 ```yaml
-cmdcheck:
-  commands:
-    - command: "systemctl status myapp"
-  sanitize_output: false  # Default: true
-  uptime_kuma:
-    token: your-token
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: myapp_status
+    type: cmdcheck
+    command: "systemctl status myapp"
+    sanitize_output: false  # Default: true
+    uptime_kuma:
+      token: your-token
 ```
 
 **⚠️ WARNING**: Only disable sanitization if you're confident the command output won't contain sensitive data.
@@ -1175,19 +1367,37 @@ Command output is:
 #### Monitor Multiple Services
 
 ```yaml
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: nginx
-    - command: "systemctl is-active postgresql"
-      name: postgresql
-    - command: "systemctl is-active redis-server"
-      name: redis
-    - command: "systemctl is-active app"
-      name: app
-  timeout: 10
-  uptime_kuma:
-    token: your-token
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: nginx
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: postgresql
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: redis
+    type: cmdcheck
+    command: "systemctl is-active redis-server"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
+  
+  - name: app
+    type: cmdcheck
+    command: "systemctl is-active app"
+    timeout: 10
+    uptime_kuma:
+      token: your-token
 ```
 
 #### Monitor Backup Completion
@@ -1201,32 +1411,49 @@ find /var/backups -name 'backup-*.tar' -mtime -1 | grep -q .
 ```
 
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/check-backup-completion.sh"
-      name: "backup_check"
-      success_pattern: ""  # Any output = success (files found)
-      timeout: 30
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: backup_check
+    type: cmdcheck
+    command: "/usr/local/bin/check-backup-completion.sh"
+    success_pattern: ""  # Any output = success (files found)
+    timeout: 30
+    uptime_kuma:
+      token: your-token
 ```
 
 **Alternative:** Use multiple test commands:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "find /var/backups -name 'backup-*.tar' -mtime -1"
-      name: "recent_backups"
-      timeout: 30
-      failure_pattern: "^$"  # Empty output = failure (no backups found)
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: recent_backups
+    type: cmdcheck
+    command: "find /var/backups -name 'backup-*.tar' -mtime -1"
+    timeout: 30
+    failure_pattern: "^$"  # Empty output = failure (no backups found)
+    uptime_kuma:
+      token: your-token
 ```
 
 #### Check Application via Custom Script
 
 ```yaml
-cmdcheck:
-  command: "/opt/monitoring/check_app_health.sh"
-  success_pattern: "HEALTHY"
-  failure_pattern: "ERROR|UNHEALTHY|TIMEOUT"
-  timeout: 60
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: app_health
+    type: cmdcheck
+    command: "/opt/monitoring/check_app_health.sh"
+    success_pattern: "HEALTHY"
+    failure_pattern: "ERROR|UNHEALTHY|TIMEOUT"
+    timeout: 60
+    uptime_kuma:
+      token: your-token
 ```
 
 #### Database Replica Lag Check
@@ -1245,22 +1472,32 @@ LAG=$(psql -h replica.db -U monitoring -d postgres \
 ```
 
 ```yaml
-cmdcheck:
-  commands:
-    - command: "/usr/local/bin/check-replica-lag.sh"
-      name: "replica_lag"
-      expect_exit_code: 0
-      timeout: 15
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: replica_lag
+    type: cmdcheck
+    command: "/usr/local/bin/check-replica-lag.sh"
+    expect_exit_code: 0
+    timeout: 15
+    uptime_kuma:
+      token: your-token
 ```
 
 **Alternative:** Use direct command with pattern matching:
 ```yaml
-cmdcheck:
-  commands:
-    - command: "psql -h replica.db -U monitoring -d postgres -c SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))"
-      name: "replica_lag"
-      failure_pattern: "^\\s*[6-9][0-9]+|^\\s*[1-9][0-9]{2,}"  # Matches >= 60 seconds
-      timeout: 15
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: replica_lag
+    type: cmdcheck
+    command: "psql -h replica.db -U monitoring -d postgres -c SELECT EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))"
+    failure_pattern: "^\\s*[6-9][0-9]+|^\\s*[1-9][0-9]{2,}"  # Matches >= 60 seconds
+    timeout: 15
+    uptime_kuma:
+      token: your-token
 ```
 
 ### Result Message Format
@@ -1349,23 +1586,39 @@ Monitor backup snapshot age and alert when backups are stale.
 
 #### Configuration File (YAML)
 ```yaml
-kopiasnapshotstatus:
-  snapshots:
-    - path: /data
-      max_age_hours: 24
-    - path: /backups
-      max_age_hours: 48
-    - path: root@fileserver:/mnt/shares
-      # Omits max_age_hours → uses global default
-  max_age_hours: 24
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: data_backup
+    type: kopiasnapshotstatus
+    path: /data
+    max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: backup_snapshot
+    type: kopiasnapshotstatus
+    path: /backups
+    max_age_hours: 48
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: remote_backup
+    type: kopiasnapshotstatus
+    path: root@fileserver:/mnt/shares
+    # Uses default max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
 ```
 
 ### Command Line
 ```bash
-# Override with CLI
+# Single snapshot
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data 24 \
-  --snapshot /backups 48
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
+  /data
 ```
 
 ### Authentication Token
@@ -1387,34 +1640,45 @@ KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 
 ### Structure
 ```
-kopiasnapshotstatus:
-  snapshots:          # List of snapshot configurations
-    - path: <string>  # Required: snapshot path (local or remote)
-      max_age_hours: <int>  # Optional: max age hours (falls back to global default)
-  max_age_hours: <int> # Global default (default: 24)
+uptime_kuma:
+  url: <string>      # Uptime Kuma push API URL
+
+checks:
+  - name: <string>   # Required: unique check name
+    type: kopiasnapshotstatus
+    path: <string>   # Required: snapshot path (local or remote)
+    max_age_hours: <int>  # Optional: max age hours (default: 24)
+    uptime_kuma:
+      token: <string> # Optional: override global token
 ```
 
 ### Configuration Priority
 
 Configuration is loaded in the following priority order (highest to lowest):
-1. **CLI arguments** - Command-line `--snapshot` and `--max-age-hours` flags (highest priority)
+1. **CLI arguments** - Command-line options (highest priority)
 2. **YAML file** - Configuration from config file
 3. **Defaults** - Built-in defaults (max_age_hours: 24)
-
-**Note:** CLI arguments completely override YAML config. Each layer fully replaces the previous one—they don't merge.
 
 ### YAML Configuration
 
 ```yaml
-kopiasnapshotstatus:
-  uptime_kuma:
-    token: your-kopia-token
-  snapshots:
-    - path: /data
-      max_age_hours: 24
-    - path: /backups
-      max_age_hours: 48
-  max_age_hours: 24
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: data_backup
+    type: kopiasnapshotstatus
+    path: /data
+    max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: backup_snapshot
+    type: kopiasnapshotstatus
+    path: /backups
+    max_age_hours: 48
+    uptime_kuma:
+      token: your-kopia-token
 ```
 
 ### Authentication Token
@@ -1428,37 +1692,27 @@ KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN=your-kopia-token
 ### CLI Arguments
 
 ```bash
-# Single snapshot with hours (format: path,hours)
-kuma-scout kopiasnapshotstatus --snapshot /data,24
-
-# Single snapshot without hours (uses hardcoded default of 24 hours)
-kuma-scout kopiasnapshotstatus --snapshot /data
-
-# Single snapshot without hours or --max-age-hours (uses hardcoded default of 24 hours)
+# Single snapshot with default max age (24 hours)
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
+  --token your-kopia-token \
+  /data
 
-# Multiple snapshots mixed format (/data and /archive use default 24h, /backups uses 48h)
+# Single snapshot with custom max age
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data \
-  --snapshot /backups,48 \
-  --snapshot "user@host:/path,72" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
+  --token your-kopia-token \
+  --max-age-hours 48 \
+  /data
 
-# Multiple snapshots with custom global default
+# Single snapshot with heartbeat
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data \
-  --snapshot /backups,48 \
-  --snapshot /archive \
-  --max-age-hours 24 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
   --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
+  /data
+
+# Multiple snapshots (not supported in CLI - use config file)
 
 # With config file and additional settings
 kuma-scout kopiasnapshotstatus \
@@ -1467,7 +1721,9 @@ kuma-scout kopiasnapshotstatus \
 
 # With Uptime Kuma options
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
+  /data
   --snapshot /backups,48 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
@@ -1504,64 +1760,118 @@ This validation is performed both at configuration load time and during executio
 
 ### Local paths with different thresholds:
 ```yaml
-snapshots:
-  - path: /data
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: data_backup
+    type: kopiasnapshotstatus
+    path: /data
     max_age_hours: 24
-  - path: /var/backups
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: backups
+    type: kopiasnapshotstatus
+    path: /var/backups
     max_age_hours: 48
-  - path: /archive
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: archive
+    type: kopiasnapshotstatus
+    path: /archive
     max_age_hours: 168  # Weekly
+    uptime_kuma:
+      token: your-kopia-token
 ```
 
 **Mixed local and remote paths:**
 ```yaml
-snapshots:
-  - path: /local/backup
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: local_backup
+    type: kopiasnapshotstatus
+    path: /local/backup
     max_age_hours: 24
-  - path: backup.example.com:/remote/snapshots
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: remote_snapshots
+    type: kopiasnapshotstatus
+    path: backup.example.com:/remote/snapshots
     max_age_hours: 48
-  - path: root@nas:/volume1/backup
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: nas_backup
+    type: kopiasnapshotstatus
+    path: root@nas:/volume1/backup
     max_age_hours: 72
+    uptime_kuma:
+      token: your-kopia-token
 ```
 
 **Using global default:**
 ```yaml
-snapshots:
-  - path: /data
-  - path: /backups
-  - path: /archive
-max_age_hours: 24  # All use 24h
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: data_backup
+    type: kopiasnapshotstatus
+    path: /data
+    max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: backups
+    type: kopiasnapshotstatus
+    path: /backups
+    max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
+  
+  - name: archive
+    type: kopiasnapshotstatus
+    path: /archive
+    max_age_hours: 24
+    uptime_kuma:
+      token: your-kopia-token
 ```
 
 ## CLI Usage
 
 ### Single snapshot
 ```bash
-kuma-scout kopiasnapshotstatus --snapshot /data,24
+kuma-scout kopiasnapshotstatus \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
+  /data
 ```
 
 ### Multiple snapshots
 ```bash
-kuma-scout kopiasnapshotstatus \
-  --snapshot /data,24 \
-  --snapshot /backups,48 \
-  --snapshot "user@host:/path,72"
+# Multiple snapshots not supported in CLI - use config file
 ```
 
 ### Override config file
 ```bash
 kuma-scout kopiasnapshotstatus \
   --config /etc/kuma-scout/config.yaml \
-  --snapshot /critical,12 \
-  --snapshot /archive,240
+  /data
 ```
 
 ### With full Uptime Kuma integration
 ```bash
 kuma-scout kopiasnapshotstatus \
-  --snapshot /data,24 \
-  --snapshot "root@fileserver:/mnt/shares,48" \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-kopia-token \
+  --heartbeat-token your-heartbeat-token \
+  /data
+```
   --heartbeat-token your-heartbeat-token \
   --token your-kopia-token
 ```
@@ -1625,28 +1935,35 @@ A: Yes, but snapshots must be fresher than 0 hours (essentially never allowed). 
 
 ### Configuration File (YAML)
 ```yaml
-portscan:
-  ports: 1-1000
-  exclude: [192.168.1.1, 192.168.1.254]
-  ip_ranges:
-    - 192.168.1.0/24
-  nmap:
-    timing: T3
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: network_scan
+    type: portscan
+    targets: ["192.168.1.0/24"]
+    ports: "1-1000"
+    exclude: ["192.168.1.1", "192.168.1.254"]
+    timing: "T3"
+    uptime_kuma:
+      token: your-portscan-token
 ```
 
 ### Command Line
 ```bash
 # Basic port scan
-kuma-scout portscan 192.168.1.0/24
+kuma-scout portscan \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-portscan-token \
+  192.168.1.0/24
 
 # With custom ports and timing
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
   --ports 22,80,443,3389 \
   --timing T4 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24
 ```
 
 ### Authentication Token
@@ -1658,19 +1975,21 @@ KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token
 
 ### YAML Structure
 ```yaml
-portscan:
-  uptime_kuma:
-    token: <string>              # Uptime Kuma API token
-  
-  nmap:
-    timing: <T0-T5>             # Timing profile (default: T3)
-    timeout: <int>              # Timeout in seconds (default: 3600)
-    arguments: [<args>]         # Additional nmap arguments
-    keep_xml_output: <bool>     # Keep XML output file (default: false)
-  
-  ports: <port-spec>            # Port range: "1-1000", "22,80,443" (default: 1-1000)
-  exclude: [<ip-list>]          # IPs to exclude from scan
-  ip_ranges: [<range-list>]     # IP ranges to scan (e.g., 192.168.1.0/24)
+uptime_kuma:
+  url: <string>                 # Uptime Kuma push API URL
+
+checks:
+  - name: <string>              # Required: unique check name
+    type: portscan
+    targets: [<range-list>]     # Required: IP ranges to scan (e.g., ["192.168.1.0/24"])
+    ports: <port-spec>          # Optional: Port range (default: "1-1000")
+    exclude: [<ip-list>]        # Optional: IPs to exclude from scan
+    timing: <T0-T5>             # Optional: Timing profile (default: "T3")
+    timeout: <int>              # Optional: Timeout in seconds (default: 3600)
+    arguments: <string>         # Optional: Additional nmap arguments
+    keep_xml: <bool>            # Optional: Keep XML output file (default: false)
+    uptime_kuma:
+      token: <string>           # Optional: override global token
 ```
 
 
@@ -1678,39 +1997,43 @@ portscan:
 ```bash
 # Single IP range
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24
 
 # Multiple IP ranges
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --ip-range 10.0.0.0/8 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24 \
+  10.0.0.0/8
 
 # With custom ports
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
   --ports 22,80,443 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24
 
 # With exclusions
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
   --exclude 192.168.1.1 \
   --exclude 192.168.1.254 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24
 
 # With nmap timing
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
+  --timing T4 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --heartbeat-token your-heartbeat-token \
+  --token your-portscan-token \
+  192.168.1.0/24
   --timing T4 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
@@ -1718,15 +2041,15 @@ kuma-scout portscan \
 
 # All options combined
 kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --ip-range 10.0.0.0/8 \
   --ports 1-10000 \
   --timing T4 \
   --exclude 192.168.1.1 \
   --exclude 192.168.1.254 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
+  --token your-portscan-token \
+  192.168.1.0/24 \
+  10.0.0.0/8
 ```
 
 ## Nmap Timing Profiles
@@ -1744,37 +2067,53 @@ kuma-scout portscan \
 
 ### Basic network scan
 ```yaml
-portscan:
-  ports: 1-1000
-  ip_ranges:
-    - 192.168.1.0/24
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: network-scan-basic
+    type: portscan
+    ports: 1-1000
+    ip_ranges:
+      - 192.168.1.0/24
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ### Multi-range scan with exclusions
 ```yaml
-portscan:
-  ports: 22,80,443,3306,3389
-  exclude:
-    - 192.168.1.1
-    - 192.168.1.254
-  ip_ranges:
-    - 192.168.1.0/24
-    - 10.0.0.0/8
-  nmap:
-    timing: T4
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: network-scan-multi
+    type: portscan
+    ports: 22,80,443,3306,3389
+    exclude:
+      - 192.168.1.1
+      - 192.168.1.254
+    ip_ranges:
+      - 192.168.1.0/24
+      - 10.0.0.0/8
+    nmap_timing: T4
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ### Fast scan with custom arguments
 ```yaml
-portscan:
-  ports: 1-65535
-  ip_ranges:
-    - 192.168.100.0/24
-  nmap:
-    timing: T5
-    arguments:
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: network-scan-fast
+    type: portscan
+    ports: 1-65535
+    ip_ranges:
+      - 192.168.100.0/24
+    nmap_timing: T5
+    nmap_arguments:
       - --script vuln
       - --min-rate 1000
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ## Common Port Ranges
@@ -1810,28 +2149,51 @@ A: Yes, set `keep_xml_output: true` in the YAML config file.
 
 ### Configuration File (YAML)
 ```yaml
-zfspoolstatus:
-  pools:
-    - name: tank
-      free_space_percent_min: 10
-    - name: backup
-      free_space_percent_min: 20
-    - name: archive
-      # Omits free_space_percent_min → uses global default
-  free_space_percent_default: 10
-  uptime_kuma:
-    token: your-zfs-token
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: tank_pool
+    type: zfspoolstatus
+    pool: tank
+    min_free_percent: 10
+    uptime_kuma:
+      token: your-zfs-token
+  
+  - name: backup_pool
+    type: zfspoolstatus
+    pool: backup
+    min_free_percent: 20
+    uptime_kuma:
+      token: your-zfs-token
+  
+  - name: archive_pool
+    type: zfspoolstatus
+    pool: archive
+    # Uses default min_free_percent: 10
+    uptime_kuma:
+      token: your-zfs-token
 ```
 
 ### Command Line
 ```bash
-# Monitor multiple pools with thresholds (comma-separated format: name,percent)
+# Monitor single pool with default threshold (10%)
 kuma-scout zfspoolstatus \
-  --pool tank,10 \
-  --pool backup,20 \
+  --uptime-kuma-url http://uptimekuma:3001/api/push \
+  --token your-zfs-token \
+  tank
+```
+  --heartbeat-token your-heartbeat-token \
+  --token your-zfs-token \
+  tank
+
+# Monitor single pool with custom threshold
+kuma-scout zfspoolstatus \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
+  --token your-zfs-token \
+  --min-free-percent 20 \
+  tank
 ```
 
 ### Authentication Token
@@ -1852,44 +2214,37 @@ KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 
 ### Structure
 ```
-zfspoolstatus:
-  pools:                          # List of pool configurations
-    - name: <string>              # Required: pool name (e.g., "tank")
-      free_space_percent_min: <int>  # Optional: min free space % (falls back to global default)
-  free_space_percent_default: <int>  # Global default (default: 10)
-  uptime_kuma:
-    token: <string>               # Uptime Kuma API token
+uptime_kuma:
+  url: <string>                   # Uptime Kuma push API URL
+
+checks:
+  - name: <string>                # Required: unique check name
+    type: zfspoolstatus
+    pool: <string>                # Required: pool name (e.g., "tank")
+    min_free_percent: <int>       # Optional: min free space % (default: 10)
+    uptime_kuma:
+      token: <string>             # Optional: override global token
 ```
 
 
 
 ```bash
-# Single pool with percent (format: name,percent)
+# Single pool with default threshold (10%)
 kuma-scout zfspoolstatus \
-  --pool tank,10 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
+  --token your-zfs-token \
+  tank
 
-# Single pool without percent (uses global default of 10%)
+# Single pool with custom threshold
 kuma-scout zfspoolstatus \
-  --pool tank \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
+  --token your-zfs-token \
+  --min-free-percent 20 \
+  tank
 
-# Single pool without percent or --min-free-percent (uses hardcoded default of 10%)
-kuma-scout zfspoolstatus \
-  --pool tank \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
-
-# Multiple pools mixed format (tank and archive use default 10%, backup uses 20%)
-kuma-scout zfspoolstatus \
-  --pool tank \
-  --pool backup,20 \
-  --pool archive \
+# Multiple pools (not supported in CLI - use config file)
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
   --token your-zfs-token
@@ -1906,16 +2261,16 @@ kuma-scout zfspoolstatus \
 
 # With config file
 kuma-scout zfspoolstatus \
-  --config /etc/kuma-scout/config.yaml
+  --config /etc/kuma-scout/config.yaml \
+  tank
 
 # Override global default with CLI
 kuma-scout zfspoolstatus \
-  --pool tank,10 \
-  --pool backup,25 \
   --min-free-percent 15 \
   --uptime-kuma-url http://uptimekuma:3001/api/push \
   --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
+  --token your-zfs-token \
+  tank
 ```
 
 **Note:** Pool format supports two options:
@@ -1940,34 +2295,52 @@ Only `ONLINE` status is considered healthy. Any other status triggers an alert:
 
 ### Single pool with default threshold
 ```yaml
-zfspoolstatus:
-  pools:
-    - name: tank
-  free_space_percent_default: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: zfs-tank
+    type: zfspoolstatus
+    pools:
+      - name: tank
+    free_space_percent_default: 10
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ### Multiple pools with different thresholds
 ```yaml
-zfspoolstatus:
-  pools:
-    - name: tank
-      free_space_percent_min: 10      # Critical: needs 10% free
-    - name: backup
-      free_space_percent_min: 20      # Important: needs 20% free
-    - name: archive
-      free_space_percent_min: 30      # Archive: more relaxed
-  free_space_percent_default: 10
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: zfs-pools-multi
+    type: zfspoolstatus
+    pools:
+      - name: tank
+        free_space_percent_min: 10      # Critical: needs 10% free
+      - name: backup
+        free_space_percent_min: 20      # Important: needs 20% free
+      - name: archive
+        free_space_percent_min: 30      # Archive: more relaxed
+    free_space_percent_default: 10
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ### Mix pools with and without explicit thresholds
 ```yaml
-zfspoolstatus:
-  pools:
-    - name: tank
-      free_space_percent_min: 10
-    - name: backup                   # Uses global default (15%)
-    - name: archive                  # Uses global default (15%)
-  free_space_percent_default: 15
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: zfs-pools-mixed
+    type: zfspoolstatus
+    pools:
+      - name: tank
+        free_space_percent_min: 10
+      - name: backup                   # Uses global default (15%)
+      - name: archive                  # Uses global default (15%)
+    free_space_percent_default: 15
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ## Alert Messages
@@ -2056,25 +2429,43 @@ export KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN=your-zfs-token
 
 **Or in YAML:**
 ```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: ${UPTIME_KUMA_TOKEN}
+
 heartbeat:
-  uptime_kuma:
-    token: your-heartbeat-token
+  enabled: true
+  interval: 300
 
-cmdcheck:
-  uptime_kuma:
-    token: your-cmdcheck-token
+checks:
+  - name: heartbeat-check
+    type: cmdcheck
+    command: "echo heartbeat"
+    token: ${HEARTBEAT_TOKEN}
 
-portscan:
-  uptime_kuma:
-    token: your-portscan-token
+  - name: nginx-check
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    token: ${CMDCHECK_TOKEN}
 
-kopiasnapshotstatus:
-  uptime_kuma:
-    token: your-kopia-token
+  - name: network-scan
+    type: portscan
+    ports: 80,443,22
+    ip_ranges:
+      - 192.168.1.0/24
+    token: ${PORTSCAN_TOKEN}
 
-zfspoolstatus:
-  uptime_kuma:
-    token: your-zfs-token
+  - name: backup-check
+    type: kopiasnapshotstatus
+    paths:
+      - /data/backups
+    token: ${KOPIASNAPSHOTSTATUS_TOKEN}
+
+  - name: pool-check
+    type: zfspoolstatus
+    pools:
+      - name: tank
+    token: ${ZFSPOOLSTATUS_TOKEN}
 ```
 
 ### Environment Variable Expansion in YAML
@@ -2095,24 +2486,23 @@ heartbeat:
   uptime_kuma:
     token: "${HEARTBEAT_TOKEN}"  # Expands to env var HEARTBEAT_TOKEN
 
-cmdcheck:
-  uptime_kuma:
-    token: "${CMDCHECK_TOKEN}"   # Expands to env var CMDCHECK_TOKEN
-  commands:
-    - command: "systemctl is-active nginx"
-      name: "web_server"
-      uptime_kuma:
-        token: "${WEB_TOKEN}"    # Per-command token expansion
-    - command: "systemctl is-active postgresql"
-      name: "database"
-      uptime_kuma:
-        token: "${DB_TOKEN}"     # Different token for database
+checks:
+  - name: web_server
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    uptime_kuma:
+      token: "${WEB_TOKEN}"    # Per-command token expansion
+  
+  - name: database
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    uptime_kuma:
+      token: "${DB_TOKEN}"     # Different token for database
 ```
 
 **Environment Setup:**
 ```bash
 export HEARTBEAT_TOKEN=abc123def456
-export CMDCHECK_TOKEN=xyz789
 export WEB_TOKEN=web_monitor_token
 export DB_TOKEN=db_monitor_token
 ```
@@ -2184,8 +2574,16 @@ Given these configurations:
 
 ```yaml
 # config.yaml (YAML file - second highest)
-portscan:
-  ports: 1-1000
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+
+checks:
+  - name: network-scan
+    type: portscan
+    ports: 1-1000
+    ip_ranges:
+      - 192.168.1.0/24
+    token: ${UPTIME_KUMA_TOKEN}
 ```
 
 ```bash

@@ -134,7 +134,7 @@ class CLIGenerator:
         heartbeat_token: Optional[str],
         timeout: int,
         log_file: Optional[str],
-        log_level: str,
+        log_level: Optional[str],
         logger,
     ) -> None:
         """Apply command-line overrides to global configuration."""
@@ -146,7 +146,13 @@ class CLIGenerator:
 
         # Apply CLI overrides using ConfigMerger
         ConfigMerger.apply_cli_overrides(
-            global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level
+            global_config,
+            uptime_kuma_url,
+            token,
+            heartbeat_token,
+            timeout,
+            log_file,
+            log_level,
         )
 
     def _setup_ssh_config(
@@ -442,7 +448,14 @@ class CLIGenerator:
 
             # Apply command-line overrides
             self._apply_command_line_overrides(
-                global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level, logger
+                global_config,
+                uptime_kuma_url,
+                token,
+                heartbeat_token,
+                timeout,
+                log_file,
+                log_level,
+                logger,
             )
 
             # Setup SSH configuration
@@ -704,7 +717,14 @@ class CLIGenerator:
 
         # Apply command-line overrides
         self._apply_command_line_overrides(
-            global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level, logger
+            global_config,
+            uptime_kuma_url,
+            token,
+            heartbeat_token,
+            timeout,
+            log_file,
+            log_level,
+            logger,
         )
 
         # Setup SSH configuration
@@ -1002,9 +1022,7 @@ class CLIGenerator:
                     annotation=str,
                 )
 
-    def _log_config_summary(
-        self, logger, global_config: GlobalConfig
-    ) -> None:
+    def _log_config_summary(self, logger, global_config: GlobalConfig) -> None:
         """Log configuration summary for debugging."""
         logger.info("🔧 Configuration loaded:")
         logger.info(

@@ -108,7 +108,7 @@ class ConfigMerger:
         heartbeat_token: Optional[str],
         timeout: int,
         log_file: Optional[str],
-        log_level: str,
+        log_level: Optional[str],
     ) -> None:
         """Apply CLI argument overrides to global configuration.
 

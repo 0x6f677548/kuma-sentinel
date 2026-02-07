@@ -124,7 +124,7 @@ class TestSendAggregatedResults:
         global_config = GlobalConfig()
         results_by_tag: dict[str, list[CheckResult]] = {"tag1": []}
 
-        with patch("kuma_scout.core.uptime_kuma.send_push") as mock_send:
+        with patch("kuma_scout.cli.generator.send_push") as mock_send:
             gen._send_aggregated_results(results_by_tag, None, global_config, logger)
             mock_send.assert_not_called()
 
@@ -138,7 +138,7 @@ class TestSendAggregatedResults:
         )
         results_by_tag: dict[str, list[CheckResult]] = {"tag1": []}
 
-        with patch("kuma_scout.core.uptime_kuma.send_push") as mock_send:
+        with patch("kuma_scout.cli.generator.send_push") as mock_send:
             gen._send_aggregated_results(
                 results_by_tag, ["tag1"], global_config, logger
             )
@@ -177,7 +177,7 @@ class TestSendAggregatedResults:
         }
 
         with patch(
-            "kuma_scout.core.uptime_kuma.send_push", return_value=True
+            "kuma_scout.cli.generator.send_push", return_value=True
         ) as mock_send:
             gen._send_aggregated_results(
                 results_by_tag, ["network", "backup"], global_config, logger
@@ -217,7 +217,7 @@ class TestSendAggregatedResults:
 
         results_by_tag: dict[str, list[CheckResult]] = {"network": []}
 
-        with patch("kuma_scout.core.uptime_kuma.send_push") as mock_send:
+        with patch("kuma_scout.cli.generator.send_push") as mock_send:
             gen._send_aggregated_results(
                 results_by_tag, ["network"], global_config, logger
             )
@@ -244,7 +244,7 @@ class TestSendAggregatedResults:
         }
 
         with patch(
-            "kuma_scout.core.uptime_kuma.send_push", return_value=False
+            "kuma_scout.cli.generator.send_push", return_value=False
         ) as mock_send:
             gen._send_aggregated_results(
                 results_by_tag, ["network"], global_config, logger
@@ -295,7 +295,7 @@ class TestSendAggregatedResults:
         all_tags = list(results_by_tag.keys())
 
         with patch(
-            "kuma_scout.core.uptime_kuma.send_push", return_value=True
+            "kuma_scout.cli.generator.send_push", return_value=True
         ) as mock_send:
             gen._send_aggregated_results(
                 results_by_tag, all_tags, global_config, logger

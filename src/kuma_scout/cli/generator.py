@@ -9,6 +9,9 @@ import typer
 from kuma_scout.core.config_loader import load_config
 from kuma_scout.core.logger import setup_default_logging, setup_logging
 from kuma_scout.core.models import CheckResult
+from kuma_scout.core.uptime_kuma import send_push
+from kuma_scout.core.utils.sanitizer import DataSanitizer
+from kuma_scout.core.utils.ssh_runner import SSHRunner, parse_ssh_connection_string
 from kuma_scout.plugins import get_all_plugins
 from kuma_scout.plugins.models import GlobalConfig, UptimeKumaConfig
 
@@ -69,9 +72,6 @@ class CLIGenerator:
                 f"global_config.tags={bool(global_config.tags)}"
             )
             return
-
-        from kuma_scout.core.uptime_kuma import send_push
-        from kuma_scout.core.utils.sanitizer import DataSanitizer
 
         logger.debug(
             f"Starting tag aggregation for tags: {requested_tags}, "
@@ -183,8 +183,6 @@ class CLIGenerator:
             return
 
         # Parse SSH host string using the utility function
-        from kuma_scout.core.utils.ssh_runner import parse_ssh_connection_string
-
         host, user, port = parse_ssh_connection_string(ssh)
 
         # Ensure host is not None (should not happen with valid input)
@@ -291,8 +289,6 @@ class CLIGenerator:
             if "@" in host:
                 user, host = host.split("@", 1)
 
-            from kuma_scout.core.utils.ssh_runner import SSHRunner
-
             ssh_runner = SSHRunner(
                 host=host,
                 user=user,
@@ -326,8 +322,6 @@ class CLIGenerator:
             and uptime_config.token
             and not uptime_config.token.startswith("${")
         ):
-            from kuma_scout.core.uptime_kuma import send_push
-
             status = result.status
             success = send_push(
                 logger=plugin.logger,

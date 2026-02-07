@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 import typer
 
+from kuma_scout.cli.config_merger import ConfigMerger
 from kuma_scout.core.config_loader import load_config
 from kuma_scout.core.logger import setup_default_logging, setup_logging
 from kuma_scout.core.models import CheckResult
@@ -141,21 +142,10 @@ class CLIGenerator:
         if heartbeat_token:
             heartbeat_token = os.path.expandvars(heartbeat_token)
 
-        # Only set uptime_kuma config if both URL and token are provided
-        if uptime_kuma_url and token:
-            global_config.uptime_kuma = UptimeKumaConfig(
-                url=uptime_kuma_url, token=token
-            )
-
-        if heartbeat_token:
-            if not global_config.heartbeat:
-                from kuma_scout.plugins.models import HeartbeatConfig
-
-                global_config.heartbeat = HeartbeatConfig()
-            global_config.heartbeat.token = heartbeat_token
-
-        if timeout != 300:  # Only override if not default
-            global_config.timeout = timeout
+        # Apply CLI overrides using ConfigMerger
+        ConfigMerger.apply_cli_overrides(
+            global_config, uptime_kuma_url, token, heartbeat_token, timeout
+        )
 
     def _setup_ssh_config(
         self,
@@ -218,36 +208,16 @@ class CLIGenerator:
         self, plugin_class, check_config: dict, global_config: GlobalConfig
     ):
         """Create plugin configuration object with merged uptime_kuma and ssh settings."""
-        # First, handle uptime_kuma merging: check-level config can override global
         merged_config = check_config.copy()
-        uptime_kuma_data = None
-        if "uptime_kuma" in check_config:
-            # Merge check-level uptime_kuma with global config
-            check_uptime = check_config["uptime_kuma"]
-            global_uptime = (
-                global_config.uptime_kuma.model_dump()
-                if global_config.uptime_kuma
-                else {}
-            )
-            uptime_kuma_data = {**global_uptime, **check_uptime}
-        elif global_config.uptime_kuma:
-            # Use global uptime_kuma if check doesn't have one
-            uptime_kuma_data = global_config.uptime_kuma.model_dump()
 
-        # Handle SSH merging: check-level config can override global
-        ssh_data = None
-        if "ssh" in check_config:
-            # Merge check-level ssh with global config
-            check_ssh = check_config["ssh"]
-            global_ssh = global_config.ssh.model_dump() if global_config.ssh else {}
-            ssh_data = {**global_ssh, **check_ssh}
-        elif global_config.ssh:
-            # Use global ssh if check doesn't have one
-            ssh_data = global_config.ssh.model_dump()
+        # Merge configurations using ConfigMerger
+        uptime_kuma_data = ConfigMerger.merge_uptime_kuma_config(
+            global_config, check_config
+        )
+        ssh_data = ConfigMerger.merge_ssh_config(global_config, check_config)
 
-        # Handle timeout merging: check-level config can override global
-        if "timeout" not in merged_config and global_config.timeout != 300:
-            merged_config["timeout"] = global_config.timeout
+        # Apply timeout from global config if not in check config
+        ConfigMerger.apply_timeout(merged_config, global_config)
 
         # Remove uptime_kuma and ssh from merged_config for config creation
         merged_config.pop("uptime_kuma", None)
@@ -772,8 +742,6 @@ class CLIGenerator:
 
         # Set uptime_kuma config if both URL and token are provided
         if uptime_kuma_url and token:
-            from kuma_scout.plugins.models import UptimeKumaConfig
-
             check_config_obj.uptime_kuma = UptimeKumaConfig(
                 url=uptime_kuma_url, token=token
             )

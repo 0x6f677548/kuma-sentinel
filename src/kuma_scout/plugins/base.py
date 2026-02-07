@@ -6,6 +6,7 @@ monitoring plugins must inherit from.
 """
 
 import logging
+import subprocess
 import time
 from abc import ABC, abstractmethod
 from typing import ClassVar, Optional, Type, cast
@@ -272,8 +273,6 @@ class Plugin(ABC):
                 return False, "", f"SSH connection failed: {e.message}", -1
 
         # Local execution
-        import subprocess
-
         self.logger.info("🔧 Running command locally...")
         self.logger.debug(f"Command: {' '.join(cmd)}")
         try:

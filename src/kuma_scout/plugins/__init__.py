@@ -6,6 +6,7 @@ Each plugin is a single file that combines configuration, CLI generation, and ex
 """
 
 import importlib
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Type
 
@@ -15,6 +16,7 @@ from .base import Plugin
 _PLUGIN_REGISTRY: Dict[str, Type[Plugin]] = {}
 
 
+@lru_cache(maxsize=1)
 def discover_plugins() -> Dict[str, Type[Plugin]]:
     """
     Automatically discover and register all plugins in this package.

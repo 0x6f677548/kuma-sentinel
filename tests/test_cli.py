@@ -56,6 +56,8 @@ def test_apply_command_line_overrides_expands_tokens():
             token="$TEST_TOKEN",
             heartbeat_token="$TEST_HEARTBEAT_TOKEN",
             timeout=300,
+            log_file=None,
+            log_level=None,
             logger=logger,
         )
 
@@ -80,6 +82,8 @@ def test_apply_command_line_overrides_sets_timeout():
         token=None,
         heartbeat_token=None,
         timeout=600,  # Not default
+        log_file=None,
+        log_level=None,
         logger=logger,
     )
 
@@ -330,7 +334,7 @@ def test_log_config_summary():
     global_config.heartbeat.interval = 300
     global_config.ssh = SSHConfig(host="host", user="user", port=22)
 
-    generator._log_config_summary(logger, global_config, "INFO")
+    generator._log_config_summary(logger, global_config)
 
     # Check that logger.info was called with expected messages
     calls = logger.info.call_args_list

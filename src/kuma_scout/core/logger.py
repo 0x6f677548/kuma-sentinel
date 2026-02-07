@@ -89,16 +89,19 @@ def setup_default_logging():
     return logger
 
 
-def setup_logging(log_file, log_level="INFO"):
+def setup_logging(log_file, log_level=None):
     """Configure logging with file, stdout, and journalctl.
 
     Args:
         log_file: Path to log file
-        log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL), or None for default
     """
     logger = logging.getLogger("kuma_scout")
     # Convert string log level to logging constant
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    if log_level:
+        level = getattr(logging, log_level.upper(), logging.INFO)
+    else:
+        level = logging.INFO
     logger.setLevel(level)
 
     # Remove existing handlers to avoid duplicates

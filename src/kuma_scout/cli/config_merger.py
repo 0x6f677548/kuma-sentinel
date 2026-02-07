@@ -107,6 +107,8 @@ class ConfigMerger:
         token: Optional[str],
         heartbeat_token: Optional[str],
         timeout: int,
+        log_file: Optional[str],
+        log_level: str,
     ) -> None:
         """Apply CLI argument overrides to global configuration.
 
@@ -116,6 +118,8 @@ class ConfigMerger:
             token: CLI-provided Uptime Kuma token
             heartbeat_token: CLI-provided heartbeat token
             timeout: CLI-provided timeout in seconds
+            log_file: CLI-provided log file path
+            log_level: CLI-provided log level
 
         Note:
             CLI arguments represent the highest priority in config hierarchy.
@@ -136,3 +140,9 @@ class ConfigMerger:
 
         if timeout != 300:  # Only override if not default
             global_config.timeout = timeout
+
+        if log_file is not None:
+            global_config.logging.file = log_file
+
+        if log_level is not None:
+            global_config.logging.level = log_level

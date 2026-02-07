@@ -133,6 +133,8 @@ class CLIGenerator:
         token: Optional[str],
         heartbeat_token: Optional[str],
         timeout: int,
+        log_file: Optional[str],
+        log_level: str,
         logger,
     ) -> None:
         """Apply command-line overrides to global configuration."""
@@ -144,7 +146,7 @@ class CLIGenerator:
 
         # Apply CLI overrides using ConfigMerger
         ConfigMerger.apply_cli_overrides(
-            global_config, uptime_kuma_url, token, heartbeat_token, timeout
+            global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level
         )
 
     def _setup_ssh_config(
@@ -413,8 +415,8 @@ class CLIGenerator:
                 "--ssh-no-strict-host-key-checking",
                 help="Disable strict SSH host key checking (overrides config)",
             ),
-            log_level: str = typer.Option(
-                "INFO",
+            log_level: Optional[str] = typer.Option(
+                None,
                 "--log-level",
                 help="Log level (DEBUG, INFO, WARNING, ERROR) (overrides config)",
             ),
@@ -440,7 +442,7 @@ class CLIGenerator:
 
             # Apply command-line overrides
             self._apply_command_line_overrides(
-                global_config, uptime_kuma_url, token, heartbeat_token, timeout, logger
+                global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level, logger
             )
 
             # Setup SSH configuration
@@ -458,7 +460,7 @@ class CLIGenerator:
             logger = setup_logging(log_file, log_level)
 
             # Log configuration summary
-            self._log_config_summary(logger, global_config, log_level)
+            self._log_config_summary(logger, global_config)
 
             # Apply filters
             filtered_checks = self._filter_checks(
@@ -619,8 +621,10 @@ class CLIGenerator:
                 "--ssh-no-strict-host-key-checking",
                 help="Disables strict SSH host key checking",
             ),
-            log_level: str = typer.Option(
-                "INFO", "--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR)"
+            log_level: Optional[str] = typer.Option(
+                None,
+                "--log-level",
+                help="Log level (DEBUG, INFO, WARNING, ERROR)",
             ),
             log_file: Optional[str] = typer.Option(
                 "/var/log/kuma-scout.log", "--log-file", help="Log file path"
@@ -673,7 +677,7 @@ class CLIGenerator:
         self,
         plugin_class,
         name: Optional[str],
-        log_level: str,
+        log_level: Optional[str],
         log_file: Optional[str],
         uptime_kuma_url: Optional[str],
         token: Optional[str],
@@ -700,7 +704,7 @@ class CLIGenerator:
 
         # Apply command-line overrides
         self._apply_command_line_overrides(
-            global_config, uptime_kuma_url, token, heartbeat_token, timeout, logger
+            global_config, uptime_kuma_url, token, heartbeat_token, timeout, log_file, log_level, logger
         )
 
         # Setup SSH configuration
@@ -999,14 +1003,14 @@ class CLIGenerator:
                 )
 
     def _log_config_summary(
-        self, logger, global_config: GlobalConfig, effective_log_level: str
+        self, logger, global_config: GlobalConfig
     ) -> None:
         """Log configuration summary for debugging."""
         logger.info("🔧 Configuration loaded:")
         logger.info(
             f"  📊 Uptime Kuma URL: {global_config.uptime_kuma.url if global_config.uptime_kuma else 'Not configured'}"
         )
-        logger.info(f"  📝 Logging level: {effective_log_level} (effective)")
+        logger.info(f"  📝 Logging level: {global_config.logging.level} (effective)")
         logger.info(f"  📁 Log file: {global_config.logging.file or 'Console only'}")
         logger.info(
             f"  🔄 Heartbeat: {'Enabled' if global_config.heartbeat.enabled else 'Disabled'}"

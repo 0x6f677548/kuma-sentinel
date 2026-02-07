@@ -470,7 +470,7 @@ class CLIGenerator:
             )
 
             # Setup logging based on options
-            logger = setup_logging(log_file, log_level)
+            logger = setup_logging(global_config.logging.file, global_config.logging.level)
 
             # Log configuration summary
             self._log_config_summary(logger, global_config)

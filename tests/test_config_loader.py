@@ -5,12 +5,14 @@ Tests for configuration loading and validation.
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from kuma_scout.core.config_loader import (
     _expand_env_vars,
     _load_yaml_config,
+    _parse_checks,
     load_config,
 )
 
@@ -143,7 +145,24 @@ other:
             Path(temp_path).unlink()
 
 
-class TestLoadConfig:
+class TestParseChecks:
+    """Test _parse_checks function."""
+
+    def test_parse_checks_invalid_checks_type(self):
+        """Test _parse_checks with invalid checks type."""
+        with pytest.raises(ValueError, match="must be a list"):
+            _parse_checks({"checks": "not a list"})
+
+    def test_parse_checks_check_not_dict(self):
+        """Test _parse_checks with check that is not a dict."""
+        with pytest.raises(ValueError, match="Check 0 must be a dictionary"):
+            _parse_checks({"checks": ["not a dict"]})
+
+    def test_parse_checks_missing_name(self):
+        """Test _parse_checks with check missing name."""
+        with pytest.raises(ValueError, match="Check 0 missing required 'name' field"):
+            _parse_checks({"checks": [{"type": "cmdcheck"}]})
+
     """Test full config loading functionality."""
 
     def test_load_valid_config(self):
@@ -248,5 +267,75 @@ checks:
                 ValueError, match="Check 0 missing required 'type' field"
             ):
                 load_config(temp_path, ignore_file_permissions=True)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_config_missing_name(self):
+        """Test loading config with check missing name field."""
+        config_content = """
+checks:
+  - type: cmdcheck
+    command: echo hello
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(config_content)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(
+                ValueError, match="Check 0 missing required 'name' field"
+            ):
+                load_config(temp_path, ignore_file_permissions=True)
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("kuma_scout.core.config_loader.log_security_event")
+    def test_load_config_ignore_permissions(self, mock_log_security):
+        """Test loading config with ignored file permissions."""
+        config_content = """
+uptime_kuma:
+  url: http://test:3001
+  token: test-token
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(config_content)
+            temp_path = f.name
+
+        try:
+            global_config, checks = load_config(temp_path, ignore_file_permissions=True)
+            mock_log_security.assert_called_once_with(
+                "config_file_permissions_ignored",
+                f"Config file permission checks bypassed for {temp_path} - file may contain sensitive data with overly permissive access",
+                level="warning",
+            )
+        finally:
+            Path(temp_path).unlink()
+
+    @patch("kuma_scout.core.config_loader.log_security_event")
+    @patch("pathlib.Path.stat")
+    def test_load_config_bad_permissions(self, mock_stat, mock_log_security):
+        """Test loading config with bad file permissions."""
+        # Mock stat to return world-readable permissions
+        import stat
+
+        mock_stat.return_value.st_mode = stat.S_IRUSR | stat.S_IROTH  # 0o404
+
+        config_content = """
+uptime_kuma:
+  url: http://test:3001
+  token: test-token
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(config_content)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="has overly permissive permissions"):
+                load_config(temp_path, ignore_file_permissions=False)
+            mock_log_security.assert_called_once_with(
+                "config_file_overly_permissive",
+                f"Config file {temp_path} has overly permissive permissions (readable by group/other) - contains sensitive data",
+                level="error",
+            )
         finally:
             Path(temp_path).unlink()

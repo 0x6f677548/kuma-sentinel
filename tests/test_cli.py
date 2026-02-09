@@ -25,6 +25,14 @@ def test_cli_version():
     assert "version" in result.output
 
 
+def test_cli_no_command():
+    """Test CLI shows error when no command is provided."""
+    result = runner.invoke(app, [])
+    assert result.exit_code == 1
+    assert "Error: No command provided." in result.output
+    assert "Use 'kuma-scout --help' to see available commands." in result.output
+
+
 def test_subcommand_common_options():
     """Test that check subcommands have all common options available."""
     result = runner.invoke(app, ["portscan", "--help"])
@@ -536,3 +544,292 @@ def test_cmdcheck_individual_command():
         "(local)" in result.output
     )  # Should show local execution since no SSH specified
     assert "completed:" in result.output
+
+
+# ConfigMerger tests
+def test_merge_uptime_kuma_config_check_level_only():
+    """Test merging uptime_kuma config when only check-level config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    check_config = {"uptime_kuma": {"url": "http://check.com", "token": "check_token"}}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    assert result == {"url": "http://check.com", "token": "check_token"}
+
+
+def test_merge_uptime_kuma_config_global_only():
+    """Test merging uptime_kuma config when only global config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    check_config = {}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    assert result == {"url": "http://global.com", "token": "global_token"}
+
+
+def test_merge_uptime_kuma_config_both_with_override():
+    """Test merging uptime_kuma config when both exist - check overrides global."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    check_config = {"uptime_kuma": {"url": "http://check.com"}}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    # Check-level should override global
+    assert result == {"url": "http://check.com", "token": "global_token"}
+
+
+def test_merge_uptime_kuma_config_none():
+    """Test merging uptime_kuma config when neither exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    check_config = {}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    assert result is None
+
+
+def test_merge_ssh_config_check_level_only():
+    """Test merging SSH config when only check-level config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    check_config = {"ssh": {"host": "check_host", "user": "check_user"}}
+
+    result = ConfigMerger.merge_ssh_config(global_config, check_config)
+
+    assert result == {"host": "check_host", "user": "check_user"}
+
+
+def test_merge_ssh_config_global_only():
+    """Test merging SSH config when only global config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+    from kuma_scout.plugins.models import SSHConfig
+
+    global_config = GlobalConfig()
+    global_config.ssh = SSHConfig(host="global_host", user="global_user", port=22)
+    check_config = {}
+
+    result = ConfigMerger.merge_ssh_config(global_config, check_config)
+
+    expected = {
+        "host": "global_host",
+        "user": "global_user",
+        "port": 22,
+        "key_file": None,
+        "password": None,
+        "strict_host_key_checking": True,
+    }
+    assert result == expected
+
+
+def test_merge_ssh_config_both_with_override():
+    """Test merging SSH config when both exist - check overrides global."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+    from kuma_scout.plugins.models import SSHConfig
+
+    global_config = GlobalConfig()
+    global_config.ssh = SSHConfig(host="global_host", user="global_user", port=22)
+    check_config = {"ssh": {"host": "check_host"}}
+
+    result = ConfigMerger.merge_ssh_config(global_config, check_config)
+
+    # Check-level should override global
+    expected = {
+        "host": "check_host",
+        "user": "global_user",
+        "port": 22,
+        "key_file": None,
+        "password": None,
+        "strict_host_key_checking": True,
+    }
+    assert result == expected
+
+
+def test_merge_ssh_config_none():
+    """Test merging SSH config when neither exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    check_config = {}
+
+    result = ConfigMerger.merge_ssh_config(global_config, check_config)
+
+    assert result is None
+
+
+def test_apply_timeout_from_global():
+    """Test applying timeout from global config when not in check config."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(timeout=600)
+    merged_config = {"name": "test_check"}
+
+    ConfigMerger.apply_timeout(merged_config, global_config)
+
+    assert merged_config["timeout"] == 600
+
+
+def test_apply_timeout_check_has_priority():
+    """Test that check-level timeout takes priority over global."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(timeout=600)
+    merged_config = {"name": "test_check", "timeout": 300}
+
+    ConfigMerger.apply_timeout(merged_config, global_config)
+
+    # Should not override existing timeout
+    assert merged_config["timeout"] == 300
+
+
+def test_apply_timeout_global_default_not_applied():
+    """Test that global default timeout (300) is not applied."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(timeout=300)  # Default value
+    merged_config = {"name": "test_check"}
+
+    ConfigMerger.apply_timeout(merged_config, global_config)
+
+    # Should not add default timeout
+    assert "timeout" not in merged_config
+
+
+def test_apply_cli_overrides_uptime_kuma():
+    """Test applying CLI overrides for uptime_kuma config."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url="http://cli.com",
+        token="cli_token",
+        heartbeat_token=None,
+        timeout=300,
+        log_file=None,
+        log_level=None,
+    )
+
+    assert global_config.uptime_kuma.url == "http://cli.com"
+    assert global_config.uptime_kuma.token == "cli_token"
+
+
+def test_apply_cli_overrides_uptime_kuma_existing_config():
+    """Test applying CLI overrides when uptime_kuma config already exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://existing.com", token="existing_token"
+    )
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url="http://cli.com",
+        token="cli_token",
+        heartbeat_token=None,
+        timeout=300,
+        log_file=None,
+        log_level=None,
+    )
+
+    # CLI should override existing config
+    assert global_config.uptime_kuma.url == "http://cli.com"
+    assert global_config.uptime_kuma.token == "cli_token"
+
+
+def test_apply_cli_overrides_uptime_kuma_url_only():
+    """Test applying CLI URL override without token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://existing.com", token="existing_token"
+    )
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url="http://cli.com",
+        token=None,  # No token provided
+        heartbeat_token=None,
+        timeout=300,
+        log_file=None,
+        log_level=None,
+    )
+
+    # URL should be overridden, token should remain
+    assert global_config.uptime_kuma.url == "http://cli.com"
+    assert global_config.uptime_kuma.token == "existing_token"
+
+
+def test_apply_cli_overrides_heartbeat_token():
+    """Test applying CLI overrides for heartbeat token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url=None,
+        token=None,
+        heartbeat_token="cli_heartbeat_token",
+        timeout=300,
+        log_file=None,
+        log_level=None,
+    )
+
+    assert global_config.heartbeat.token == "cli_heartbeat_token"
+
+
+def test_apply_cli_overrides_timeout():
+    """Test applying CLI overrides for timeout."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url=None,
+        token=None,
+        heartbeat_token=None,
+        timeout=600,
+        log_file=None,
+        log_level=None,
+    )
+
+    assert global_config.timeout == 600
+
+
+def test_apply_cli_overrides_logging():
+    """Test applying CLI overrides for logging config."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+
+    ConfigMerger.apply_cli_overrides(
+        global_config=global_config,
+        uptime_kuma_url=None,
+        token=None,
+        heartbeat_token=None,
+        timeout=300,
+        log_file="/tmp/test.log",
+        log_level="DEBUG",
+    )
+
+    assert global_config.logging.file == "/tmp/test.log"
+    assert global_config.logging.level == "DEBUG"

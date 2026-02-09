@@ -286,9 +286,9 @@ class TestPluginSubcommandGeneration:
         command = generator.generate_list_plugins_command()
         assert callable(command)
 
-    def test_generate_run_command(self, generator):
-        """Test that run command can be generated."""
-        command = generator.generate_run_command()
+    def test_generate_list_checks_command(self, generator):
+        """Test that list checks command can be generated."""
+        command = generator.generate_list_checks_command()
         assert callable(command)
 
 
@@ -363,3 +363,363 @@ class TestCreatePluginConfig:
             config.uptime_kuma is None
             or config.uptime_kuma.url == global_config.uptime_kuma.url
         )
+
+
+class TestSetupRunCommand:
+    """Test _setup_run_command method."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a CLIGenerator instance."""
+        return CLIGenerator()
+
+    @patch("kuma_scout.cli.generator.load_config")
+    @patch("kuma_scout.cli.generator.setup_logging")
+    @patch("kuma_scout.cli.generator.setup_default_logging")
+    def test_setup_run_command_success(
+        self, mock_setup_default, mock_setup_logging, mock_load_config, generator
+    ):
+        """Test successful setup of run command."""
+        from kuma_scout.plugins.models import GlobalConfig
+
+        mock_global_config = GlobalConfig(
+            uptime_kuma=UptimeKumaConfig(url="http://test.com")
+        )
+        mock_checks = [("cmdcheck", {"name": "test"})]
+
+        mock_load_config.return_value = (mock_global_config, mock_checks)
+
+        with patch("kuma_scout.cli.generator.OutputHandler"):
+            result = generator._setup_run_command(
+                config="test.yaml",
+                ignore_file_permissions=False,
+                uptime_kuma_url=None,
+                token=None,
+                heartbeat_token=None,
+                timeout=30,
+                log_file=None,
+                log_level=None,
+                ssh=None,
+                ssh_key_file=None,
+                ssh_password=None,
+                ssh_strict_host_key_checking=True,
+                ssh_no_strict_host_key_checking=False,
+            )
+
+            mock_setup_default.assert_called_once()
+            mock_setup_logging.assert_called_once_with(None, None)
+            mock_load_config.assert_called_once_with(
+                "test.yaml", ignore_file_permissions=False
+            )
+            assert len(result) == 3  # output_handler, global_config, checks
+
+    @patch("kuma_scout.cli.generator.load_config")
+    @patch("kuma_scout.cli.generator.setup_logging")
+    @patch("kuma_scout.cli.generator.setup_default_logging")
+    def test_setup_run_command_config_error(
+        self, mock_setup_default, mock_setup_logging, mock_load_config, generator
+    ):
+        """Test setup with config loading error."""
+        mock_load_config.side_effect = ValueError("Invalid config")
+
+        with patch(
+            "kuma_scout.cli.generator.OutputHandler"
+        ) as mock_output_handler_class:
+            mock_output_handler = Mock()
+            mock_output_handler_class.return_value = mock_output_handler
+
+            with pytest.raises(RuntimeError):  # typer.Exit inherits from RuntimeError
+                generator._setup_run_command(
+                    config="invalid.yaml",
+                    ignore_file_permissions=False,
+                    uptime_kuma_url=None,
+                    token=None,
+                    heartbeat_token=None,
+                    timeout=30,
+                    log_file=None,
+                    log_level=None,
+                    ssh=None,
+                    ssh_key_file=None,
+                    ssh_password=None,
+                    ssh_strict_host_key_checking=True,
+                    ssh_no_strict_host_key_checking=False,
+                )
+
+            mock_output_handler.error.assert_called_once_with(
+                "Configuration error: Invalid config", echo=True
+            )
+
+    @patch("kuma_scout.cli.generator.load_config")
+    @patch("kuma_scout.cli.generator.setup_logging")
+    @patch("kuma_scout.cli.generator.setup_default_logging")
+    def test_setup_run_command_with_ssh(
+        self, mock_setup_default, mock_setup_logging, mock_load_config, generator
+    ):
+        """Test setup with SSH configuration."""
+        from kuma_scout.plugins.models import GlobalConfig
+
+        mock_global_config = GlobalConfig(
+            uptime_kuma=UptimeKumaConfig(url="http://test.com")
+        )
+        mock_checks = [("cmdcheck", {"name": "test"})]
+
+        mock_load_config.return_value = (mock_global_config, mock_checks)
+
+        with patch("kuma_scout.cli.generator.OutputHandler"):
+            result = generator._setup_run_command(
+                config="test.yaml",
+                ignore_file_permissions=False,
+                uptime_kuma_url=None,
+                token=None,
+                heartbeat_token=None,
+                timeout=30,
+                log_file=None,
+                log_level=None,
+                ssh="user@host:2222",
+                ssh_key_file="/path/to/key",
+                ssh_password="secret",
+                ssh_strict_host_key_checking=False,
+                ssh_no_strict_host_key_checking=False,
+            )
+
+            mock_setup_default.assert_called_once()
+            mock_setup_logging.assert_called_once_with(None, None)
+            mock_load_config.assert_called_once_with(
+                "test.yaml", ignore_file_permissions=False
+            )
+            assert len(result) == 3
+            # Check that SSH config was set
+            output_handler, global_config, checks = result
+            assert global_config.ssh is not None
+            assert global_config.ssh.host == "host"
+            assert global_config.ssh.user == "user"
+            assert global_config.ssh.port == 2222
+            assert global_config.ssh.key_file == "/path/to/key"
+            assert global_config.ssh.password == "secret"
+            assert global_config.ssh.strict_host_key_checking is False
+
+
+class TestHandleDryRun:
+    """Test _handle_dry_run method."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a CLIGenerator instance."""
+        return CLIGenerator()
+
+    def test_handle_dry_run_no_filters(self, generator):
+        """Test dry run with no filters."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "check1", "tags": ["web"]}),
+            ("portscan", {"name": "check2", "tags": ["network"]}),
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=None,
+            name=None,
+            plugin_type=None,
+            exclude=None,
+        )
+
+        mock_output_handler.info.assert_any_call("Configuration: test.yaml", echo=True)
+        mock_output_handler.info.assert_any_call(
+            "Found 2 check(s) to execute", echo=True
+        )
+
+    def test_handle_dry_run_with_filters(self, generator):
+        """Test dry run with filters applied."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "nginx-check", "tags": ["web"]}),
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=["web"],
+            name=None,
+            plugin_type=None,
+            exclude=None,
+        )
+
+        mock_output_handler.info.assert_any_call("Configuration: test.yaml", echo=True)
+        mock_output_handler.info.assert_any_call("Tag filters: web", echo=True)
+        mock_output_handler.info.assert_any_call(
+            "Found 1 check(s) to execute", echo=True
+        )
+
+    def test_handle_dry_run_with_name_filter(self, generator):
+        """Test dry run with name filter."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "nginx-check", "tags": ["web"]}),
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=None,
+            name=["nginx-check"],
+            plugin_type=None,
+            exclude=None,
+        )
+
+        mock_output_handler.info.assert_any_call("Configuration: test.yaml", echo=True)
+        mock_output_handler.info.assert_any_call("Name filters: nginx-check", echo=True)
+        mock_output_handler.info.assert_any_call(
+            "Found 1 check(s) to execute", echo=True
+        )
+
+    def test_handle_dry_run_with_plugin_type_filter(self, generator):
+        """Test dry run with plugin type filter."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "nginx-check", "tags": ["web"]}),
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=None,
+            name=None,
+            plugin_type=["cmdcheck"],
+            exclude=None,
+        )
+
+        mock_output_handler.info.assert_any_call("Configuration: test.yaml", echo=True)
+        mock_output_handler.info.assert_any_call("Type filters: cmdcheck", echo=True)
+        mock_output_handler.info.assert_any_call(
+            "Found 1 check(s) to execute", echo=True
+        )
+
+    def test_handle_dry_run_with_exclude_filter(self, generator):
+        """Test dry run with exclude filter."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "nginx-check", "tags": ["web"]}),
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=None,
+            name=None,
+            plugin_type=None,
+            exclude=["old-check"],
+        )
+
+        mock_output_handler.info.assert_any_call("Configuration: test.yaml", echo=True)
+        mock_output_handler.info.assert_any_call(
+            "Excluding checks: old-check", echo=True
+        )
+        mock_output_handler.info.assert_any_call(
+            "Found 1 check(s) to execute", echo=True
+        )
+
+    def test_handle_dry_run_check_without_tags(self, generator):
+        """Test dry run with check that has no tags."""
+        mock_output_handler = Mock()
+        filtered_checks = [
+            ("cmdcheck", {"name": "check1"}),  # No tags
+        ]
+
+        generator._handle_dry_run(
+            mock_output_handler,
+            filtered_checks,
+            config="test.yaml",
+            tag=None,
+            name=None,
+            plugin_type=None,
+            exclude=None,
+        )
+
+        mock_output_handler.info.assert_any_call("  - 'check1' (cmdcheck)", echo=True)
+
+
+class TestProcessResults:
+    """Test _process_results method."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a CLIGenerator instance."""
+        return CLIGenerator()
+
+    @pytest.fixture
+    def global_config(self):
+        """Create a basic global config."""
+        return GlobalConfig(
+            uptime_kuma=UptimeKumaConfig(
+                url="http://uptimekuma:3001/api/push",
+                token="test-token",
+            )
+        )
+
+    def test_process_results_with_results(self, generator, global_config):
+        """Test processing results when there are results to process."""
+        mock_output_handler = Mock()
+        results_by_tag = {
+            "web": [
+                CheckResult(
+                    check_name="nginx-check",
+                    status="up",
+                    message="OK",
+                    duration_seconds=1,
+                    tags=["web"],
+                    plugin_type="cmdcheck",
+                )
+            ]
+        }
+        all_results = list(results_by_tag["web"])
+
+        with patch.object(generator, "_send_aggregated_results") as mock_send:
+            generator._process_results_and_report(
+                results_by_tag, all_results, global_config, mock_output_handler
+            )
+
+            mock_send.assert_called_once()
+            mock_output_handler.print_table.assert_called_once()
+
+    def test_process_results_no_results_by_tag(self, generator, global_config):
+        """Test processing when there are no results by tag."""
+        mock_output_handler = Mock()
+        results_by_tag = {}
+        all_results = [
+            CheckResult(
+                check_name="nginx-check",
+                status="up",
+                message="OK",
+                duration_seconds=1,
+                tags=["web"],
+                plugin_type="cmdcheck",
+            )
+        ]
+
+        with patch.object(generator, "_send_aggregated_results") as mock_send:
+            generator._process_results_and_report(
+                results_by_tag, all_results, global_config, mock_output_handler
+            )
+
+            mock_send.assert_not_called()
+            mock_output_handler.print_table.assert_called_once()
+
+    def test_process_results_no_all_results(self, generator, global_config):
+        """Test processing when there are no results at all."""
+        mock_output_handler = Mock()
+        results_by_tag = {"web": []}
+        all_results = []
+
+        with patch.object(generator, "_send_aggregated_results") as mock_send:
+            generator._process_results_and_report(
+                results_by_tag, all_results, global_config, mock_output_handler
+            )
+
+            mock_send.assert_not_called()
+            mock_output_handler.print_table.assert_not_called()

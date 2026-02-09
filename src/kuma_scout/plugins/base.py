@@ -9,7 +9,7 @@ import subprocess
 import time
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import ClassVar, Optional, Type
+from typing import Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -113,9 +113,9 @@ class Plugin(ABC):
     """
 
     # Required class attributes - must be set by subclasses
-    name: ClassVar[str]  # Plugin type identifier (e.g., "cmdcheck")
-    description: ClassVar[str]  # Help text for CLI
-    config_class: ClassVar[Type[CheckConfig]]  # Pydantic model for this plugin
+    name: str  # Plugin type identifier (e.g., "cmdcheck")
+    description: str  # Help text for CLI
+    config_class: Type[CheckConfig]  # Pydantic model for this plugin
 
     def __init__(
         self,

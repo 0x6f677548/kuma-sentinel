@@ -11,6 +11,7 @@ from typing import Optional, cast
 
 from pydantic import Field
 
+from kuma_scout.core.logger import log_security_event
 from kuma_scout.core.models import CheckResult
 from kuma_scout.core.utils.sanitizer import DataSanitizer
 
@@ -48,8 +49,11 @@ class CmdCheckPlugin(Plugin):
         config = cast(CmdCheckConfig, config)
         start_time = time.time()
 
+        # Check for dangerous commands
+        self._check_for_dangerous_commands(config.command)
+
         try:
-            self.logger.info("🔍 CmdCheck: Executing...")
+            self.logger.info("CmdCheck: Executing...")
             self.logger.debug(f"Command: {config.command}")
             # Execute the command
             success, stdout, stderr, exit_code = self.run_command(
@@ -105,3 +109,28 @@ class CmdCheckPlugin(Plugin):
                 message=f"Command execution failed: {str(e)}",
                 duration_seconds=int(duration),
             )
+
+    def _check_for_dangerous_commands(self, command: str) -> None:
+        """Check for potentially dangerous commands and log security events."""
+        dangerous_patterns = [
+            r'\brm\s+-rf\s+/?',  # rm -rf /
+            r'\brm\s+-rf\s+\*',  # rm -rf *
+            r'\bdd\s+if=',  # dd commands that might overwrite disks
+            r'\bformat\s+',  # format commands
+            r'\bmkfs\.',  # filesystem creation commands
+            r'\bfdisk\s+',  # disk partitioning
+            r'\bwipefs\s+',  # wipe filesystem signatures
+            r'\bshred\s+',  # secure file deletion
+            r'\bsudo\s+.*\b(rm|dd|format|mkfs|fdisk|wipefs|shred)\b',  # sudo with dangerous commands
+        ]
+
+        command_lower = command.lower()
+        for pattern in dangerous_patterns:
+            if re.search(pattern, command_lower, re.IGNORECASE):
+                log_security_event(
+                    self.logger,
+                    "dangerous_command_detected",
+                    f"Potentially dangerous command detected: {command}",
+                    level="warning"
+                )
+                break  # Only log once per command

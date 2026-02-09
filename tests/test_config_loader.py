@@ -11,7 +11,6 @@ import pytest
 from kuma_scout.core.config_loader import (
     _expand_env_vars,
     _load_yaml_config,
-    filter_checks,
     load_config,
 )
 
@@ -251,68 +250,3 @@ checks:
                 load_config(temp_path, ignore_file_permissions=True)
         finally:
             Path(temp_path).unlink()
-
-
-class TestFilterChecks:
-    """Test check filtering functionality."""
-
-    def create_mock_checks(self):
-        """Create mock checks for testing."""
-        from kuma_scout.plugins.cmdcheck import CmdCheckConfig
-
-        check1 = CmdCheckConfig(
-            name="check1", command="echo hello", tags=["web", "production"]
-        )
-        check2 = CmdCheckConfig(
-            name="check2", command="echo world", tags=["db", "production"]
-        )
-        check3 = CmdCheckConfig(
-            name="check3", command="echo test", tags=["web", "staging"]
-        )
-
-        return [
-            ("cmdcheck", check1),
-            ("cmdcheck", check2),
-            ("cmdcheck", check3),
-        ]
-
-    def test_filter_by_names(self):
-        """Test filtering checks by name."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks, names=["check1", "check3"])
-        assert len(result) == 2
-        assert result[0][1].name == "check1"
-        assert result[1][1].name == "check3"
-
-    def test_filter_by_tags(self):
-        """Test filtering checks by tags."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks, tags=["web"])
-        assert len(result) == 2
-        assert all("web" in check[1].tags for check in result)
-
-    def test_filter_by_type(self):
-        """Test filtering checks by type."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks, check_type="cmdcheck")
-        assert len(result) == 3  # All are cmdcheck
-
-    def test_filter_exclude(self):
-        """Test excluding checks by name."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks, exclude=["check2"])
-        assert len(result) == 2
-        assert all(check[1].name != "check2" for check in result)
-
-    def test_filter_combined(self):
-        """Test combined filtering."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks, tags=["production"], exclude=["check1"])
-        assert len(result) == 1
-        assert result[0][1].name == "check2"
-
-    def test_filter_no_filters(self):
-        """Test with no filters (should return all)."""
-        checks = self.create_mock_checks()
-        result = filter_checks(checks)
-        assert len(result) == 3

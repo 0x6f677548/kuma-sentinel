@@ -82,7 +82,7 @@ class CLIGenerator:
         for tag_name in requested_tags:
             if tag_name not in global_config.tags:
                 logger.warning(
-                    f"⚠️  Tag '{tag_name}' has no aggregation config, skipping aggregation"
+                    f"Tag '{tag_name}' has no aggregation config, skipping aggregation"
                 )
                 continue
 
@@ -101,7 +101,7 @@ class CLIGenerator:
             sanitized_message = DataSanitizer.sanitize_output(message)
 
             logger.info(
-                f"📊 Aggregating {len(tag_results)} check(s) for tag '{tag_name}': {status}"
+                f"Aggregating {len(tag_results)} check(s) for tag '{tag_name}': {status}"
             )
 
             # Send to Uptime Kuma
@@ -119,11 +119,11 @@ class CLIGenerator:
 
             if success:
                 logger.info(
-                    f"✅ Aggregated result for tag '{tag_name}' sent to Uptime Kuma"
+                    f"Aggregated result for tag '{tag_name}' sent to Uptime Kuma"
                 )
             else:
                 logger.error(
-                    f"❌ Failed to send aggregated result for tag '{tag_name}' to Uptime Kuma"
+                    f"Failed to send aggregated result for tag '{tag_name}' to Uptime Kuma"
                 )
 
     def _apply_command_line_overrides(
@@ -185,7 +185,7 @@ class CLIGenerator:
 
         # Ensure host is not None (should not happen with valid input)
         if host is None:
-            logger.error("❌ Failed to parse SSH host from connection string")
+            logger.error("Failed to parse SSH host from connection string")
             raise typer.Exit(1)
 
         if not global_config.ssh:
@@ -311,13 +311,13 @@ class CLIGenerator:
                 ping_ms=int(result.duration_seconds * 1000),
             )
             if success:
-                logger.info(f"✅ {check_config_obj.name} executed and reported")
+                logger.info(f"{check_config_obj.name} executed and reported")
             else:
                 logger.warning(
-                    f"⚠️  {check_config_obj.name} executed but failed to report"
+                    f"{check_config_obj.name} executed but failed to report"
                 )
         else:
-            logger.info(f"✅ {check_config_obj.name} executed (no Uptime Kuma config)")
+            logger.info(f"{check_config_obj.name} executed (no Uptime Kuma config)")
 
         return result
 
@@ -337,7 +337,7 @@ class CLIGenerator:
         try:
             plugin_class = plugins.get(check_type)
             if not plugin_class:
-                logger.error(f"❌ Unknown plugin type: {check_type}")
+                logger.error(f"Unknown plugin type: {check_type}")
                 return None
 
             check_config_obj = self._create_plugin_config(
@@ -349,7 +349,7 @@ class CLIGenerator:
 
         except Exception as e:
             logger.error(
-                f"❌ Failed to execute {check_config.get('name', check_type)}: {str(e)}"
+                f"Failed to execute {check_config.get('name', check_type)}: {str(e)}"
             )
             return None
 
@@ -473,7 +473,7 @@ class CLIGenerator:
             logger = setup_logging(global_config.logging.file, global_config.logging.level)
 
             # Log configuration summary
-            self._log_config_summary(logger, global_config)
+            self._log_config_summary(logger, global_config, tag, name, plugin_type, exclude)
 
             # Apply filters
             filtered_checks = self._filter_checks(
@@ -488,7 +488,7 @@ class CLIGenerator:
 
             # Execute the checks
             plugins = get_all_plugins()
-            logger.info(f"🚀 Starting execution of {len(filtered_checks)} checks")
+            logger.info(f"Starting execution of {len(filtered_checks)} checks")
 
             # Collect results for aggregation
             results_by_tag: dict[str, list] = {}
@@ -741,7 +741,7 @@ class CLIGenerator:
         # Validate Uptime Kuma options - both URL and token are required for individual checks
         if not uptime_kuma_url or not token:
             logger.error(
-                "❌ Both --uptime-kuma-url and --token are required for individual check commands"
+                "Both --uptime-kuma-url and --token are required for individual check commands"
             )
             raise typer.Exit(1)
 
@@ -761,7 +761,7 @@ class CLIGenerator:
         try:
             check_config_obj = config_class(**check_config_data)
         except Exception as e:
-            logger.error(f"❌ Invalid configuration: {e}")
+            logger.error(f"Invalid configuration: {e}")
             raise typer.Exit(1) from e
 
         # Set uptime_kuma config if both URL and token are provided
@@ -1022,26 +1022,50 @@ class CLIGenerator:
                     annotation=str,
                 )
 
-    def _log_config_summary(self, logger, global_config: GlobalConfig) -> None:
+    def _log_config_summary(
+        self,
+        logger,
+        global_config: GlobalConfig,
+        tags: Optional[List[str]] = None,
+        names: Optional[List[str]] = None,
+        types: Optional[List[str]] = None,
+        excludes: Optional[List[str]] = None,
+    ) -> None:
         """Log configuration summary for debugging."""
-        logger.info("🔧 Configuration loaded:")
+        logger.info("Configuration loaded:")
         logger.info(
-            f"  📊 Uptime Kuma URL: {global_config.uptime_kuma.url if global_config.uptime_kuma else 'Not configured'}"
+            f"  Uptime Kuma URL: {global_config.uptime_kuma.url if global_config.uptime_kuma else 'Not configured'}"
         )
-        logger.info(f"  📝 Logging level: {global_config.logging.level} (effective)")
-        logger.info(f"  📁 Log file: {global_config.logging.file or 'Console only'}")
+        logger.info(f"  Logging level: {global_config.logging.level} (effective)")
+        logger.info(f"  Log file: {global_config.logging.file or 'Console only'}")
         logger.info(
-            f"  🔄 Heartbeat: {'Enabled' if global_config.heartbeat.enabled else 'Disabled'}"
+            f"  Heartbeat: {'Enabled' if global_config.heartbeat.enabled else 'Disabled'}"
         )
         if global_config.heartbeat.enabled:
-            logger.info(f"    ⏱️  Interval: {global_config.heartbeat.interval}s")
+            logger.info(f"    Interval: {global_config.heartbeat.interval}s")
         logger.info(
-            f"  🔌 SSH: {'Configured' if global_config.ssh else 'Not configured'}"
+            f"  SSH: {'Configured' if global_config.ssh else 'Not configured'}"
         )
         if global_config.ssh:
-            logger.info(f"    🖥️  Host: {global_config.ssh.host}")
-            logger.info(f"    👤 User: {global_config.ssh.user or 'Default'}")
-            logger.info(f"    🔢 Port: {global_config.ssh.port}")
+            logger.info(f"    Host: {global_config.ssh.host}")
+            logger.info(f"    User: {global_config.ssh.user or 'Default'}")
+            logger.info(f"    Port: {global_config.ssh.port}")
+
+        # Log filters
+        filters = []
+        if tags:
+            filters.append(f"tags: {', '.join(tags)}")
+        if names:
+            filters.append(f"names: {', '.join(names)}")
+        if types:
+            filters.append(f"types: {', '.join(types)}")
+        if excludes:
+            filters.append(f"excludes: {', '.join(excludes)}")
+
+        if filters:
+            logger.info(f"  Filters: {', '.join(filters)}")
+        else:
+            logger.info("  Filters: None")
 
     def _filter_checks(
         self,
@@ -1063,7 +1087,7 @@ class CLIGenerator:
 
             if should_include and tags:
                 check_tags = check_config.get("tags", [])
-                if not check_tags or not any(tag in check_tags for tag in tags):
+                if not check_tags or not all(tag in check_tags for tag in tags):
                     should_include = False
 
             if should_include and names:

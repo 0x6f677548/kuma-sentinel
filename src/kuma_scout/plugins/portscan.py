@@ -11,6 +11,7 @@ from typing import List, Optional, cast
 
 from pydantic import Field
 
+from kuma_scout.core.logger import log_security_event
 from kuma_scout.core.models import CheckResult
 
 from .base import CheckConfig, Plugin
@@ -54,7 +55,7 @@ class PortscanPlugin(Plugin):
             cmd.extend(["-oX", nmap_xml])
             cmd.extend(config.targets)
 
-            self.logger.info(f"🔍 Portscan: running {' '.join(cmd)}")
+            self.logger.info(f"Portscan: running {' '.join(cmd)}")
 
             # Run nmap scan
             success, stdout, stderr, exit_code = self.run_command(
@@ -62,7 +63,7 @@ class PortscanPlugin(Plugin):
             )
 
             if success:
-                self.logger.info("✅ Portscan: Nmap scan completed successfully")
+                self.logger.info("Portscan: Nmap scan completed successfully")
 
                 # Parse results
                 hosts_with_ports = (
@@ -73,8 +74,14 @@ class PortscanPlugin(Plugin):
 
                 if hosts_with_ports:
                     open_ports_str = ", ".join(hosts_with_ports)
+                    log_security_event(
+                        self.logger,
+                        "open_ports_detected",
+                        f"Port scan detected open ports on hosts: {open_ports_str}",
+                        level="warning"
+                    )
                     self.logger.warning(
-                        f"⚠️ Portscan: Open ports found: {open_ports_str}"
+                        f"Portscan: Open ports found: {open_ports_str}"
                     )
                     return CheckResult(
                         check_name=config.name,
@@ -84,7 +91,7 @@ class PortscanPlugin(Plugin):
                         details={"open_hosts": hosts_with_ports},
                     )
                 else:
-                    self.logger.info("✅ Portscan: No open ports found")
+                    self.logger.info("Portscan: No open ports found")
                     return CheckResult(
                         check_name=config.name,
                         status="up",
@@ -94,7 +101,7 @@ class PortscanPlugin(Plugin):
             else:
                 scan_duration = int(time.time() - scan_start)
                 error_msg = stderr.strip() if stderr else f"Exit code: {exit_code}"
-                self.logger.error(f"❌ Portscan: Port scan failed: {error_msg}")
+                self.logger.error(f"Portscan: Port scan failed: {error_msg}")
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -105,7 +112,7 @@ class PortscanPlugin(Plugin):
 
         except Exception as e:
             scan_duration = int(time.time() - scan_start)
-            self.logger.error("❌ Unexpected error during port scan", exc_info=True)
+            self.logger.error("Unexpected error during port scan", exc_info=True)
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -124,11 +131,11 @@ class PortscanPlugin(Plugin):
                 try:
                     os.remove(nmap_xml)
                     self.logger.debug(
-                        f"🗑️ Portscan: Cleaned up temporary file: {nmap_xml}"
+                        f"Portscan: Cleaned up temporary file: {nmap_xml}"
                     )
                 except OSError as e:
                     self.logger.warning(
-                        f"⚠️ Portscan: Failed to cleanup temporary file {nmap_xml}: {e}"
+                        f"Portscan: Failed to cleanup temporary file {nmap_xml}: {e}"
                     )
 
     def _build_nmap_command(self, config: PortscanConfig) -> List[str]:

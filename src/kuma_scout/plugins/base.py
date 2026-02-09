@@ -95,18 +95,18 @@ class Plugin(ABC):
         uptime_config = self.global_config.uptime_kuma
 
         if not heartbeat_config.enabled:
-            self.logger.debug("ℹ️  Heartbeat disabled (heartbeat.enabled=false)")
+            self.logger.debug("Heartbeat disabled (heartbeat.enabled=false)")
             return
 
         if not heartbeat_config.token:
             self.logger.warning(
-                "⚠️  Heartbeat enabled but token missing - check will run without heartbeat notifications"
+                "Heartbeat enabled but token missing - check will run without heartbeat notifications"
             )
             return
 
         if not uptime_config or not uptime_config.url:
             self.logger.warning(
-                "⚠️  Heartbeat enabled but Uptime Kuma URL missing - check will run without heartbeat notifications"
+                "Heartbeat enabled but Uptime Kuma URL missing - check will run without heartbeat notifications"
             )
             return
 
@@ -118,7 +118,7 @@ class Plugin(ABC):
             check_name=self.name,
         )
         self.logger.debug(
-            f"✅ Heartbeat initialized (interval: {heartbeat_config.interval}s)"
+            f"Heartbeat initialized (interval: {heartbeat_config.interval}s)"
         )
 
     def _initialize_ssh(self) -> None:
@@ -136,7 +136,7 @@ class Plugin(ABC):
             strict_host_key_checking=ssh_config.strict_host_key_checking,
         )
         self.logger.debug(
-            f"🔌 SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}"
+            f"SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}"
         )
 
     def execute_with_heartbeat(self, config: CheckConfig) -> CheckResult:
@@ -158,12 +158,12 @@ class Plugin(ABC):
             return result
         except TimeoutError as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ {self.name} check timed out: {sanitized_error}")
+            self.logger.error(f"{self.name} check timed out: {sanitized_error}")
             raise
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(
-                f"❌ {self.name} check failed with unexpected error: {sanitized_error}"
+                f"{self.name} check failed with unexpected error: {sanitized_error}"
             )
             raise
         finally:
@@ -172,16 +172,16 @@ class Plugin(ABC):
     def _start_heartbeat(self) -> None:
         """Initialize and start heartbeat service if configured."""
         if self.heartbeat:
-            self.logger.debug(f"📤 Sending heartbeat start message for {self.name}")
+            self.logger.debug(f"Sending heartbeat start message for {self.name}")
             self.heartbeat.send_message(f"{self.name} check starting...")
             self.heartbeat.start()
-            self.logger.debug(f"✅ Heartbeat service started for {self.name}")
+            self.logger.debug(f"Heartbeat service started for {self.name}")
 
     def _execute_with_retry(self, config: CheckConfig) -> CheckResult:
         """Execute the check with retry logic."""
-        self.logger.info(f"▶️  Executing {self.name} check")
+        self.logger.info(f"Executing {self.name} check")
         self.logger.debug(
-            f"🔄 Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s"
+            f"Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s"
         )
 
         result = None
@@ -213,24 +213,23 @@ class Plugin(ABC):
                 f"{self.name} check failed after {config.retry.attempts + 1} attempts"
             )
 
-        self.logger.info(f"✅ {self.name} check completed with status: {result.status}")
+        self.logger.info(f"{self.name} check completed with status: {result.status}")
         return result
 
     def _send_heartbeat_completion(self, result: CheckResult) -> None:
         """Send heartbeat completion message."""
         if self.heartbeat:
-            status_emoji = "✅" if result.status == "up" else "❌"
             self.logger.debug(
-                f"📤 Sending heartbeat completion message for {self.name}"
+                f"Sending heartbeat completion message for {self.name}"
             )
             self.heartbeat.send_message(
-                f"{status_emoji} {self.name} completed in {result.duration_seconds}s"
+                f"{self.name} completed in {result.duration_seconds}s (status: {result.status})"
             )
 
     def _stop_heartbeat(self) -> None:
         """Stop heartbeat service if running."""
         if self.heartbeat:
-            self.logger.debug(f"🛑 Stopping heartbeat service for {self.name}")
+            self.logger.debug(f"Stopping heartbeat service for {self.name}")
             self.heartbeat.stop()
 
     @abstractmethod
@@ -263,17 +262,17 @@ class Plugin(ABC):
             target = f"{self.ssh_runner.user or 'current_user'}@{self.ssh_runner.host}"
             if self.ssh_runner.port != 22:
                 target += f":{self.ssh_runner.port}"
-            self.logger.info(f"🔌 Running command via SSH on {target}...")
+            self.logger.info(f"Running command via SSH on {target}...")
             self.logger.debug(f"Command: {' '.join(cmd)}")
             try:
                 success, stdout, stderr, exit_code = self.ssh_runner.run(cmd, timeout)
                 return success, stdout, stderr, exit_code
             except SSHConnectionError as e:
-                self.logger.error(f"🔌 SSH connection failed: {e.message}")
+                self.logger.error(f"SSH connection failed: {e.message}")
                 return False, "", f"SSH connection failed: {e.message}", -1
 
         # Local execution
-        self.logger.info("🔧 Running command locally...")
+        self.logger.info("Running command locally...")
         self.logger.debug(f"Command: {' '.join(cmd)}")
         try:
             result = subprocess.run(
@@ -289,11 +288,11 @@ class Plugin(ABC):
                 result.returncode,
             )
         except subprocess.TimeoutExpired:
-            self.logger.error(f"❌ Command timed out after {timeout}s")
+            self.logger.error(f"Command timed out after {timeout}s")
             return False, "", f"Command timed out after {timeout}s", -1
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"❌ Command execution failed: {sanitized_error}")
+            self.logger.error(f"Command execution failed: {sanitized_error}")
             return False, "", f"Command execution failed: {sanitized_error}", -1
 
     def get_effective_config(self, check_config: CheckConfig) -> dict:

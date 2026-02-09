@@ -2,10 +2,9 @@
 
 import shlex
 import subprocess
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from kuma_scout.core.logger import get_logger
+from kuma_scout.core.logger import get_logger, log_security_event
 
 
 class SSHConnectionError(Exception):
@@ -15,48 +14,6 @@ class SSHConnectionError(Exception):
         self.message = message
         self.stderr = stderr
         super().__init__(f"SSH connection failed: {message}")
-
-
-@dataclass
-class SSHConfig:
-    """SSH configuration with parsing capabilities."""
-
-    host: Optional[str] = None
-    user: Optional[str] = None
-    port: Optional[int] = None
-    key_file: Optional[str] = None
-    password: Optional[str] = None
-    strict_host_key_checking: bool = True
-
-    @classmethod
-    def from_connection_string(cls, connection_string: str) -> "SSHConfig":
-        """Create SSHConfig from connection string.
-
-        Args:
-            connection_string: SSH connection string in supported formats
-
-        Returns:
-            SSHConfig instance with parsed values
-        """
-        host, user, port = parse_ssh_connection_string(connection_string)
-        return cls(host=host, user=user, port=port)
-
-    def update_from_connection_string(self, connection_string: str) -> None:
-        """Update this config from a connection string.
-
-        Only sets values that are not already set (None).
-        """
-        host, user, port = parse_ssh_connection_string(connection_string)
-        if host and self.host is None:
-            self.host = host
-        if user and self.user is None:
-            self.user = user
-        if port and self.port is None:
-            self.port = port
-
-    def is_complete(self) -> bool:
-        """Check if config has minimum required fields for SSH connection."""
-        return self.host is not None
 
 
 class SSHRunner:
@@ -99,6 +56,16 @@ class SSHRunner:
         self.password = password
         self.timeout = timeout
         self.strict_host_key_checking = strict_host_key_checking
+
+        # Log security event if host key checking is disabled
+        if not self.strict_host_key_checking:
+            logger = get_logger()
+            log_security_event(
+                logger,
+                "ssh_host_key_checking_disabled",
+                f"SSH host key checking disabled for host {self.host} - connections may be vulnerable to man-in-the-middle attacks",
+                level="warning"
+            )
 
     def build_ssh_command(self, remote_cmd: List[str]) -> List[str]:
         """Build the SSH command with options.
@@ -163,6 +130,17 @@ class SSHRunner:
         stderr_lower = stderr.lower()
         return any(pattern in stderr_lower for pattern in connection_error_patterns)
 
+    def _log_ssh_auth_failure(self, stderr: str) -> None:
+        """Log security event for SSH authentication failures."""
+        if "permission denied" in stderr.lower() or "authentication failed" in stderr.lower():
+            logger = get_logger()
+            log_security_event(
+                logger,
+                "ssh_authentication_failed",
+                f"SSH authentication failed for user {self.user or 'current_user'}@{self.host}",
+                level="warning"
+            )
+
     def run(
         self, cmd: List[str], timeout: Optional[int] = None
     ) -> Tuple[bool, str, str, int]:
@@ -186,10 +164,11 @@ class SSHRunner:
             import os
 
             logger = get_logger()
-            logger.warning(
-                "⚠️  SECURITY WARNING: Using SSH password authentication. "
-                "Password may be exposed in process list (ps/top) even with environment variable method. "
-                "Please use SSH key authentication instead."
+            log_security_event(
+                logger,
+                "ssh_password_authentication_used",
+                f"SSH password authentication used for host {self.host} - consider using SSH key authentication instead",
+                level="warning"
             )
 
             # Try to use sshpass with environment variable (more secure than -p flag)
@@ -211,6 +190,7 @@ class SSHRunner:
                 if result.returncode != 0 and self._is_ssh_connection_error(
                     result.stderr
                 ):
+                    self._log_ssh_auth_failure(result.stderr)
                     raise SSHConnectionError(
                         result.stderr or "Connection failed", result.stderr
                     )
@@ -237,6 +217,7 @@ class SSHRunner:
             )
             # Check for SSH connection errors
             if result.returncode != 0 and self._is_ssh_connection_error(result.stderr):
+                self._log_ssh_auth_failure(result.stderr)
                 raise SSHConnectionError(
                     result.stderr or "Connection failed", result.stderr
                 )
@@ -252,23 +233,6 @@ class SSHRunner:
             raise  # Re-raise SSH connection errors
         except Exception as e:
             return False, "", str(e), -1
-
-
-def parse_ssh_shorthand(ssh: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """Parse SSH shorthand format (user@host or just host).
-
-    Args:
-        ssh: SSH shorthand string (e.g., "root@server" or "server")
-
-    Returns:
-        Tuple of (host, user) where either may be None
-    """
-    if not ssh:
-        return None, None
-    if "@" in ssh:
-        user, host = ssh.rsplit("@", 1)
-        return host, user
-    return ssh, None
 
 
 def parse_ssh_connection_string(

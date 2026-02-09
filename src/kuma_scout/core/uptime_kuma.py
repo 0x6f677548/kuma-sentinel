@@ -6,6 +6,8 @@ import urllib.request
 from logging import Logger
 from typing import Optional
 
+from kuma_scout.core.logger import log_security_event
+
 # Timeout constants for different push types
 PUSH_TIMEOUT_HEARTBEAT = 5
 PUSH_TIMEOUT_ALERT = 10
@@ -44,12 +46,17 @@ def send_push(
     # Validate required parameters
     if not uptime_kuma_url:
         logger.warning(
-            f"⚠️  Cannot send {command} push: Uptime Kuma URL not configured"
+            f"Cannot send {command} push: Uptime Kuma URL not configured"
         )
         return False
 
     if not push_token:
-        logger.warning(f"⚠️  Cannot send {command} push: push token not configured")
+        log_security_event(
+            logger,
+            "uptime_kuma_token_missing",
+            f"Push token not configured for {command} - cannot send status updates to Uptime Kuma",
+            level="warning"
+        )
         return False
 
     try:
@@ -63,11 +70,19 @@ def send_push(
         with urllib.request.urlopen(push_url, timeout=timeout) as response:
             data = response.read().decode()
             if '{"ok":true}' in data:
-                logger.info(f"✅ {command} push sent ({status}): {message}")
+                logger.info(f"{command} push sent ({status}): {message}")
                 return True
             else:
-                logger.error(f"❌ {command} push failed: {data}")
+                # Check for authentication errors
+                if "unauthorized" in data.lower() or "forbidden" in data.lower() or "invalid token" in data.lower():
+                    log_security_event(
+                        logger,
+                        "uptime_kuma_authentication_failed",
+                        f"Uptime Kuma API authentication failed for {command} - check push token validity",
+                        level="error"
+                    )
+                logger.error(f"{command} push failed: {data}")
                 return False
     except Exception as e:
-        logger.error(f"❌ {command} push failed: {str(e)}")
+        logger.error(f"{command} push failed: {str(e)}")
         return False

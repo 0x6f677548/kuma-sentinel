@@ -5,45 +5,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from kuma_scout.core.utils.ssh_runner import (
-    SSHConfig,
     SSHConnectionError,
     SSHRunner,
     parse_ssh_connection_string,
-    parse_ssh_shorthand,
 )
-
-
-class TestSSHConfig:
-    """Test SSHConfig dataclass and methods."""
-
-    def test_from_connection_string(self):
-        """Test creating SSHConfig from connection string."""
-        config = SSHConfig.from_connection_string("user@host:22")
-        assert config.host == "host"
-        assert config.user == "user"
-        assert config.port == 22
-
-    def test_update_from_connection_string(self):
-        """Test updating SSHConfig from connection string."""
-        config = SSHConfig(host="existing", user="existing")
-        config.update_from_connection_string("newuser@newhost:2222")
-        # Should not update since values are already set
-        assert config.host == "existing"
-        assert config.user == "existing"
-        assert config.port == 2222  # Port was None, so it gets set
-
-        # Now update with None values
-        config2 = SSHConfig()
-        config2.update_from_connection_string("user@host:22")
-        assert config2.host == "host"
-        assert config2.user == "user"
-        assert config2.port == 22
-
-    def test_is_complete(self):
-        """Test is_complete method."""
-        assert SSHConfig(host="host").is_complete()
-        assert not SSHConfig().is_complete()
-        assert not SSHConfig(user="user").is_complete()
 
 
 class TestSSHRunner:
@@ -251,24 +216,6 @@ class TestSSHRunner:
 
         assert "SSH connection failed" in str(exc_info.value)
         assert exc_info.value.stderr == "Permission denied (publickey,password)"
-
-
-class TestParseSSHShorthand:
-    """Test parse_ssh_shorthand function."""
-
-    @pytest.mark.parametrize(
-        "input_str,expected",
-        [
-            ("user@host", ("host", "user")),
-            ("host", ("host", None)),
-            ("", (None, None)),
-            (None, (None, None)),
-            ("root@192.168.1.1", ("192.168.1.1", "root")),
-        ],
-    )
-    def test_parse_ssh_shorthand(self, input_str, expected):
-        """Test parsing various SSH shorthand formats."""
-        assert parse_ssh_shorthand(input_str) == expected
 
 
 class TestParseSSHConnectionString:

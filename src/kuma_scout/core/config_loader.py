@@ -2,16 +2,16 @@
 Configuration loading and validation for Kuma-Scout.
 
 This module handles loading YAML configuration files, validating them against
-Pydantic models, and providing filtering logic for check execution.
+Pydantic models, and parsing check configurations.
 """
 
 import os
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 import yaml
 
-from kuma_scout.plugins.base import CheckConfig
+from kuma_scout.core.logger import get_logger, log_security_event
 from kuma_scout.plugins.models import GlobalConfig
 
 
@@ -37,6 +37,15 @@ def load_config(
 
     if not ignore_file_permissions:
         _check_file_permissions(config_file, config_path)
+    else:
+        # Log security event when permission checks are bypassed
+        logger = get_logger()
+        log_security_event(
+            logger,
+            "config_file_permissions_ignored",
+            f"Config file permission checks bypassed for {config_path} - file may contain sensitive data with overly permissive access",
+            level="warning"
+        )
 
     raw_config = _load_yaml_config(config_file)
     _parse_ssh_host(raw_config)
@@ -62,6 +71,13 @@ def _check_file_permissions(config_file: Path, config_path: str) -> None:
     file_stat = config_file.stat()
     # Check if file is world-readable or group-readable when it shouldn't be
     if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):
+        logger = get_logger()
+        log_security_event(
+            logger,
+            "config_file_overly_permissive",
+            f"Config file {config_path} has overly permissive permissions (readable by group/other) - contains sensitive data",
+            level="error"
+        )
         raise ValueError(
             f"Configuration file {config_path} has overly permissive permissions. "
             "Remove group/other read permissions (chmod 600) or use --ignore-file-permissions"
@@ -142,60 +158,3 @@ def _expand_env_vars(data: Any) -> Any:
         return [_expand_env_vars(item) for item in data]
     else:
         return data
-
-
-def filter_checks(
-    checks: List[Tuple[str, CheckConfig]],
-    names: Optional[List[str]] = None,
-    tags: Optional[List[str]] = None,
-    check_type: Optional[str] = None,
-    exclude: Optional[List[str]] = None,
-) -> List[Tuple[str, CheckConfig]]:
-    """
-    Filter checks based on name, tags, type, and exclusions.
-
-    Matching logic:
-    - If --name is specified, include checks matching those names
-    - If --tag is specified, include checks having ANY of those tags
-    - If --type is specified, include checks of that type
-    - If both --name and --tag specified, include checks matching EITHER
-    - --exclude removes checks regardless of other filters
-
-    Args:
-        checks: List of (plugin_type, config) tuples
-        names: List of check names to include
-        tags: List of tags to include
-        check_type: Plugin type to include
-        exclude: List of check names to exclude
-
-    Returns:
-        Filtered list of (plugin_type, config) tuples
-    """
-    result = []
-
-    for plugin_type, config in checks:
-        # Check exclusion first
-        if exclude and config.name in exclude:
-            continue
-
-        # If no filters, include all
-        if not names and not tags and not check_type:
-            result.append((plugin_type, config))
-            continue
-
-        # Check --name filter
-        if names and config.name in names:
-            result.append((plugin_type, config))
-            continue
-
-        # Check --tag filter
-        if tags and any(tag in config.tags for tag in tags):
-            result.append((plugin_type, config))
-            continue
-
-        # Check --type filter
-        if check_type and plugin_type == check_type:
-            result.append((plugin_type, config))
-            continue
-
-    return result

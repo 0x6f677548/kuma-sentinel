@@ -251,6 +251,11 @@ def test_filter_checks_by_tags():
     assert "check1" in names
     assert "check2" in names
 
+    # Filter by tag1 and tag2 (should match only check1)
+    filtered = generator._filter_checks(checks, ["tag1", "tag2"], None, None, None)
+    assert len(filtered) == 1
+    assert filtered[0][1]["name"] == "check1"
+
 
 def test_filter_checks_by_names():
     """Test _filter_checks filters by names correctly."""
@@ -298,6 +303,61 @@ def test_filter_checks_excludes():
     assert "check1" in names
     assert "check3" in names
     assert "check2" not in names
+
+
+def test_filter_checks_combined():
+    """Test _filter_checks with multiple filter types combined (AND logic)."""
+    generator = CLIGenerator()
+    checks: list[tuple[str, dict]] = [
+        ("type1", {"name": "check1", "tags": ["web", "prod"]}),
+        ("type1", {"name": "check2", "tags": ["web", "dev"]}),
+        ("type2", {"name": "check3", "tags": ["db", "prod"]}),
+        ("type2", {"name": "check4"}),  # No tags
+    ]
+
+    # Filter by tags AND names (should match check1 only)
+    filtered = generator._filter_checks(checks, ["web", "prod"], ["check1"], None, None)
+    assert len(filtered) == 1
+    assert filtered[0][1]["name"] == "check1"
+
+    # Filter by tags AND types (should match check1 and check2)
+    filtered = generator._filter_checks(checks, ["web"], None, ["type1"], None)
+    assert len(filtered) == 2
+    names = [c[1]["name"] for c in filtered]
+    assert "check1" in names
+    assert "check2" in names
+
+    # Filter by tags AND exclude (should match check2 only)
+    filtered = generator._filter_checks(checks, ["web"], None, None, ["check1"])
+    assert len(filtered) == 1
+    assert filtered[0][1]["name"] == "check2"
+
+
+def test_filter_checks_edge_cases():
+    """Test _filter_checks edge cases."""
+    generator = CLIGenerator()
+    checks: list[tuple[str, dict]] = [
+        ("type1", {"name": "check1", "tags": ["tag1"]}),
+        ("type1", {"name": "check2"}),  # No tags
+        ("type2", {"name": "check3", "tags": []}),  # Empty tags
+    ]
+
+    # Filter by non-existent tag (should match nothing)
+    filtered = generator._filter_checks(checks, ["nonexistent"], None, None, None)
+    assert len(filtered) == 0
+
+    # Filter by empty tags list (should not filter - return all)
+    filtered = generator._filter_checks(checks, [], None, None, None)
+    assert len(filtered) == 3
+
+    # Filter by tag on check with no tags field (should not match)
+    filtered = generator._filter_checks(checks, ["tag1"], None, None, None)
+    assert len(filtered) == 1
+    assert filtered[0][1]["name"] == "check1"
+
+    # No filters (should return all)
+    filtered = generator._filter_checks(checks, None, None, None, None)
+    assert len(filtered) == 3
 
 
 def test_build_check_config_data():

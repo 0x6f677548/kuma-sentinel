@@ -90,7 +90,7 @@ class TestCmdCheckExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Command execution failed" in result.message
+            assert "Check execution failed" in result.message
 
     def test_output_sanitization(self, plugin, config):
         """Test that output is sanitized when enabled."""

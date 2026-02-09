@@ -4,14 +4,13 @@ ZFS pool plugin for Kuma-Scout.
 Checks ZFS pool health status and free space percentage.
 """
 
-import time
-from typing import Optional, Tuple, cast
+from typing import Optional, Tuple
 
 from pydantic import Field
 
 from kuma_scout.core.models import CheckResult
 
-from .base import CheckConfig, Plugin
+from .base import CheckConfig, Plugin, execute_with_timing
 
 
 class ZfsPoolConfig(CheckConfig):
@@ -30,116 +29,96 @@ class ZfsPoolPlugin(Plugin):
     description = "Checks ZFS pool health status and free space percentage"
     config_class = ZfsPoolConfig
 
-    def execute(self, config: CheckConfig) -> CheckResult:
+    @execute_with_timing
+    def execute(self, config: ZfsPoolConfig) -> CheckResult:
         """Execute ZFS pool status check."""
-        # Cast to the specific config type
-        config = cast(ZfsPoolConfig, config)
-        check_start = time.time()
+        self.output_handler.info(
+            "ZfsPoolStatus: Starting ZFS pool status check", echo=False
+        )
 
-        try:
-            self.output_handler.info(
-                "ZfsPoolStatus: Starting ZFS pool status check", echo=False
-            )
-
-            if not config.pool:
-                self.output_handler.error(
-                    "ZfsPoolStatus: No ZFS pool configured", echo=False
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message="No ZFS pool configured",
-                    duration_seconds=int(time.time() - check_start),
-                    details={"error": "no_pool"},
-                )
-
-            self.output_handler.info(
-                f"ZfsPoolStatus: Checking pool '{config.pool}' (min free space: {config.min_free_percent}%)",
-                echo=False,
-            )
-
-            health, free_percent = self._get_pool_status(config.pool)
-
-            if health is None or free_percent is None:
-                self.output_handler.error(
-                    f"Failed to get status for pool '{config.pool}'", echo=False
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Failed to get status for pool '{config.pool}'",
-                    duration_seconds=int(time.time() - check_start),
-                    details={"error": "status_unavailable", "pool": config.pool},
-                )
-
-            check_duration = int(time.time() - check_start)
-
-            # Check health status
-            if health != "ONLINE":
-                self.output_handler.warning(
-                    f"ZfsPoolStatus: Pool '{config.pool}' health is {health} (not ONLINE)",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Pool '{config.pool}' is not healthy (status: {health})",
-                    duration_seconds=check_duration,
-                    details={
-                        "health": health,
-                        "free_percent": free_percent,
-                        "pool": config.pool,
-                    },
-                )
-
-            # Check free space threshold
-            if free_percent < config.min_free_percent:
-                self.output_handler.warning(
-                    f"ZfsPoolStatus: Pool '{config.pool}' low on space: {free_percent:.1f}% free < {config.min_free_percent}% threshold",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Pool '{config.pool}' low on space ({free_percent:.1f}% free < {config.min_free_percent}%)",
-                    duration_seconds=check_duration,
-                    details={
-                        "health": health,
-                        "free_percent": free_percent,
-                        "min_free_percent": config.min_free_percent,
-                        "pool": config.pool,
-                    },
-                )
-            else:
-                self.output_handler.info(
-                    f"ZfsPoolStatus: Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="up",
-                    message=f"Pool '{config.pool}' is healthy ({free_percent:.1f}% free)",
-                    duration_seconds=check_duration,
-                    details={
-                        "health": health,
-                        "free_percent": free_percent,
-                        "min_free_percent": config.min_free_percent,
-                        "pool": config.pool,
-                    },
-                )
-
-        except Exception as e:
-            duration = int(time.time() - check_start)
+        if not config.pool:
             self.output_handler.error(
-                f"ZfsPoolStatus: Unexpected error during ZFS pool check: {str(e)}",
+                "ZfsPoolStatus: No ZFS pool configured", echo=False
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message="No ZFS pool configured",
+                duration_seconds=0,  # Will be set by decorator
+                details={"error": "no_pool"},
+            )
+
+        self.output_handler.info(
+            f"ZfsPoolStatus: Checking pool '{config.pool}' (min free space: {config.min_free_percent}%)",
+            echo=False,
+        )
+
+        health, free_percent = self._get_pool_status(config.pool)
+
+        if health is None or free_percent is None:
+            self.output_handler.error(
+                f"Failed to get status for pool '{config.pool}'", echo=False
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message=f"Failed to get status for pool '{config.pool}'",
+                duration_seconds=0,  # Will be set by decorator
+                details={"error": "status_unavailable", "pool": config.pool},
+            )
+
+        # Check health status
+        if health != "ONLINE":
+            self.output_handler.warning(
+                f"ZfsPoolStatus: Pool '{config.pool}' health is {health} (not ONLINE)",
                 echo=False,
             )
             return CheckResult(
                 check_name=config.name,
                 status="down",
-                message=f"ZFS pool check error: {str(e)}",
-                duration_seconds=duration,
-                details={"error": str(e)},
+                message=f"Pool '{config.pool}' is not healthy (status: {health})",
+                duration_seconds=0,  # Will be set by decorator
+                details={
+                    "health": health,
+                    "free_percent": free_percent,
+                    "pool": config.pool,
+                },
+            )
+
+        # Check free space threshold
+        if free_percent < config.min_free_percent:
+            self.output_handler.warning(
+                f"ZfsPoolStatus: Pool '{config.pool}' low on space: {free_percent:.1f}% free < {config.min_free_percent}% threshold",
+                echo=False,
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message=f"Pool '{config.pool}' low on space ({free_percent:.1f}% free < {config.min_free_percent}%)",
+                duration_seconds=0,  # Will be set by decorator
+                details={
+                    "health": health,
+                    "free_percent": free_percent,
+                    "min_free_percent": config.min_free_percent,
+                    "pool": config.pool,
+                },
+            )
+        else:
+            self.output_handler.info(
+                f"ZfsPoolStatus: Pool '{config.pool}' is healthy: {free_percent:.1f}% free >= {config.min_free_percent}%",
+                echo=False,
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="up",
+                message=f"Pool '{config.pool}' is healthy ({free_percent:.1f}% free)",
+                duration_seconds=0,  # Will be set by decorator
+                details={
+                    "health": health,
+                    "free_percent": free_percent,
+                    "min_free_percent": config.min_free_percent,
+                    "pool": config.pool,
+                },
             )
 
     def _get_pool_status(self, pool_name: str) -> Tuple[Optional[str], Optional[float]]:

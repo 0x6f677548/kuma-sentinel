@@ -6,8 +6,7 @@ Executes shell commands and reports results to Uptime Kuma.
 
 import re
 import shlex
-import time
-from typing import Optional, cast
+from typing import Optional
 
 from pydantic import Field
 
@@ -15,7 +14,7 @@ from kuma_scout.core.logger import log_security_event
 from kuma_scout.core.models import CheckResult
 from kuma_scout.core.utils.sanitizer import DataSanitizer
 
-from .base import CheckConfig, Plugin
+from .base import CheckConfig, Plugin, execute_with_timing
 
 
 class CmdCheckConfig(CheckConfig):
@@ -43,72 +42,53 @@ class CmdCheckPlugin(Plugin):
     description = "Executes shell commands and reports results to Uptime Kuma"
     config_class = CmdCheckConfig
 
-    def execute(self, config: CheckConfig) -> CheckResult:
+    @execute_with_timing
+    def execute(self, config: CmdCheckConfig) -> CheckResult:
         """Execute the command check."""
-        # Cast to the specific config type
-        config = cast(CmdCheckConfig, config)
-        start_time = time.time()
-
         # Check for dangerous commands
         self._check_for_dangerous_commands(config.command)
 
-        try:
-            self.output_handler.info("CmdCheck: Executing...", echo=False)
-            self.output_handler.debug(f"Command: {config.command}", echo=False)
-            # Execute the command
-            success, stdout, stderr, exit_code = self.run_command(
-                shlex.split(config.command),
-                timeout=config.timeout,
-            )
+        self.output_handler.info("CmdCheck: Executing...", echo=False)
+        self.output_handler.debug(f"Command: {config.command}", echo=False)
 
-            duration = time.time() - start_time
+        # Execute the command
+        success, stdout, stderr, exit_code = self.run_command(
+            shlex.split(config.command),
+            timeout=config.timeout,
+        )
 
-            # Sanitize output if requested
-            sanitize_output = getattr(config, "sanitize_output", True)
-            if sanitize_output:
-                stdout = DataSanitizer.sanitize(stdout)
-                stderr = DataSanitizer.sanitize(stderr)
+        # Sanitize output if requested
+        if config.sanitize_output:
+            stdout = DataSanitizer.sanitize(stdout)
+            stderr = DataSanitizer.sanitize(stderr)
 
-            # Determine success based on exit code and patterns
-            expect_exit_code = getattr(config, "expect_exit_code", 0)
-            success_pattern = getattr(config, "success_pattern", None)
-            failure_pattern = getattr(config, "failure_pattern", None)
+        # Determine success based on exit code and patterns
+        is_success = exit_code == config.expect_exit_code
 
-            is_success = exit_code == expect_exit_code
+        stdout_stripped = stdout.strip()
+        if config.success_pattern and re.search(config.success_pattern, stdout_stripped):
+            is_success = True
+        elif config.failure_pattern and re.search(config.failure_pattern, stdout_stripped):
+            is_success = False
 
-            stdout_stripped = stdout.strip()
-            if success_pattern and re.search(success_pattern, stdout_stripped):
-                is_success = True
-            elif failure_pattern and re.search(failure_pattern, stdout_stripped):
-                is_success = False
+        # Build message
+        message_parts = []
+        if stdout.strip():
+            message_parts.append(f"stdout: {stdout.strip()}")
+        if stderr.strip():
+            message_parts.append(f"stderr: {stderr.strip()}")
+        if not message_parts:
+            message_parts.append(f"exit code: {exit_code}")
 
-            # Build message
-            message_parts = []
-            if stdout.strip():
-                message_parts.append(f"stdout: {stdout.strip()}")
-            if stderr.strip():
-                message_parts.append(f"stderr: {stderr.strip()}")
-            if not message_parts:
-                message_parts.append(f"exit code: {exit_code}")
+        message = "; ".join(message_parts)
 
-            message = "; ".join(message_parts)
-
-            return CheckResult(
-                check_name=config.name,
-                status="up" if is_success else "down",
-                message=message,
-                duration_seconds=int(duration),
-                details={"exit_code": exit_code, "stdout": stdout, "stderr": stderr},
-            )
-
-        except Exception as e:
-            duration = time.time() - start_time
-            return CheckResult(
-                check_name=config.name,
-                status="down",
-                message=f"Command execution failed: {str(e)}",
-                duration_seconds=int(duration),
-            )
+        return CheckResult(
+            check_name=config.name,
+            status="up" if is_success else "down",
+            message=message,
+            duration_seconds=0,  # Will be set by decorator
+            details={"exit_code": exit_code, "stdout": stdout, "stderr": stderr},
+        )
 
     def _check_for_dangerous_commands(self, command: str) -> None:
         """Check for potentially dangerous commands and log security events."""

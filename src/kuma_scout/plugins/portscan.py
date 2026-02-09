@@ -5,16 +5,15 @@ Scans TCP ports on target IP ranges and reports results to Uptime Kuma.
 """
 
 import os
-import time
 import xml.etree.ElementTree as ET
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from pydantic import Field
 
 from kuma_scout.core.logger import log_security_event
 from kuma_scout.core.models import CheckResult
 
-from .base import CheckConfig, Plugin
+from .base import CheckConfig, Plugin, execute_with_timing
 
 
 class PortscanConfig(CheckConfig):
@@ -40,21 +39,18 @@ class PortscanPlugin(Plugin):
     description = "Scans TCP ports on target IP ranges and reports to Uptime Kuma"
     config_class = PortscanConfig
 
-    def execute(self, config: CheckConfig) -> CheckResult:
+    @execute_with_timing
+    def execute(self, config: PortscanConfig) -> CheckResult:
         """Execute the port scan."""
-        # Cast to the specific config type
-        config = cast(PortscanConfig, config)
-        scan_start = time.time()
+        # Build nmap command
+        cmd = self._build_nmap_command(config)
+
+        # Create temp XML file
+        nmap_xml = self._create_nmap_xml_file()
+        cmd.extend(["-oX", nmap_xml])
+        cmd.extend(config.targets)
 
         try:
-            # Build nmap command
-            cmd = self._build_nmap_command(config)
-
-            # Create temp XML file
-            nmap_xml = self._create_nmap_xml_file()
-            cmd.extend(["-oX", nmap_xml])
-            cmd.extend(config.targets)
-
             self.output_handler.info(f"Portscan: running {' '.join(cmd)}", echo=False)
 
             # Run nmap scan
@@ -72,8 +68,6 @@ class PortscanPlugin(Plugin):
                     self._parse_nmap_xml(nmap_xml) if os.path.exists(nmap_xml) else []
                 )
 
-                scan_duration = int(time.time() - scan_start)
-
                 if hosts_with_ports:
                     open_ports_str = ", ".join(hosts_with_ports)
                     log_security_event(
@@ -88,7 +82,7 @@ class PortscanPlugin(Plugin):
                         check_name=config.name,
                         status="down",
                         message=f"Open ports found: {open_ports_str}",
-                        duration_seconds=scan_duration,
+                        duration_seconds=0,  # Will be set by decorator
                         details={"open_hosts": hosts_with_ports},
                     )
                 else:
@@ -99,10 +93,9 @@ class PortscanPlugin(Plugin):
                         check_name=config.name,
                         status="up",
                         message="No open ports found",
-                        duration_seconds=scan_duration,
+                        duration_seconds=0,  # Will be set by decorator
                     )
             else:
-                scan_duration = int(time.time() - scan_start)
                 error_msg = stderr.strip() if stderr else f"Exit code: {exit_code}"
                 self.output_handler.error(
                     f"Portscan: Port scan failed: {error_msg}", echo=False
@@ -111,28 +104,12 @@ class PortscanPlugin(Plugin):
                     check_name=config.name,
                     status="down",
                     message=f"Port scan execution failed: {error_msg}",
-                    duration_seconds=scan_duration,
+                    duration_seconds=0,  # Will be set by decorator
                     details={"error": error_msg},
                 )
-
-        except Exception as e:
-            scan_duration = int(time.time() - scan_start)
-            self.output_handler.error("Unexpected error during port scan", echo=False)
-            return CheckResult(
-                check_name=config.name,
-                status="down",
-                message=f"Port scan error: {str(e)}",
-                duration_seconds=scan_duration,
-                details={"error": str(e)},
-            )
         finally:
             # Cleanup XML file
-            if (
-                "nmap_xml" in locals()
-                and nmap_xml
-                and os.path.exists(nmap_xml)
-                and not config.keep_xml
-            ):
+            if nmap_xml and os.path.exists(nmap_xml) and not config.keep_xml:
                 try:
                     os.remove(nmap_xml)
                     self.output_handler.debug(

@@ -8,6 +8,7 @@ monitoring plugins must inherit from.
 import subprocess
 import time
 from abc import ABC, abstractmethod
+from functools import wraps
 from typing import ClassVar, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,6 +20,46 @@ from kuma_scout.core.utils.sanitizer import DataSanitizer
 from kuma_scout.core.utils.ssh_runner import SSHConnectionError, SSHRunner
 
 from .models import GlobalConfig, RetryConfig, SSHConfig, UptimeKumaConfig
+
+
+def execute_with_timing(func):
+    """
+    Decorator that provides standardized timing, config casting, and error handling for plugin execute methods.
+
+    This decorator:
+    - Casts the config to the plugin's specific config type
+    - Measures execution time
+    - Handles exceptions with standardized CheckResult creation
+    - Ensures consistent error handling across all plugins
+    """
+    @wraps(func)
+    def wrapper(self, config: CheckConfig) -> CheckResult:
+        # Cast config to the plugin's specific type
+        if hasattr(self, 'config_class'):
+            config = self.config_class(**config.model_dump())
+
+        start_time = time.time()
+
+        try:
+            # Call the actual execute logic
+            return func(self, config)
+        except Exception as e:
+            duration = int(time.time() - start_time)
+            sanitized_error = DataSanitizer.sanitize_error_message(e)
+
+            self.output_handler.error(
+                f"{self.name} check failed: {sanitized_error}", echo=False
+            )
+
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message=f"Check execution failed: {sanitized_error}",
+                duration_seconds=duration,
+                details={"error": sanitized_error, "error_type": type(e).__name__},
+            )
+
+    return wrapper
 
 
 class CheckConfig(BaseModel):

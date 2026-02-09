@@ -105,7 +105,7 @@ class TestKopiaSnapshotExecution:
             result = plugin.execute(config)
 
             assert result.status == "down"
-            assert "Snapshot check error" in result.message
+            assert "Check execution failed" in result.message
 
     def test_invalid_json_response(self, plugin, config):
         """Test handling of invalid JSON response."""

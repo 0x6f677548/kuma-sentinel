@@ -6,15 +6,14 @@ Checks Kopia snapshot freshness and reports results to Uptime Kuma.
 
 import json
 import re
-import time
 from datetime import datetime
-from typing import Optional, cast
+from typing import Optional
 
 from pydantic import Field
 
 from kuma_scout.core.models import CheckResult
 
-from .base import CheckConfig, Plugin
+from .base import CheckConfig, Plugin, execute_with_timing
 
 
 class KopiaSnapshotConfig(CheckConfig):
@@ -33,110 +32,90 @@ class KopiaSnapshotPlugin(Plugin):
     description = "Checks Kopia snapshot freshness and reports to Uptime Kuma"
     config_class = KopiaSnapshotConfig
 
-    def execute(self, config: CheckConfig) -> CheckResult:
+    @execute_with_timing
+    def execute(self, config: KopiaSnapshotConfig) -> CheckResult:
         """Execute the snapshot status check."""
-        # Cast to the specific config type
-        config = cast(KopiaSnapshotConfig, config)
-        check_start = time.time()
+        self.output_handler.info("KopiaSnapshotStatus: Starting check", echo=False)
 
-        try:
-            self.output_handler.info("KopiaSnapshotStatus: Starting check", echo=False)
-
-            if not config.path:
-                self.output_handler.error("No snapshot path configured", echo=False)
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message="No snapshot path configured",
-                    duration_seconds=int(time.time() - check_start),
-                    details={"error": "no_path"},
-                )
-
-            # Validate path format
-            try:
-                self._validate_snapshot_path(config.path)
-            except ValueError as e:
-                self.output_handler.error(
-                    f"KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Invalid snapshot path: {str(e)}",
-                    duration_seconds=int(time.time() - check_start),
-                    details={"error": str(e), "path": config.path},
-                )
-
-            self.output_handler.info(
-                f"KopiaSnapshotStatus: Checking snapshot path {config.path} (max age: {config.max_age_hours}h)",
-                echo=False,
+        if not config.path:
+            self.output_handler.error("No snapshot path configured", echo=False)
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message="No snapshot path configured",
+                duration_seconds=0,  # Will be set by decorator
+                details={"error": "no_path"},
             )
 
-            # Get snapshot info
-            age_hours = self._get_snapshot_info(config.path)
-
-            if age_hours is None:
-                self.output_handler.error(
-                    f"KopiaSnapshotStatus: Failed to get snapshot info for {config.path}",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Failed to get snapshot info for {config.path}",
-                    duration_seconds=int(time.time() - check_start),
-                    details={"error": "failed_to_get_info", "path": config.path},
-                )
-
-            # Check if snapshot is too old
-            check_duration = int(time.time() - check_start)
-
-            if age_hours <= config.max_age_hours:
-                self.output_handler.info(
-                    f"KopiaSnapshotStatus: OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="up",
-                    message=f"Snapshot is fresh ({age_hours:.1f}h old)",
-                    duration_seconds=check_duration,
-                    details={
-                        "age_hours": age_hours,
-                        "max_age_hours": config.max_age_hours,
-                        "path": config.path,
-                    },
-                )
-            else:
-                self.output_handler.warning(
-                    f"KopiaSnapshotStatus: TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h",
-                    echo=False,
-                )
-                return CheckResult(
-                    check_name=config.name,
-                    status="down",
-                    message=f"Snapshot is too old ({age_hours:.1f}h > {config.max_age_hours}h)",
-                    duration_seconds=check_duration,
-                    details={
-                        "age_hours": age_hours,
-                        "max_age_hours": config.max_age_hours,
-                        "path": config.path,
-                    },
-                )
-
-        except Exception as e:
-            check_duration = int(time.time() - check_start)
+        # Validate path format
+        try:
+            self._validate_snapshot_path(config.path)
+        except ValueError as e:
             self.output_handler.error(
-                "KopiaSnapshotStatus: Unexpected error during snapshot check",
+                f"KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}",
                 echo=False,
             )
             return CheckResult(
                 check_name=config.name,
                 status="down",
-                message=f"Snapshot check error: {str(e)}",
-                duration_seconds=check_duration,
+                message=f"Invalid snapshot path: {str(e)}",
+                duration_seconds=0,  # Will be set by decorator
                 details={"error": str(e), "path": config.path},
+            )
+
+        self.output_handler.info(
+            f"KopiaSnapshotStatus: Checking snapshot path {config.path} (max age: {config.max_age_hours}h)",
+            echo=False,
+        )
+
+        # Get snapshot info
+        age_hours = self._get_snapshot_info(config.path)
+
+        if age_hours is None:
+            self.output_handler.error(
+                f"KopiaSnapshotStatus: Failed to get snapshot info for {config.path}",
+                echo=False,
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message=f"Failed to get snapshot info for {config.path}",
+                duration_seconds=0,  # Will be set by decorator
+                details={"error": "failed_to_get_info", "path": config.path},
+            )
+
+        # Check if snapshot is too old
+        if age_hours <= config.max_age_hours:
+            self.output_handler.info(
+                f"KopiaSnapshotStatus: OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h",
+                echo=False,
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="up",
+                message=f"Snapshot is fresh ({age_hours:.1f}h old)",
+                duration_seconds=0,  # Will be set by decorator
+                details={
+                    "age_hours": age_hours,
+                    "max_age_hours": config.max_age_hours,
+                    "path": config.path,
+                },
+            )
+        else:
+            self.output_handler.warning(
+                f"KopiaSnapshotStatus: TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h",
+                echo=False,
+            )
+            return CheckResult(
+                check_name=config.name,
+                status="down",
+                message=f"Snapshot is too old ({age_hours:.1f}h > {config.max_age_hours}h)",
+                duration_seconds=0,  # Will be set by decorator
+                details={
+                    "age_hours": age_hours,
+                    "max_age_hours": config.max_age_hours,
+                    "path": config.path,
+                },
             )
 
     def _validate_snapshot_path(self, path: str) -> None:

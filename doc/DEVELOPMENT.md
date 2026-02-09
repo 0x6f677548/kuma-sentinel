@@ -52,7 +52,7 @@ kuma-scout/
 
 ## Creating a New Plugin
 
-Plugins are simple, self-contained monitoring components. Each plugin defines configuration via Pydantic and execution logic.
+Plugins are simple, self-contained monitoring components. Each plugin defines configuration via Pydantic and execution logic. The plugin system uses a decorator-based architecture that automatically handles timing, error handling, and config casting.
 
 ### Step 1: Create Plugin File
 
@@ -62,46 +62,52 @@ Create `src/kuma_scout/plugins/my_check.py`:
 """My custom monitoring plugin."""
 from pydantic import Field
 from kuma_scout.core.models import CheckResult
-from kuma_scout.plugins.base import CheckConfig, Plugin
+from kuma_scout.plugins.base import CheckConfig, Plugin, execute_with_timing
 
 
 class MyCheckConfig(CheckConfig):
     """Configuration for my custom check."""
-    
+
     target: str = Field(description="Target to monitor")
     timeout: int = Field(default=30, ge=1, le=3600, description="Timeout in seconds")
 
 
 class MyCheckPlugin(Plugin):
     """Custom monitoring plugin."""
-    
+
     name = "my_check"
     description = "Monitor custom target"
     config_class = MyCheckConfig
 
-    def execute(self, config: CheckConfig) -> CheckResult:
+    @execute_with_timing
+    def execute(self, config: MyCheckConfig) -> CheckResult:
         """Execute the check."""
-        cfg = config  # type: ignore
-        try:
-            # Your monitoring logic here
-            is_up = self._check_target(cfg.target)
-            
-            return CheckResult(
-                status="up" if is_up else "down",
-                message="Check passed" if is_up else "Check failed",
-                duration_seconds=1.0,
-            )
-        except Exception as e:
-            return CheckResult(
-                status="down",
-                message=f"Error: {str(e)}",
-                duration_seconds=1.0,
-            )
+        # Config is automatically cast to MyCheckConfig by the decorator
+        # Timing and error handling are handled automatically
+
+        # Your monitoring logic here
+        is_up = self._check_target(config.target)
+
+        return CheckResult(
+            check_name=config.name,
+            status="up" if is_up else "down",
+            message="Check passed" if is_up else "Check failed",
+            duration_seconds=0,  # Will be set by decorator
+        )
 
     def _check_target(self, target: str) -> bool:
         """Your check logic here."""
         return True
 ```
+
+### Key Changes in Plugin Architecture
+
+The `@execute_with_timing` decorator provides:
+
+- **Automatic config casting**: No need for manual type casting
+- **Built-in timing**: Execution time is measured automatically
+- **Standardized error handling**: Exceptions are caught and converted to proper CheckResult objects
+- **Consistent behavior**: All plugins have identical error handling and timing
 
 ### Step 2: Add Tests
 
@@ -123,9 +129,26 @@ def test_execute_success():
     plugin = MyCheckPlugin()
     config = MyCheckConfig(name="test", target="example.com")
     result = plugin.execute(config)
-    
+
     assert result.status == "up"
     assert "passed" in result.message
+    assert result.duration_seconds > 0  # Timing is handled by decorator
+
+
+def test_execute_error():
+    """Test error handling."""
+    plugin = MyCheckPlugin()
+    config = MyCheckConfig(name="test", target="example.com")
+
+    # Mock an error in the check logic
+    original_check = plugin._check_target
+    plugin._check_target = lambda x: (_ for _ in ()).throw(RuntimeError("Test error"))
+
+    result = plugin.execute(config)
+
+    assert result.status == "down"
+    assert "Check execution failed" in result.message
+    assert result.duration_seconds > 0
 ```
 
 ### Step 3: Update Configuration Example
@@ -176,11 +199,12 @@ checks:
 
 - **Single Responsibility** - Each plugin monitors one thing
 - **Clear Configuration** - Use descriptive field names and help text
-- **Error Handling** - Always catch exceptions and return appropriate status
+- **Error Handling** - The `@execute_with_timing` decorator handles exceptions automatically
 - **Logging** - Use `self.output_handler` for debug/info messages (echo=False for internal logs)
 - **Sanitization** - Use `DataSanitizer` for output sent to Uptime Kuma
-- **Testing** - Comprehensive unit tests with good coverage
+- **Testing** - Comprehensive unit tests with good coverage, including error cases
 - **Documentation** - Document purpose, configuration, and examples
+- **Decorator Usage** - Always use `@execute_with_timing` on your `execute()` method
 
 ## Configuration Reference
 
@@ -222,12 +246,12 @@ checks:
 
 **Core Layer** - Shared: config loading, API integration, logging, sanitization.
 
-**Plugin Layer** - Self-contained monitoring logic. Plugins auto-discover on startup.
+**Plugin Layer** - Self-contained monitoring logic with automatic timing and error handling via `@execute_with_timing` decorator. Plugins auto-discover on startup.
 
 When you create a plugin:
 - Define config via Pydantic (validation + CLI args)
-- Implement `execute()` method
-- Return `CheckResult` with status and message
+- Implement `execute()` method with `@execute_with_timing` decorator
+- Return `CheckResult` with status and message (timing and errors handled automatically)
 - Done! CLI and config loading work automatically
 
 ## Troubleshooting

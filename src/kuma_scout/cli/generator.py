@@ -10,6 +10,7 @@ from rich.table import Table
 
 from kuma_scout.cli.config_merger import ConfigMerger
 from kuma_scout.core.config_loader import load_config
+from kuma_scout.core.execution_context import execution_context_manager
 from kuma_scout.core.logger import setup_default_logging, setup_logging
 from kuma_scout.core.models import CheckResult
 from kuma_scout.core.output_handler import OutputHandler
@@ -473,79 +474,95 @@ class CLIGenerator:
     ) -> Optional[CheckResult]:
         """Execute a check and handle SSH setup and Uptime Kuma reporting.
 
+        Sets execution context for structured error logging throughout the
+        check execution chain.
+
         Returns:
             CheckResult from the check execution, or None if execution failed
         """
-        # Create SSH runner if needed - use check-level SSH config if available, fallback to global
-        ssh_runner = None
-        ssh_config = check_config_obj.ssh or global_config.ssh
-        if ssh_config and ssh_config.host:
-            # Parse user@host format
-            host = ssh_config.host
-            user = None
-            if "@" in host:
-                user, host = host.split("@", 1)
+        # Create config snapshot for execution context (without sensitive data)
+        config_snapshot = {
+            "name": check_config_obj.name,
+            "timeout": check_config_obj.timeout,
+            "tags": check_config_obj.tags,
+        }
 
-            ssh_runner = SSHRunner(
-                host=host,
-                user=user,
-                port=ssh_config.port or 22,
-                key_file=ssh_config.key_file,
-                password=ssh_config.password,
-                strict_host_key_checking=ssh_config.strict_host_key_checking,
-            )
-
-        # Create plugin instance
-        plugin = plugin_class(
-            global_config=global_config,
-            ssh_runner=ssh_runner,
-            output_handler=output_handler,
-        )
-
-        # Execute the check
-        result = plugin.execute_with_heartbeat(check_config_obj)
-
-        # Attach tags to result for aggregation
-        result.tags = check_config_obj.tags
-        result.plugin_type = plugin_class.name
-        output_handler.debug(
-            f"Check '{check_config_obj.name}' completed with tags: {result.tags}",
-            echo=False,
-        )
-
-        # Send to Uptime Kuma if configured
-        uptime_config = check_config_obj.uptime_kuma or global_config.uptime_kuma
-        if (
-            uptime_config
-            and uptime_config.url
-            and uptime_config.token
-            and not uptime_config.token.startswith("${")
+        with execution_context_manager(
+            check_name=check_config_obj.name,
+            plugin_type=plugin_class.name,
+            config_snapshot=config_snapshot,
         ):
-            status = result.status
-            success = send_push(
-                uptime_kuma_url=str(uptime_config.url),
-                push_token=uptime_config.token,
-                message=result.message,
-                command=check_config_obj.name,
-                status=status,
-                ping_ms=int(result.duration_seconds * 1000),
+            # Create SSH runner if needed - use check-level SSH config if available, fallback to global
+            ssh_runner = None
+            ssh_config = check_config_obj.ssh or global_config.ssh
+            if ssh_config and ssh_config.host:
+                # Parse user@host format
+                host = ssh_config.host
+                user = None
+                if "@" in host:
+                    user, host = host.split("@", 1)
+
+                ssh_runner = SSHRunner(
+                    host=host,
+                    user=user,
+                    port=ssh_config.port or 22,
+                    key_file=ssh_config.key_file,
+                    password=ssh_config.password,
+                    strict_host_key_checking=ssh_config.strict_host_key_checking,
+                )
+
+            # Create plugin instance
+            plugin = plugin_class(
+                global_config=global_config,
+                ssh_runner=ssh_runner,
                 output_handler=output_handler,
             )
-            if success:
-                output_handler.info(
-                    f"'{check_config_obj.name}' executed and reported", echo=True
-                )
-            else:
-                output_handler.warning(
-                    f"'{check_config_obj.name}' executed but failed to report",
-                    echo=True,
-                )
-        else:
-            output_handler.info(
-                f"'{check_config_obj.name}' executed (no Uptime Kuma config)", echo=True
+
+            # Execute the check
+            result = plugin.execute_with_heartbeat(check_config_obj)
+
+            # Attach tags to result for aggregation
+            result.tags = check_config_obj.tags
+            result.plugin_type = plugin_class.name
+            output_handler.debug(
+                f"Check '{check_config_obj.name}' completed with tags: {result.tags}",
+                echo=False,
             )
 
-        return result
+            # Send to Uptime Kuma if configured
+            uptime_config = check_config_obj.uptime_kuma or global_config.uptime_kuma
+            if (
+                uptime_config
+                and uptime_config.url
+                and uptime_config.token
+                and not uptime_config.token.startswith("${")
+            ):
+                status = result.status
+                success = send_push(
+                    uptime_kuma_url=str(uptime_config.url),
+                    push_token=uptime_config.token,
+                    message=result.message,
+                    command=check_config_obj.name,
+                    status=status,
+                    ping_ms=int(result.duration_seconds * 1000),
+                    output_handler=output_handler,
+                )
+                if success:
+                    output_handler.info(
+                        f"'{check_config_obj.name}' executed and reported", echo=True
+                    )
+                else:
+                    output_handler.warning(
+                        f"'{check_config_obj.name}' executed but failed to report",
+                        echo=True,
+                    )
+            else:
+                output_handler.info(
+                    f"'{check_config_obj.name}' executed (no Uptime Kuma config)",
+                    echo=True,
+                )
+
+            return result
 
     def _execute_single_check(
         self,

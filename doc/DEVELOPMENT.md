@@ -107,7 +107,28 @@ The `@execute_with_timing` decorator provides:
 - **Automatic config casting**: No need for manual type casting
 - **Built-in timing**: Execution time is measured automatically
 - **Standardized error handling**: Exceptions are caught and converted to proper CheckResult objects
+- **Structured error context**: All logs and errors are automatically enriched with check name, plugin type, and execution context
 - **Consistent behavior**: All plugins have identical error handling and timing
+
+### Execution Context System
+
+All check executions run within an **execution context** that automatically enriches logs and error messages with contextual information. This provides structured logging throughout the entire check execution chain.
+
+**Automatic Log Enrichment:**
+```python
+# Logs automatically include context when available
+self.output_handler.info("Check starting")  # → "[cmdcheck:my-check] Check starting"
+self.output_handler.error("Command failed")  # → "[cmdcheck:my-check] Command failed"
+```
+
+**Context-Aware Error Details:**
+When errors occur, CheckResult details automatically include:
+- `timeout_seconds`: The configured timeout value
+- `elapsed_seconds`: How long the check ran before failing
+- `error`: Sanitized error message
+- `error_type`: The exception type that occurred
+
+**Context is automatically managed** - no changes needed in plugin code. The execution context is set at the start of check execution and cleared when complete.
 
 ### Step 2: Add Tests
 
@@ -200,7 +221,7 @@ checks:
 - **Single Responsibility** - Each plugin monitors one thing
 - **Clear Configuration** - Use descriptive field names and help text
 - **Error Handling** - The `@execute_with_timing` decorator handles exceptions automatically
-- **Logging** - Use `self.output_handler` for debug/info messages (echo=False for internal logs)
+- **Structured Logging** - Use `self.output_handler` for debug/info messages; logs are automatically enriched with execution context (check name, plugin type)
 - **Sanitization** - Use `DataSanitizer` for output sent to Uptime Kuma
 - **Testing** - Comprehensive unit tests with good coverage, including error cases
 - **Documentation** - Document purpose, configuration, and examples
@@ -244,15 +265,24 @@ checks:
 
 **CLI Layer** - Auto-generated from Pydantic models. No manual CLI code needed.
 
-**Core Layer** - Shared: config loading, API integration, logging, sanitization.
+**Core Layer** - Shared: config loading, API integration, logging, sanitization, execution context management.
 
-**Plugin Layer** - Self-contained monitoring logic with automatic timing and error handling via `@execute_with_timing` decorator. Plugins auto-discover on startup.
+**Plugin Layer** - Self-contained monitoring logic with automatic timing, error handling, and structured logging via `@execute_with_timing` decorator. Plugins auto-discover on startup and run within execution contexts that provide automatic log enrichment.
+
+### Execution Context System
+
+The execution context system provides automatic enrichment of logs and error messages throughout check execution:
+
+- **Context Variables**: Uses Python's `contextvars` for thread-safe, transparent state management
+- **Automatic Enrichment**: All logs include `[plugin_type:check_name]` prefix when context is available
+- **Error Context**: Failed checks include timeout, elapsed time, and error details in CheckResult
+- **No Code Changes**: Context is set automatically at check execution start and cleared on completion
 
 When you create a plugin:
 - Define config via Pydantic (validation + CLI args)
 - Implement `execute()` method with `@execute_with_timing` decorator
-- Return `CheckResult` with status and message (timing and errors handled automatically)
-- Done! CLI and config loading work automatically
+- Return `CheckResult` with status and message (timing, errors, and context handled automatically)
+- Done! CLI, config loading, and structured logging work automatically
 
 ## Troubleshooting
 

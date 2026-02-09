@@ -66,9 +66,13 @@ class CmdCheckPlugin(Plugin):
         is_success = exit_code == config.expect_exit_code
 
         stdout_stripped = stdout.strip()
-        if config.success_pattern and re.search(config.success_pattern, stdout_stripped):
+        if config.success_pattern and re.search(
+            config.success_pattern, stdout_stripped
+        ):
             is_success = True
-        elif config.failure_pattern and re.search(config.failure_pattern, stdout_stripped):
+        elif config.failure_pattern and re.search(
+            config.failure_pattern, stdout_stripped
+        ):
             is_success = False
 
         # Build message

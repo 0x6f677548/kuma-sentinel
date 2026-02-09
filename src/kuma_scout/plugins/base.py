@@ -13,6 +13,10 @@ from typing import ClassVar, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from kuma_scout.core.execution_context import (
+    execution_context_manager,
+    get_execution_context,
+)
 from kuma_scout.core.heartbeat import HeartbeatService
 from kuma_scout.core.models import CheckResult
 from kuma_scout.core.output_handler import OutputHandler
@@ -31,11 +35,13 @@ def execute_with_timing(func):
     - Measures execution time
     - Handles exceptions with standardized CheckResult creation
     - Ensures consistent error handling across all plugins
+    - Enriches error context with execution context when available
     """
+
     @wraps(func)
     def wrapper(self, config: CheckConfig) -> CheckResult:
         # Cast config to the plugin's specific type
-        if hasattr(self, 'config_class'):
+        if hasattr(self, "config_class"):
             config = self.config_class(**config.model_dump())
 
         start_time = time.time()
@@ -46,9 +52,19 @@ def execute_with_timing(func):
         except Exception as e:
             duration = int(time.time() - start_time)
             sanitized_error = DataSanitizer.sanitize_error_message(e)
+            context = get_execution_context()
+
+            # Build detailed error message with context
+            error_details: dict[str, str | int | float] = {
+                "error": sanitized_error,
+                "error_type": type(e).__name__,
+            }
+            if context:
+                error_details["timeout_seconds"] = int(config.timeout)
+                error_details["elapsed_seconds"] = context.elapsed_seconds
 
             self.output_handler.error(
-                f"{self.name} check failed: {sanitized_error}", echo=False
+                f"Check execution failed: {sanitized_error}", echo=False
             )
 
             return CheckResult(
@@ -56,7 +72,7 @@ def execute_with_timing(func):
                 status="down",
                 message=f"Check execution failed: {sanitized_error}",
                 duration_seconds=duration,
-                details={"error": sanitized_error, "error_type": type(e).__name__},
+                details=error_details,
             )
 
     return wrapper
@@ -190,7 +206,8 @@ class Plugin(ABC):
         """Execute check with automatic heartbeat management.
 
         Sends heartbeat at start and end (with duration), starts the service
-        before execution and stops it afterward.
+        before execution and stops it afterward. Sets execution context for
+        structured error logging throughout execution.
 
         Args:
             config: Plugin-specific configuration
@@ -198,26 +215,39 @@ class Plugin(ABC):
         Returns:
             CheckResult from the check execution
         """
-        try:
-            self._start_heartbeat()
-            result = self._execute_with_retry(config)
-            self._send_heartbeat_completion(result)
-            return result
-        except TimeoutError as e:
-            sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.output_handler.error(
-                f"{self.name} check timed out: {sanitized_error}", echo=False
-            )
-            raise
-        except Exception as e:
-            sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.output_handler.error(
-                f"{self.name} check failed with unexpected error: {sanitized_error}",
-                echo=False,
-            )
-            raise
-        finally:
-            self._stop_heartbeat()
+        # Create config snapshot for error context (without sensitive data)
+        config_snapshot = {
+            "name": config.name,
+            "timeout": config.timeout,
+            "retry_attempts": config.retry.attempts,
+            "retry_delay_seconds": config.retry.delay_seconds,
+        }
+
+        with execution_context_manager(
+            check_name=config.name,
+            plugin_type=self.name,
+            config_snapshot=config_snapshot,
+        ):
+            try:
+                self._start_heartbeat()
+                result = self._execute_with_retry(config)
+                self._send_heartbeat_completion(result)
+                return result
+            except TimeoutError as e:
+                sanitized_error = DataSanitizer.sanitize_error_message(e)
+                self.output_handler.error(
+                    f"Check timed out: {sanitized_error}", echo=False
+                )
+                raise
+            except Exception as e:
+                sanitized_error = DataSanitizer.sanitize_error_message(e)
+                self.output_handler.error(
+                    f"Check failed with unexpected error: {sanitized_error}",
+                    echo=False,
+                )
+                raise
+            finally:
+                self._stop_heartbeat()
 
     def _start_heartbeat(self) -> None:
         """Initialize and start heartbeat service if configured."""

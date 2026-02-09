@@ -8,7 +8,7 @@ Each plugin is a single file that combines configuration, CLI generation, and ex
 import importlib
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Type
+from typing import Dict, Type
 
 from .base import Plugin
 
@@ -66,26 +66,6 @@ def discover_plugins() -> Dict[str, Type[Plugin]]:
     return _PLUGIN_REGISTRY
 
 
-def get_plugin(name: str) -> Type[Plugin]:
-    """
-    Get a plugin class by name.
-
-    Args:
-        name: Plugin name (e.g., 'cmdcheck', 'portscan')
-
-    Returns:
-        Plugin class
-
-    Raises:
-        KeyError: If plugin not found
-    """
-    plugins = discover_plugins()
-    if name not in plugins:
-        available = ", ".join(sorted(plugins.keys()))
-        raise KeyError(f"Plugin '{name}' not found. Available plugins: {available}")
-    return plugins[name]
-
-
 def get_all_plugins() -> Dict[str, Type[Plugin]]:
     """
     Get all discovered plugins.
@@ -94,13 +74,3 @@ def get_all_plugins() -> Dict[str, Type[Plugin]]:
         Dictionary mapping plugin names to plugin classes.
     """
     return discover_plugins()
-
-
-def list_plugin_names() -> List[str]:
-    """
-    Get list of all available plugin names.
-
-    Returns:
-        Sorted list of plugin names.
-    """
-    return sorted(discover_plugins().keys())

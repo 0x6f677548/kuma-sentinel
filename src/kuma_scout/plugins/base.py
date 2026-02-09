@@ -9,7 +9,7 @@ import logging
 import subprocess
 import time
 from abc import ABC, abstractmethod
-from typing import ClassVar, Optional, Type, cast
+from typing import ClassVar, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -294,35 +294,3 @@ class Plugin(ABC):
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             self.logger.error(f"Command execution failed: {sanitized_error}")
             return False, "", f"Command execution failed: {sanitized_error}", -1
-
-    def get_effective_config(self, check_config: CheckConfig) -> dict:
-        """
-        Merge global config with check-specific overrides.
-
-        Returns effective configuration for this check.
-        """
-        # Start with global config
-        effective = {
-            "uptime_kuma": (
-                self.global_config.uptime_kuma.model_dump()
-                if self.global_config.uptime_kuma
-                else None
-            ),
-            "ssh": (
-                self.global_config.ssh.model_dump() if self.global_config.ssh else None
-            ),
-            "timeout": check_config.timeout,
-            "retry": check_config.retry.model_dump(),
-        }
-
-        # Apply check-specific overrides
-        if check_config.uptime_kuma:
-            check_dict = check_config.uptime_kuma.model_dump(exclude_unset=True)
-            if effective["uptime_kuma"]:
-                cast(dict, effective["uptime_kuma"]).update(check_dict)
-            else:
-                effective["uptime_kuma"] = check_dict
-
-        # Note: SSH overrides would be handled here if needed
-
-        return effective

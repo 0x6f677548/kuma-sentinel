@@ -1,6 +1,5 @@
 """Uptime Kuma API integration."""
 
-import urllib.error
 import urllib.parse
 import urllib.request
 from logging import Logger
@@ -10,7 +9,6 @@ from kuma_scout.core.logger import log_security_event
 
 # Timeout constants for different push types
 PUSH_TIMEOUT_HEARTBEAT = 5
-PUSH_TIMEOUT_ALERT = 10
 
 
 def url_encode(msg: str) -> str:

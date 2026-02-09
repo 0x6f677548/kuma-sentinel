@@ -133,31 +133,28 @@ Understanding potential security threats helps you deploy Kuma Scout securely:
 
 ## Dangerous Command Pattern Detection
 
-Kuma Scout monitors for and **warns about dangerous commands** that could modify system state when executed with elevated privileges (via sudo). This is a **non-blocking security feature** that helps prevent accidental or malicious system modifications.
+Kuma Scout monitors for and **warns about destructive commands** that could permanently damage system state. This is a **non-blocking security feature** that helps prevent accidental or malicious data loss.
 
-**Detection is automatic** - dangerous patterns trigger warning messages in logs but commands still execute. This allows administrators to review and audit commands while maintaining operational continuity.
+**Detection is automatic** - dangerous patterns trigger warning messages in logs but commands still execute. This allows administrators to review suspicious commands while maintaining operational continuity.
 
-**Commands that trigger warnings:**
+**Patterns that trigger warnings:**
 
-| Category | Tools | Examples |
-|----------|-------|----------|
-| **Package Managers** | `apt`, `apt-get`, `yum`, `dnf`, `pacman`, `brew`, `pip`, `npm`, `gem`, `cargo` | Installing/removing/upgrading packages |
-| **System Services** | `systemctl`, `service` | Starting, stopping, restarting, enabling/disabling services |
-| **File System** | `rm`, `mkfs`, `dd`, `fdisk`, `parted` | Deleting files, formatting disks, modifying partitions |
-| **User Management** | `useradd`, `userdel`, `usermod`, `passwd`, `chmod`, `chown` | Creating/modifying users, changing permissions |
-| **System Control** | `reboot`, `shutdown`, `halt`, `poweroff` | Shutting down or rebooting the system |
-| **Process Management** | `kill`, `killall` | Terminating processes |
-| **ZFS Storage** | `zpool`, `zfs` | Creating/destroying pools or datasets, snapshots, rollbacks |
+- `rm -rf /` - Recursive file deletion at root
+- `rm -rf *` - Recursive file deletion of all files  
+- `dd if=` - Disk imaging/overwriting
+- `mkfs.` - Filesystem creation (overwrites disks)
+- `fdisk` - Disk partitioning
+- `wipefs` - Filesystem wiping
+- `shred` - Secure file deletion
+- `sudo` with any of the above
 
-**Example Warning Messages:**
+**Example Warning Message:**
 
 ```
-⚠️  Command 'check_nginx' may modify system state: systemctl start detected. Ensure this is authorized and runs with read-only intent.
-⚠️  Command 'update_packages' may install/remove packages: apt install detected. Ensure this is authorized and runs with read-only intent.
-⚠️  Command 'cleanup' may delete files: rm detected. Ensure this is authorized and runs with read-only intent.
+⚠️  Potentially dangerous command detected: rm -rf /var/data
 ```
-- Restrict sudo to read-only commands when possible
-- Use `NOPASSWD` to avoid password prompts
+
+**Why these patterns?** These operations cannot be undone and cause total data loss if executed accidentally. Unlike configuration changes (systemctl, apt, etc.), destructive operations require immediate attention.
 
 ## Configuration File Permissions
 

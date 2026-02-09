@@ -177,7 +177,7 @@ checks:
 - **Single Responsibility** - Each plugin monitors one thing
 - **Clear Configuration** - Use descriptive field names and help text
 - **Error Handling** - Always catch exceptions and return appropriate status
-- **Logging** - Use `self.logger` for debug/info messages
+- **Logging** - Use `self.output_handler` for debug/info messages (echo=False for internal logs)
 - **Sanitization** - Use `DataSanitizer` for output sent to Uptime Kuma
 - **Testing** - Comprehensive unit tests with good coverage
 - **Documentation** - Document purpose, configuration, and examples

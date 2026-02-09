@@ -5,11 +5,14 @@ import os
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 import typer
+from rich.console import Console
+from rich.table import Table
 
 from kuma_scout.cli.config_merger import ConfigMerger
 from kuma_scout.core.config_loader import load_config
 from kuma_scout.core.logger import setup_default_logging, setup_logging
 from kuma_scout.core.models import CheckResult
+from kuma_scout.core.output_handler import OutputHandler
 from kuma_scout.core.uptime_kuma import send_push
 from kuma_scout.core.utils.sanitizer import DataSanitizer
 from kuma_scout.core.utils.ssh_runner import SSHRunner, parse_ssh_connection_string
@@ -42,21 +45,226 @@ class CLIGenerator:
         # Status is "down" if ANY check is down
         overall_status = "down" if any(r.status == "down" for r in results) else "up"
 
-        # Combine messages with check status
-        check_summaries = [f"{r.check_name}: {r.status}" for r in results]
-        message = f"Tag '{tag_name}' [{len([r for r in results if r.status == 'up'])}/{len(results)} healthy]: {' | '.join(check_summaries)}"
+        # Create detailed breakdown
+        up_checks = [r.check_name for r in results if r.status == "up"]
+        down_checks = [r.check_name for r in results if r.status == "down"]
+
+        check_details = []
+        if up_checks:
+            quoted_up = [f"'{name}'" for name in up_checks]
+            check_details.append(f"UP: {', '.join(quoted_up)}")
+        if down_checks:
+            quoted_down = [f"'{name}'" for name in down_checks]
+            check_details.append(f"DOWN: {', '.join(quoted_down)}")
+
+        message = f"Tag '{tag_name}' [{len(up_checks)}/{len(results)} healthy] - {'; '.join(check_details)}"
 
         # Total duration is sum of all check durations
         total_duration_ms = sum(r.duration_seconds for r in results) * 1000
 
         return overall_status, message, int(total_duration_ms)
 
+    def _setup_run_command(
+        self,
+        config: str,
+        ignore_file_permissions: bool,
+        uptime_kuma_url: Optional[str],
+        token: Optional[str],
+        heartbeat_token: Optional[str],
+        timeout: int,
+        log_file: Optional[str],
+        log_level: Optional[str],
+        ssh: Optional[str],
+        ssh_key_file: Optional[str],
+        ssh_password: Optional[str],
+        ssh_strict_host_key_checking: bool,
+        ssh_no_strict_host_key_checking: bool,
+    ) -> tuple:
+        """Setup phase for run command: logging, config loading, overrides, SSH."""
+        # Initialize default logging first
+        setup_default_logging()
+
+        # Setup logging based on options (do this early so logger is available for errors)
+        setup_logging(log_file, log_level)
+
+        # Create output handler for unified logging and echoing
+        output_handler = OutputHandler(Console())
+
+        # Load config with global options
+        try:
+            global_config, checks = load_config(
+                config, ignore_file_permissions=ignore_file_permissions
+            )
+        except ValueError as e:
+            output_handler.error(f"Configuration error: {e}", echo=True)
+            raise typer.Exit(1) from e
+
+        # Apply command-line overrides
+        self._apply_command_line_overrides(
+            global_config,
+            uptime_kuma_url,
+            token,
+            heartbeat_token,
+            timeout,
+            log_file,
+            log_level,
+        )
+
+        # Setup SSH configuration
+        self._setup_ssh_config(
+            global_config,
+            ssh,
+            ssh_key_file,
+            ssh_password,
+            ssh_strict_host_key_checking,
+            ssh_no_strict_host_key_checking,
+            output_handler,
+        )
+
+        return output_handler, global_config, checks
+
+    def _handle_dry_run(
+        self,
+        output_handler,
+        filtered_checks: list,
+        config: str,
+        tag: Optional[List[str]],
+        name: Optional[List[str]],
+        plugin_type: Optional[List[str]],
+        exclude: Optional[List[str]],
+    ) -> None:
+        """Handle dry run mode - show what would be executed."""
+        output_handler.info(f"Configuration: {config}", echo=True)
+        if tag:
+            output_handler.info(f"Tag filters: {', '.join(tag)}", echo=True)
+        if name:
+            output_handler.info(f"Name filters: {', '.join(name)}", echo=True)
+        if plugin_type:
+            output_handler.info(f"Type filters: {', '.join(plugin_type)}", echo=True)
+        if exclude:
+            output_handler.info(f"Excluding checks: {', '.join(exclude)}", echo=True)
+        output_handler.info(
+            f"Found {len(filtered_checks)} check(s) to execute", echo=True
+        )
+
+        output_handler.info("Dry run - would execute the following checks:", echo=True)
+        for check_type, check_config in filtered_checks:
+            tags_str = (
+                f" [tags: {', '.join(check_config.get('tags', []))}]"
+                if check_config.get("tags")
+                else ""
+            )
+            output_handler.info(
+                f"  - '{check_config['name']}' ({check_type}){tags_str}",
+                echo=True,
+            )
+
+    def _execute_checks_and_collect_results(
+        self,
+        filtered_checks: list,
+        global_config,
+        plugins: dict,
+        output_handler,
+    ) -> tuple:
+        """Execute checks and collect results for aggregation."""
+        results_by_tag: dict[str, list] = {}
+        all_results = []
+
+        output_handler.info(
+            f"Starting execution of {len(filtered_checks)} checks", echo=True
+        )
+
+        for check_type, check_config in filtered_checks:
+            check_name = check_config.get("name", f"unnamed-{check_type}")
+
+            # Determine execution type (local/remote)
+            ssh_config_dict = check_config.get("ssh")
+            if ssh_config_dict and ssh_config_dict.get("host"):
+                host = ssh_config_dict.get("host")
+            elif global_config.ssh and global_config.ssh.host:
+                host = global_config.ssh.host
+            else:
+                host = None
+
+            execution_type = f"remote: {host}" if host else "local"
+
+            output_handler.info(
+                f"Starting check: '{check_name}' ({check_type}) ({execution_type})",
+                echo=True,
+            )
+            result = self._execute_single_check(
+                check_type, check_config, global_config, plugins, output_handler
+            )
+            if result:
+                all_results.append(result)
+                # Organize results by tag for aggregation
+                for result_tag in result.tags:
+                    if result_tag not in results_by_tag:
+                        results_by_tag[result_tag] = []
+                    results_by_tag[result_tag].append(result)
+
+        return results_by_tag, all_results
+
+    def _process_results_and_report(
+        self,
+        results_by_tag: dict,
+        all_results: list,
+        global_config,
+        output_handler,
+    ) -> None:
+        """Process results: send aggregated results and print summary table."""
+        # Send aggregated results for all tags found in executed checks
+        if results_by_tag and all_results:
+            all_tags = list(results_by_tag.keys())
+            output_handler.debug(
+                f"Auto-aggregating results for tags: {all_tags}, "
+                f"total checks: {len(all_results)}",
+                echo=False,
+            )
+            self._send_aggregated_results(
+                results_by_tag, all_tags, global_config, output_handler
+            )
+
+        # Print summary table
+        if all_results:
+            table = Table(title="Check Results Summary")
+            table.add_column("Check Name", style="cyan")
+            table.add_column("Type", style="magenta")
+            table.add_column("Tags", style="blue")
+            table.add_column("Status")
+            table.add_column("Duration (s)", style="yellow")
+            table.add_column("Message", style="white")
+
+            for result in all_results:
+                # Color status: green for up, red for down
+                status_text = (
+                    f"[green]{result.status}[/green]"
+                    if result.status == "up"
+                    else f"[red]{result.status}[/red]"
+                )
+                tags_str = ", ".join(result.tags) if result.tags else ""
+
+                table.add_row(
+                    result.check_name,
+                    result.plugin_type,
+                    tags_str,
+                    status_text,
+                    f"{result.duration_seconds:.2f}",
+                    (
+                        result.message[:50] + "..."
+                        if len(result.message) > 50
+                        else result.message
+                    ),
+                )
+
+            output_handler.print_table(table, echo=True)
+
     def _send_aggregated_results(
         self,
         results_by_tag: dict[str, list],
         requested_tags: Optional[List[str]],
         global_config: GlobalConfig,
-        logger,
+        output_handler,
     ) -> None:
         """
         Send aggregated results to Uptime Kuma for each requested tag.
@@ -65,24 +273,27 @@ class CLIGenerator:
             results_by_tag: Dict mapping tag_name -> list of CheckResults
             requested_tags: List of tag names passed via --tag flags
             global_config: Global configuration containing tag configs
-            logger: Logger instance
+            output_handler: OutputHandler instance for logging and console output
         """
         if not requested_tags or not global_config.tags:
-            logger.debug(
+            output_handler.debug(
                 f"No tag aggregation: requested_tags={requested_tags}, "
-                f"global_config.tags={bool(global_config.tags)}"
+                f"global_config.tags={bool(global_config.tags)}",
+                echo=False,
             )
             return
 
-        logger.debug(
+        output_handler.debug(
             f"Starting tag aggregation for tags: {requested_tags}, "
-            f"available results: {list(results_by_tag.keys())}"
+            f"available results: {list(results_by_tag.keys())}",
+            echo=False,
         )
 
         for tag_name in requested_tags:
             if tag_name not in global_config.tags:
-                logger.warning(
-                    f"Tag '{tag_name}' has no aggregation config, skipping aggregation"
+                output_handler.warning(
+                    f"Tag '{tag_name}' has no aggregation config, skipping aggregation",
+                    echo=True,
                 )
                 continue
 
@@ -90,7 +301,9 @@ class CLIGenerator:
             tag_results = results_by_tag.get(tag_name, [])
 
             if not tag_results:
-                logger.debug(f"No checks found for tag '{tag_name}'")
+                output_handler.debug(
+                    f"No checks found for tag '{tag_name}'", echo=False
+                )
                 continue
 
             status, message, duration_ms = self._compute_aggregated_result(
@@ -100,13 +313,13 @@ class CLIGenerator:
             # Sanitize message before sending
             sanitized_message = DataSanitizer.sanitize_output(message)
 
-            logger.info(
-                f"Aggregating {len(tag_results)} check(s) for tag '{tag_name}': {status}"
+            output_handler.info(
+                f"Aggregating {len(tag_results)} check(s) for tag '{tag_name}': {status}",
+                echo=True,
             )
 
             # Send to Uptime Kuma
             success = send_push(
-                logger=logger,
                 uptime_kuma_url=(
                     global_config.uptime_kuma.url if global_config.uptime_kuma else None
                 ),
@@ -115,15 +328,18 @@ class CLIGenerator:
                 command=f"tag-{tag_name}",
                 status=status,
                 ping_ms=duration_ms,
+                output_handler=output_handler,
             )
 
             if success:
-                logger.info(
-                    f"Aggregated result for tag '{tag_name}' sent to Uptime Kuma"
+                output_handler.info(
+                    f"Aggregated result for tag '{tag_name}' sent to Uptime Kuma",
+                    echo=True,
                 )
             else:
-                logger.error(
-                    f"Failed to send aggregated result for tag '{tag_name}' to Uptime Kuma"
+                output_handler.error(
+                    f"Failed to send aggregated result for tag '{tag_name}' to Uptime Kuma",
+                    echo=True,
                 )
 
     def _apply_command_line_overrides(
@@ -135,7 +351,6 @@ class CLIGenerator:
         timeout: int,
         log_file: Optional[str],
         log_level: Optional[str],
-        logger,
     ) -> None:
         """Apply command-line overrides to global configuration."""
         # Expand environment variables in tokens
@@ -163,7 +378,7 @@ class CLIGenerator:
         ssh_password: Optional[str],
         ssh_strict_host_key_checking: bool,
         ssh_no_strict_host_key_checking: bool,
-        logger,
+        output_handler: OutputHandler,
     ) -> None:
         """Setup SSH configuration from command-line options."""
         if not ssh:
@@ -176,7 +391,9 @@ class CLIGenerator:
                     or ssh_no_strict_host_key_checking
                 )
             ):
-                logger.error("SSH options specified but no SSH host provided")
+                output_handler.error(
+                    "SSH options specified but no SSH host provided", echo=True
+                )
                 raise typer.Exit(1)
             return
 
@@ -185,7 +402,9 @@ class CLIGenerator:
 
         # Ensure host is not None (should not happen with valid input)
         if host is None:
-            logger.error("Failed to parse SSH host from connection string")
+            output_handler.error(
+                "Failed to parse SSH host from connection string", echo=True
+            )
             raise typer.Exit(1)
 
         if not global_config.ssh:
@@ -250,7 +469,7 @@ class CLIGenerator:
         plugin_class,
         check_config_obj,
         global_config: GlobalConfig,
-        logger,
+        output_handler,
     ) -> Optional[CheckResult]:
         """Execute a check and handle SSH setup and Uptime Kuma reporting.
 
@@ -280,7 +499,7 @@ class CLIGenerator:
         plugin = plugin_class(
             global_config=global_config,
             ssh_runner=ssh_runner,
-            logger=logger,
+            output_handler=output_handler,
         )
 
         # Execute the check
@@ -288,8 +507,10 @@ class CLIGenerator:
 
         # Attach tags to result for aggregation
         result.tags = check_config_obj.tags
-        logger.debug(
-            f"Check '{check_config_obj.name}' completed with tags: {result.tags}"
+        result.plugin_type = plugin_class.name
+        output_handler.debug(
+            f"Check '{check_config_obj.name}' completed with tags: {result.tags}",
+            echo=False,
         )
 
         # Send to Uptime Kuma if configured
@@ -302,22 +523,27 @@ class CLIGenerator:
         ):
             status = result.status
             success = send_push(
-                logger=plugin.logger,
                 uptime_kuma_url=str(uptime_config.url),
                 push_token=uptime_config.token,
                 message=result.message,
                 command=check_config_obj.name,
                 status=status,
                 ping_ms=int(result.duration_seconds * 1000),
+                output_handler=output_handler,
             )
             if success:
-                logger.info(f"{check_config_obj.name} executed and reported")
+                output_handler.info(
+                    f"'{check_config_obj.name}' executed and reported", echo=True
+                )
             else:
-                logger.warning(
-                    f"{check_config_obj.name} executed but failed to report"
+                output_handler.warning(
+                    f"'{check_config_obj.name}' executed but failed to report",
+                    echo=True,
                 )
         else:
-            logger.info(f"{check_config_obj.name} executed (no Uptime Kuma config)")
+            output_handler.info(
+                f"'{check_config_obj.name}' executed (no Uptime Kuma config)", echo=True
+            )
 
         return result
 
@@ -327,7 +553,7 @@ class CLIGenerator:
         check_config: dict,
         global_config: GlobalConfig,
         plugins: dict,
-        logger,
+        output_handler,
     ) -> Optional[CheckResult]:
         """Execute a single check and handle reporting.
 
@@ -337,19 +563,20 @@ class CLIGenerator:
         try:
             plugin_class = plugins.get(check_type)
             if not plugin_class:
-                logger.error(f"Unknown plugin type: {check_type}")
+                output_handler.error(f"Unknown plugin type: {check_type}", echo=True)
                 return None
 
             check_config_obj = self._create_plugin_config(
                 plugin_class, check_config, global_config
             )
             return self._execute_check_with_reporting(
-                plugin_class, check_config_obj, global_config, logger
+                plugin_class, check_config_obj, global_config, output_handler
             )
 
         except Exception as e:
-            logger.error(
-                f"Failed to execute {check_config.get('name', check_type)}: {str(e)}"
+            output_handler.error(
+                f"Failed to execute {check_config.get('name', check_type)}: {str(e)}",
+                echo=True,
             )
             return None
 
@@ -431,91 +658,56 @@ class CLIGenerator:
             ),
         ) -> None:
             """Run checks from a configuration file."""
-            # Initialize default logging first
-            setup_default_logging()
-
-            # Setup logging based on options (do this early so logger is available for errors)
-            logger = setup_logging(log_file, log_level)
-
-            # Load config with global options
-            try:
-                global_config, checks = load_config(
-                    config, ignore_file_permissions=ignore_file_permissions
-                )
-            except ValueError as e:
-                logger.error(f"Configuration error: {e}")
-                raise typer.Exit(1) from e
-
-            # Apply command-line overrides
-            self._apply_command_line_overrides(
-                global_config,
+            # Setup phase: logging, config loading, overrides, SSH
+            output_handler, global_config, checks = self._setup_run_command(
+                config,
+                ignore_file_permissions,
                 uptime_kuma_url,
                 token,
                 heartbeat_token,
                 timeout,
                 log_file,
                 log_level,
-                logger,
-            )
-
-            # Setup SSH configuration
-            self._setup_ssh_config(
-                global_config,
                 ssh,
                 ssh_key_file,
                 ssh_password,
                 ssh_strict_host_key_checking,
                 ssh_no_strict_host_key_checking,
-                logger,
             )
 
-            # Setup logging based on options
-            logger = setup_logging(global_config.logging.file, global_config.logging.level)
-
             # Log configuration summary
-            self._log_config_summary(logger, global_config, tag, name, plugin_type, exclude)
+            self._log_config_summary(
+                output_handler, global_config, tag, name, plugin_type, exclude
+            )
 
             # Apply filters
             filtered_checks = self._filter_checks(
                 checks, tag, name, plugin_type, exclude
             )
 
+            # Handle dry run mode
             if dry_run:
-                logger.info("Dry run - would execute the following checks:")
-                for check_type, check_config in filtered_checks:
-                    logger.info(f"  - {check_config['name']} ({check_type})")
+                self._handle_dry_run(
+                    output_handler,
+                    filtered_checks,
+                    config,
+                    tag,
+                    name,
+                    plugin_type,
+                    exclude,
+                )
                 return
 
-            # Execute the checks
+            # Execute checks and collect results
             plugins = get_all_plugins()
-            logger.info(f"Starting execution of {len(filtered_checks)} checks")
+            results_by_tag, all_results = self._execute_checks_and_collect_results(
+                filtered_checks, global_config, plugins, output_handler
+            )
 
-            # Collect results for aggregation
-            results_by_tag: dict[str, list] = {}
-            all_results = []
-
-            for check_type, check_config in filtered_checks:
-                result = self._execute_single_check(
-                    check_type, check_config, global_config, plugins, logger
-                )
-                if result:
-                    all_results.append(result)
-                    # Organize results by tag for aggregation
-                    for result_tag in result.tags:
-                        if result_tag not in results_by_tag:
-                            results_by_tag[result_tag] = []
-                        results_by_tag[result_tag].append(result)
-
-            # Send aggregated results for all tags found in executed checks
-            if results_by_tag and all_results:
-                all_tags = list(results_by_tag.keys())
-                logger.debug(
-                    f"Auto-aggregating results for tags: {all_tags}, "
-                    f"total checks: {len(all_results)}"
-                )
-                self._send_aggregated_results(
-                    results_by_tag, all_tags, global_config, logger
-                )
+            # Process results and generate reports
+            self._process_results_and_report(
+                results_by_tag, all_results, global_config, output_handler
+            )
 
         return run_command
 
@@ -710,7 +902,10 @@ class CLIGenerator:
         setup_default_logging()
 
         # Setup logging based on options
-        logger = setup_logging(log_file, log_level)
+        setup_logging(log_file, log_level)
+
+        # Create output handler for unified logging and echoing
+        output_handler = OutputHandler(Console())
 
         # Create global config
         global_config = GlobalConfig()
@@ -724,7 +919,6 @@ class CLIGenerator:
             timeout,
             log_file,
             log_level,
-            logger,
         )
 
         # Setup SSH configuration
@@ -735,13 +929,14 @@ class CLIGenerator:
             ssh_password,
             ssh_strict_host_key_checking,
             ssh_no_strict_host_key_checking,
-            logger,
+            output_handler,
         )
 
         # Validate Uptime Kuma options - both URL and token are required for individual checks
         if not uptime_kuma_url or not token:
-            logger.error(
-                "Both --uptime-kuma-url and --token are required for individual check commands"
+            output_handler.error(
+                "Both --uptime-kuma-url and --token are required for individual check commands",
+                echo=True,
             )
             raise typer.Exit(1)
 
@@ -761,7 +956,7 @@ class CLIGenerator:
         try:
             check_config_obj = config_class(**check_config_data)
         except Exception as e:
-            logger.error(f"Invalid configuration: {e}")
+            output_handler.error(f"Invalid configuration: {e}", echo=True)
             raise typer.Exit(1) from e
 
         # Set uptime_kuma config if both URL and token are provided
@@ -770,9 +965,31 @@ class CLIGenerator:
                 url=uptime_kuma_url, token=token
             )
 
-        self._execute_check_with_reporting(
-            plugin_class, check_config_obj, global_config, logger
+        # Show execution start
+        if global_config.ssh and global_config.ssh.host:
+            execution_type = f"remote: {global_config.ssh.host}"
+        else:
+            execution_type = "local"
+        output_handler.info(
+            f"Executing individual check: '{name}' ({plugin_class.name}) ({execution_type})",
+            echo=True,
         )
+
+        # Execute the check
+        result = self._execute_check_with_reporting(
+            plugin_class, check_config_obj, global_config, output_handler
+        )
+
+        # Show result
+        if result:
+            status_text = (
+                "[green]UP[/green]" if result.status == "up" else "[red]DOWN[/red]"
+            )
+            tags_str = f" [{', '.join(result.tags)}]" if result.tags else ""
+            output_handler.info(
+                f"Check '{result.check_name}' ({result.plugin_type}){tags_str} completed: {status_text} - {result.message} ({result.duration_seconds:.2f}s)",
+                echo=True,
+            )
 
     def _build_check_config_data(
         self,
@@ -1024,7 +1241,7 @@ class CLIGenerator:
 
     def _log_config_summary(
         self,
-        logger,
+        output_handler,
         global_config: GlobalConfig,
         tags: Optional[List[str]] = None,
         names: Optional[List[str]] = None,
@@ -1032,24 +1249,35 @@ class CLIGenerator:
         excludes: Optional[List[str]] = None,
     ) -> None:
         """Log configuration summary for debugging."""
-        logger.info("Configuration loaded:")
-        logger.info(
-            f"  Uptime Kuma URL: {global_config.uptime_kuma.url if global_config.uptime_kuma else 'Not configured'}"
+        output_handler.info("Configuration loaded:", echo=True)
+        output_handler.info(
+            f"  Uptime Kuma URL: {global_config.uptime_kuma.url if global_config.uptime_kuma else 'Not configured'}",
+            echo=True,
         )
-        logger.info(f"  Logging level: {global_config.logging.level} (effective)")
-        logger.info(f"  Log file: {global_config.logging.file or 'Console only'}")
-        logger.info(
-            f"  Heartbeat: {'Enabled' if global_config.heartbeat.enabled else 'Disabled'}"
+        output_handler.info(
+            f"  Logging level: {global_config.logging.level} (effective)", echo=True
+        )
+        output_handler.info(
+            f"  Log file: {global_config.logging.file or 'Console only'}", echo=True
+        )
+        output_handler.info(
+            f"  Heartbeat: {'Enabled' if global_config.heartbeat.enabled else 'Disabled'}",
+            echo=True,
         )
         if global_config.heartbeat.enabled:
-            logger.info(f"    Interval: {global_config.heartbeat.interval}s")
-        logger.info(
-            f"  SSH: {'Configured' if global_config.ssh else 'Not configured'}"
+            output_handler.info(
+                f"    Interval: {global_config.heartbeat.interval}s", echo=True
+            )
+        output_handler.info(
+            f"  SSH: {'Configured' if global_config.ssh else 'Not configured'}",
+            echo=True,
         )
         if global_config.ssh:
-            logger.info(f"    Host: {global_config.ssh.host}")
-            logger.info(f"    User: {global_config.ssh.user or 'Default'}")
-            logger.info(f"    Port: {global_config.ssh.port}")
+            output_handler.info(f"    Host: {global_config.ssh.host}", echo=True)
+            output_handler.info(
+                f"    User: {global_config.ssh.user or 'Default'}", echo=True
+            )
+            output_handler.info(f"    Port: {global_config.ssh.port}", echo=True)
 
         # Log filters
         filters = []
@@ -1063,9 +1291,9 @@ class CLIGenerator:
             filters.append(f"excludes: {', '.join(excludes)}")
 
         if filters:
-            logger.info(f"  Filters: {', '.join(filters)}")
+            output_handler.info(f"  Filters: {', '.join(filters)}", echo=False)
         else:
-            logger.info("  Filters: None")
+            output_handler.info("  Filters: None", echo=False)
 
     def _filter_checks(
         self,

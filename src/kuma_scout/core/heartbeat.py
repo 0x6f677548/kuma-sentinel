@@ -15,7 +15,7 @@ class HeartbeatService:
 
     def __init__(
         self,
-        logger,
+        output_handler,
         uptime_kuma_url: str,
         heartbeat_token: str,
         interval: int = 300,
@@ -23,13 +23,13 @@ class HeartbeatService:
     ):
         """Initialize heartbeat service.
         Args:
-            logger: Logger instance for heartbeat status messages
+            output_handler: OutputHandler instance for heartbeat status messages
             uptime_kuma_url: Base URL for Uptime Kuma API
             heartbeat_token: Push token for heartbeat monitor
             interval: Seconds between heartbeat pings (default: 300)
             check_name: Name of the check being run (e.g., "PortScan")
         """
-        self.logger = logger
+        self.output_handler = output_handler
         self.uptime_kuma_url = uptime_kuma_url
         self.heartbeat_token = heartbeat_token
         self.interval = interval
@@ -69,11 +69,11 @@ class HeartbeatService:
             True if ping was successful, False otherwise
         """
         return send_push(
-            self.logger,
             self.uptime_kuma_url,
             self.heartbeat_token,
             message,
             command="heartbeat",
+            output_handler=self.output_handler,
         )
 
     def _ping_loop(self) -> None:

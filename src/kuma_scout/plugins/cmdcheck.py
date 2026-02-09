@@ -53,8 +53,8 @@ class CmdCheckPlugin(Plugin):
         self._check_for_dangerous_commands(config.command)
 
         try:
-            self.logger.info("CmdCheck: Executing...")
-            self.logger.debug(f"Command: {config.command}")
+            self.output_handler.info("CmdCheck: Executing...", echo=False)
+            self.output_handler.debug(f"Command: {config.command}", echo=False)
             # Execute the command
             success, stdout, stderr, exit_code = self.run_command(
                 shlex.split(config.command),
@@ -113,24 +113,24 @@ class CmdCheckPlugin(Plugin):
     def _check_for_dangerous_commands(self, command: str) -> None:
         """Check for potentially dangerous commands and log security events."""
         dangerous_patterns = [
-            r'\brm\s+-rf\s+/?',  # rm -rf /
-            r'\brm\s+-rf\s+\*',  # rm -rf *
-            r'\bdd\s+if=',  # dd commands that might overwrite disks
-            r'\bformat\s+',  # format commands
-            r'\bmkfs\.',  # filesystem creation commands
-            r'\bfdisk\s+',  # disk partitioning
-            r'\bwipefs\s+',  # wipe filesystem signatures
-            r'\bshred\s+',  # secure file deletion
-            r'\bsudo\s+.*\b(rm|dd|format|mkfs|fdisk|wipefs|shred)\b',  # sudo with dangerous commands
+            r"\brm\s+-rf\s+/?",  # rm -rf /
+            r"\brm\s+-rf\s+\*",  # rm -rf *
+            r"\bdd\s+if=",  # dd commands that might overwrite disks
+            r"\bformat\s+",  # format commands
+            r"\bmkfs\.",  # filesystem creation commands
+            r"\bfdisk\s+",  # disk partitioning
+            r"\bwipefs\s+",  # wipe filesystem signatures
+            r"\bshred\s+",  # secure file deletion
+            r"\bsudo\s+.*\b(rm|dd|format|mkfs|fdisk|wipefs|shred)\b",  # sudo with dangerous commands
         ]
 
         command_lower = command.lower()
         for pattern in dangerous_patterns:
             if re.search(pattern, command_lower, re.IGNORECASE):
                 log_security_event(
-                    self.logger,
                     "dangerous_command_detected",
                     f"Potentially dangerous command detected: {command}",
-                    level="warning"
+                    level="warning",
+                    echo=False,
                 )
                 break  # Only log once per command

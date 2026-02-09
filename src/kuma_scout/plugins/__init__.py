@@ -10,6 +10,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Type
 
+from kuma_scout.core.logger import get_logger
+
 from .base import Plugin
 
 # Global registry of discovered plugins
@@ -58,9 +60,7 @@ def discover_plugins() -> Dict[str, Type[Plugin]]:
 
         except Exception as e:
             # Log warning but continue with other plugins
-            import logging
-
-            logger = logging.getLogger(__name__)
+            logger = get_logger()
             logger.warning(f"Failed to load plugin {module_name}: {e}")
 
     return _PLUGIN_REGISTRY

@@ -91,7 +91,7 @@ All plugins support `--ssh user@host` for remote execution. SSH settings configu
 
 ## Common Patterns
 - **Error Handling**: Return `CheckResult(status="down", message=error)` on failures
-- **Logging**: Use `self.logger` in plugins for debug/info messages
+- **Logging**: Use `self.output_handler` in plugins for debug/info messages (echo=False for internal logs)
 - **Validation**: Config classes use Pydantic validation automatically
 - **Timeouts**: Respect `timeout` settings in long-running operations
 - **Heartbeats**: Send periodic pings during extended checks via heartbeat service

@@ -5,7 +5,6 @@ This module defines the Plugin base class and CheckConfig model that all
 monitoring plugins must inherit from.
 """
 
-import logging
 import subprocess
 import time
 from abc import ABC, abstractmethod
@@ -15,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from kuma_scout.core.heartbeat import HeartbeatService
 from kuma_scout.core.models import CheckResult
+from kuma_scout.core.output_handler import OutputHandler
 from kuma_scout.core.utils.sanitizer import DataSanitizer
 from kuma_scout.core.utils.ssh_runner import SSHConnectionError, SSHRunner
 
@@ -64,11 +64,11 @@ class Plugin(ABC):
         self,
         global_config: GlobalConfig,
         ssh_runner: Optional["SSHRunner"] = None,
-        logger: Optional[logging.Logger] = None,
+        output_handler: Optional[OutputHandler] = None,
     ):
         self.global_config = global_config
         self.ssh_runner = ssh_runner
-        self.logger = logger or logging.getLogger(f"kuma_scout.plugins.{self.name}")
+        self.output_handler = output_handler or OutputHandler()
 
         # Initialize heartbeat and SSH
         self.heartbeat: Optional[HeartbeatService] = None
@@ -95,30 +95,35 @@ class Plugin(ABC):
         uptime_config = self.global_config.uptime_kuma
 
         if not heartbeat_config.enabled:
-            self.logger.debug("Heartbeat disabled (heartbeat.enabled=false)")
+            self.output_handler.debug(
+                "Heartbeat disabled (heartbeat.enabled=false)", echo=False
+            )
             return
 
         if not heartbeat_config.token:
-            self.logger.warning(
-                "Heartbeat enabled but token missing - check will run without heartbeat notifications"
+            self.output_handler.warning(
+                "Heartbeat enabled but token missing - check will run without heartbeat notifications",
+                echo=False,
             )
             return
 
         if not uptime_config or not uptime_config.url:
-            self.logger.warning(
-                "Heartbeat enabled but Uptime Kuma URL missing - check will run without heartbeat notifications"
+            self.output_handler.warning(
+                "Heartbeat enabled but Uptime Kuma URL missing - check will run without heartbeat notifications",
+                echo=False,
             )
             return
 
         self.heartbeat = HeartbeatService(
-            self.logger,
+            self.output_handler,
             str(uptime_config.url),
             str(heartbeat_config.token),
             heartbeat_config.interval,
             check_name=self.name,
         )
-        self.logger.debug(
-            f"Heartbeat initialized (interval: {heartbeat_config.interval}s)"
+        self.output_handler.debug(
+            f"Heartbeat initialized (interval: {heartbeat_config.interval}s)",
+            echo=False,
         )
 
     def _initialize_ssh(self) -> None:
@@ -135,8 +140,9 @@ class Plugin(ABC):
             password=ssh_config.password,
             strict_host_key_checking=ssh_config.strict_host_key_checking,
         )
-        self.logger.debug(
-            f"SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}"
+        self.output_handler.debug(
+            f"SSH runner initialized: {ssh_config.user or 'current_user'}@{ssh_config.host}",
+            echo=False,
         )
 
     def execute_with_heartbeat(self, config: CheckConfig) -> CheckResult:
@@ -158,12 +164,15 @@ class Plugin(ABC):
             return result
         except TimeoutError as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"{self.name} check timed out: {sanitized_error}")
+            self.output_handler.error(
+                f"{self.name} check timed out: {sanitized_error}", echo=False
+            )
             raise
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(
-                f"{self.name} check failed with unexpected error: {sanitized_error}"
+            self.output_handler.error(
+                f"{self.name} check failed with unexpected error: {sanitized_error}",
+                echo=False,
             )
             raise
         finally:
@@ -172,16 +181,21 @@ class Plugin(ABC):
     def _start_heartbeat(self) -> None:
         """Initialize and start heartbeat service if configured."""
         if self.heartbeat:
-            self.logger.debug(f"Sending heartbeat start message for {self.name}")
+            self.output_handler.debug(
+                f"Sending heartbeat start message for {self.name}", echo=False
+            )
             self.heartbeat.send_message(f"{self.name} check starting...")
             self.heartbeat.start()
-            self.logger.debug(f"Heartbeat service started for {self.name}")
+            self.output_handler.debug(
+                f"Heartbeat service started for {self.name}", echo=False
+            )
 
     def _execute_with_retry(self, config: CheckConfig) -> CheckResult:
         """Execute the check with retry logic."""
-        self.logger.info(f"Executing {self.name} check")
-        self.logger.debug(
-            f"Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s"
+        self.output_handler.info(f"Executing {self.name} check", echo=False)
+        self.output_handler.debug(
+            f"Retry config: attempts={config.retry.attempts}, delay={config.retry.delay_seconds}s",
+            echo=False,
         )
 
         result = None
@@ -192,17 +206,19 @@ class Plugin(ABC):
                     break
                 else:
                     if attempt < config.retry.attempts:
-                        self.logger.warning(
+                        self.output_handler.warning(
                             f"Check failed (status: {result.status}), retrying in {config.retry.delay_seconds}s "
-                            f"(attempt {attempt + 1}/{config.retry.attempts + 1})"
+                            f"(attempt {attempt + 1}/{config.retry.attempts + 1})",
+                            echo=False,
                         )
                         time.sleep(config.retry.delay_seconds)
             except Exception as e:
                 if attempt < config.retry.attempts:
                     sanitized_error = DataSanitizer.sanitize_error_message(e)
-                    self.logger.warning(
+                    self.output_handler.warning(
                         f"Check failed with exception, retrying in {config.retry.delay_seconds}s "
-                        f"(attempt {attempt + 1}/{config.retry.attempts + 1}): {sanitized_error}"
+                        f"(attempt {attempt + 1}/{config.retry.attempts + 1}): {sanitized_error}",
+                        echo=False,
                     )
                     time.sleep(config.retry.delay_seconds)
                 else:
@@ -213,14 +229,16 @@ class Plugin(ABC):
                 f"{self.name} check failed after {config.retry.attempts + 1} attempts"
             )
 
-        self.logger.info(f"{self.name} check completed with status: {result.status}")
+        self.output_handler.info(
+            f"{self.name} check completed with status: {result.status}", echo=False
+        )
         return result
 
     def _send_heartbeat_completion(self, result: CheckResult) -> None:
         """Send heartbeat completion message."""
         if self.heartbeat:
-            self.logger.debug(
-                f"Sending heartbeat completion message for {self.name}"
+            self.output_handler.debug(
+                f"Sending heartbeat completion message for {self.name}", echo=False
             )
             self.heartbeat.send_message(
                 f"{self.name} completed in {result.duration_seconds}s (status: {result.status})"
@@ -229,7 +247,9 @@ class Plugin(ABC):
     def _stop_heartbeat(self) -> None:
         """Stop heartbeat service if running."""
         if self.heartbeat:
-            self.logger.debug(f"Stopping heartbeat service for {self.name}")
+            self.output_handler.debug(
+                f"Stopping heartbeat service for {self.name}", echo=False
+            )
             self.heartbeat.stop()
 
     @abstractmethod
@@ -262,18 +282,22 @@ class Plugin(ABC):
             target = f"{self.ssh_runner.user or 'current_user'}@{self.ssh_runner.host}"
             if self.ssh_runner.port != 22:
                 target += f":{self.ssh_runner.port}"
-            self.logger.info(f"Running command via SSH on {target}...")
-            self.logger.debug(f"Command: {' '.join(cmd)}")
+            self.output_handler.info(
+                f"Running command via SSH on {target}...", echo=False
+            )
+            self.output_handler.debug(f"Command: {' '.join(cmd)}", echo=False)
             try:
                 success, stdout, stderr, exit_code = self.ssh_runner.run(cmd, timeout)
                 return success, stdout, stderr, exit_code
             except SSHConnectionError as e:
-                self.logger.error(f"SSH connection failed: {e.message}")
+                self.output_handler.warning(
+                    f"SSH connection failed: {e.message}", echo=True
+                )
                 return False, "", f"SSH connection failed: {e.message}", -1
 
         # Local execution
-        self.logger.info("Running command locally...")
-        self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.output_handler.info("Running command locally...", echo=False)
+        self.output_handler.debug(f"Command: {' '.join(cmd)}", echo=False)
         try:
             result = subprocess.run(
                 cmd,
@@ -288,9 +312,12 @@ class Plugin(ABC):
                 result.returncode,
             )
         except subprocess.TimeoutExpired:
-            self.logger.error(f"Command timed out after {timeout}s")
+            self.output_handler.warning(f"Command timed out after {timeout}s", echo=True)
             return False, "", f"Command timed out after {timeout}s", -1
+        except FileNotFoundError:
+            self.output_handler.warning(f"Command not found: {cmd[0]}", echo=True)
+            return False, "", f"Command not found: {cmd[0]}", -1
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.logger.error(f"Command execution failed: {sanitized_error}")
+            self.output_handler.warning(f"Command execution failed: {sanitized_error}", echo=True)
             return False, "", f"Command execution failed: {sanitized_error}", -1

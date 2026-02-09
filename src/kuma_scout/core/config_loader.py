@@ -11,7 +11,7 @@ from typing import Any, List, Tuple
 
 import yaml
 
-from kuma_scout.core.logger import get_logger, log_security_event
+from kuma_scout.core.logger import log_security_event
 from kuma_scout.plugins.models import GlobalConfig
 
 
@@ -39,12 +39,10 @@ def load_config(
         _check_file_permissions(config_file, config_path)
     else:
         # Log security event when permission checks are bypassed
-        logger = get_logger()
         log_security_event(
-            logger,
             "config_file_permissions_ignored",
             f"Config file permission checks bypassed for {config_path} - file may contain sensitive data with overly permissive access",
-            level="warning"
+            level="warning",
         )
 
     raw_config = _load_yaml_config(config_file)
@@ -71,12 +69,10 @@ def _check_file_permissions(config_file: Path, config_path: str) -> None:
     file_stat = config_file.stat()
     # Check if file is world-readable or group-readable when it shouldn't be
     if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):
-        logger = get_logger()
         log_security_event(
-            logger,
             "config_file_overly_permissive",
             f"Config file {config_path} has overly permissive permissions (readable by group/other) - contains sensitive data",
-            level="error"
+            level="error",
         )
         raise ValueError(
             f"Configuration file {config_path} has overly permissive permissions. "

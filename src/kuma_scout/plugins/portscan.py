@@ -55,7 +55,7 @@ class PortscanPlugin(Plugin):
             cmd.extend(["-oX", nmap_xml])
             cmd.extend(config.targets)
 
-            self.logger.info(f"Portscan: running {' '.join(cmd)}")
+            self.output_handler.info(f"Portscan: running {' '.join(cmd)}", echo=False)
 
             # Run nmap scan
             success, stdout, stderr, exit_code = self.run_command(
@@ -63,7 +63,9 @@ class PortscanPlugin(Plugin):
             )
 
             if success:
-                self.logger.info("Portscan: Nmap scan completed successfully")
+                self.output_handler.info(
+                    "Portscan: Nmap scan completed successfully", echo=False
+                )
 
                 # Parse results
                 hosts_with_ports = (
@@ -75,13 +77,12 @@ class PortscanPlugin(Plugin):
                 if hosts_with_ports:
                     open_ports_str = ", ".join(hosts_with_ports)
                     log_security_event(
-                        self.logger,
                         "open_ports_detected",
                         f"Port scan detected open ports on hosts: {open_ports_str}",
-                        level="warning"
+                        level="warning",
                     )
-                    self.logger.warning(
-                        f"Portscan: Open ports found: {open_ports_str}"
+                    self.output_handler.warning(
+                        f"Portscan: Open ports found: {open_ports_str}", echo=False
                     )
                     return CheckResult(
                         check_name=config.name,
@@ -91,7 +92,9 @@ class PortscanPlugin(Plugin):
                         details={"open_hosts": hosts_with_ports},
                     )
                 else:
-                    self.logger.info("Portscan: No open ports found")
+                    self.output_handler.info(
+                        "Portscan: No open ports found", echo=False
+                    )
                     return CheckResult(
                         check_name=config.name,
                         status="up",
@@ -101,7 +104,9 @@ class PortscanPlugin(Plugin):
             else:
                 scan_duration = int(time.time() - scan_start)
                 error_msg = stderr.strip() if stderr else f"Exit code: {exit_code}"
-                self.logger.error(f"Portscan: Port scan failed: {error_msg}")
+                self.output_handler.error(
+                    f"Portscan: Port scan failed: {error_msg}", echo=False
+                )
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -112,7 +117,7 @@ class PortscanPlugin(Plugin):
 
         except Exception as e:
             scan_duration = int(time.time() - scan_start)
-            self.logger.error("Unexpected error during port scan", exc_info=True)
+            self.output_handler.error("Unexpected error during port scan", echo=False)
             return CheckResult(
                 check_name=config.name,
                 status="down",
@@ -130,12 +135,13 @@ class PortscanPlugin(Plugin):
             ):
                 try:
                     os.remove(nmap_xml)
-                    self.logger.debug(
-                        f"Portscan: Cleaned up temporary file: {nmap_xml}"
+                    self.output_handler.debug(
+                        f"Portscan: Cleaned up temporary file: {nmap_xml}", echo=False
                     )
                 except OSError as e:
-                    self.logger.warning(
-                        f"Portscan: Failed to cleanup temporary file {nmap_xml}: {e}"
+                    self.output_handler.warning(
+                        f"Portscan: Failed to cleanup temporary file {nmap_xml}: {e}",
+                        echo=False,
                     )
 
     def _build_nmap_command(self, config: PortscanConfig) -> List[str]:
@@ -184,7 +190,7 @@ class PortscanPlugin(Plugin):
                         hosts_with_ports.append(f"{host_display}:{ports_str}")
 
         except Exception as e:
-            self.logger.error(f"Error parsing nmap XML: {e}")
+            self.output_handler.error(f"Error parsing nmap XML: {e}", echo=False)
 
         return hosts_with_ports
 

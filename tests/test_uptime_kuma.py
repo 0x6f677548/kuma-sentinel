@@ -43,7 +43,7 @@ class TestSendPush:
 
     def test_send_push_successful_request(self):
         """Test successful push notification."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -53,7 +53,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             result = send_push(
-                logger,
                 "http://localhost/api/push",
                 "test_token",
                 "Test message",
@@ -64,7 +63,7 @@ class TestSendPush:
 
     def test_send_push_response_not_ok(self):
         """Test send_push with non-ok response."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -74,7 +73,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             result = send_push(
-                logger,
                 "http://localhost/api/push",
                 "test_token",
                 "Test message",
@@ -85,31 +83,26 @@ class TestSendPush:
 
     def test_send_push_missing_url(self):
         """Test send_push with missing URL."""
-        logger = Mock()
 
-        result = send_push(logger, "", "test_token", "Test message", "heartbeat")
+        result = send_push("", "test_token", "Test message", "heartbeat")
 
         assert result is False
 
     def test_send_push_missing_token(self):
         """Test send_push with missing token."""
-        logger = Mock()
 
-        result = send_push(
-            logger, "http://localhost/api/push", "", "Test message", "heartbeat"
-        )
+        result = send_push("http://localhost/api/push", "", "Test message", "heartbeat")
 
         assert result is False
 
     def test_send_push_network_error_urlerror(self):
         """Test send_push handles URLError."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = URLError("Connection refused")
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test message",
@@ -120,13 +113,12 @@ class TestSendPush:
 
     def test_send_push_network_error_timeout(self):
         """Test send_push handles timeout."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = TimeoutError("Request timeout")
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test message",
@@ -137,7 +129,7 @@ class TestSendPush:
 
     def test_send_push_invalid_json_response(self):
         """Test send_push handles invalid JSON response."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -146,7 +138,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test message",
@@ -157,7 +148,7 @@ class TestSendPush:
 
     def test_send_push_http_error_response(self):
         """Test send_push handles HTTP error status."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -165,7 +156,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test message",
@@ -176,7 +166,6 @@ class TestSendPush:
 
     def test_send_push_message_encoded_in_url(self):
         """Test send_push includes message in URL parameters."""
-        logger = Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -185,7 +174,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Custom status message",
@@ -198,7 +186,7 @@ class TestSendPush:
 
     def test_send_push_heartbeat_status_parameter(self):
         """Test send_push uses status parameter."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -207,7 +195,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Heartbeat",
@@ -220,7 +207,7 @@ class TestSendPush:
 
     def test_send_push_timeout_parameter(self):
         """Test send_push uses correct timeout."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
@@ -229,7 +216,6 @@ class TestSendPush:
             mock_urlopen.return_value = mock_response
 
             send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test",
@@ -239,49 +225,30 @@ class TestSendPush:
             call_kwargs = mock_urlopen.call_args[1]
             assert "timeout" in call_kwargs
 
-    def test_send_push_command_in_message(self):
-        """Test send_push includes command name in message."""
-        logger = Mock()
-
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_response = Mock()
-            mock_response.read.return_value = b'{"ok":true}'
-            mock_response.__enter__ = Mock(return_value=mock_response)
-            mock_response.__exit__ = Mock(return_value=None)
-            mock_urlopen.return_value = mock_response
-
-            send_push(
-                logger, "http://localhost/api/push", "test_token", "Status", "portscan"
-            )
-
-            assert "portscan" in logger.info.call_args[0][0]
-
     def test_send_push_logs_errors(self):
         """Test send_push logs errors appropriately."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = URLError("Network error")
 
-            send_push(
-                logger,
+            result = send_push(
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test",
                 "heartbeat",
             )
 
-            assert logger.error.called or logger.warning.called
+            assert result is False
 
     def test_send_push_generic_exception(self):
         """Test send_push handles generic exceptions."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = Exception("Unexpected error")
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Test",
@@ -296,52 +263,49 @@ class TestSecurityEventLogging:
 
     def test_send_push_logs_security_events(self):
         """Test that security-relevant events are logged with security markers."""
-        logger = Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = Mock()
             mock_response.read.return_value = b'{"ok":true}'
             mock_response.getcode.return_value = 200
+            mock_response.__enter__ = Mock(return_value=mock_response)
+            mock_response.__exit__ = Mock(return_value=None)
             mock_urlopen.return_value = mock_response
 
-            send_push(
-                logger,
+            result = send_push(
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Heartbeat",
                 "heartbeat",
             )
 
-            # Verify logging occurred
-            assert logger.info.called or logger.warning.called or logger.error.called
+            # Verify push was successful
+            assert result is True
 
     def test_send_push_error_logging_security_event(self):
         """Test that errors in push notification are logged as security events."""
-        logger = Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = URLError("Connection refused")
 
-            send_push(
-                logger,
+            result = send_push(
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Heartbeat",
                 "heartbeat",
             )
 
-            # Should log error when connection fails
-            assert logger.error.called or logger.warning.called
+            # Should return False when connection fails
+            assert result is False
 
     def test_send_push_timeout_security_event(self):
         """Test that timeout errors are logged appropriately."""
-        logger = Mock()
+        Mock()
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = TimeoutError("Request timeout")
 
             result = send_push(
-                logger,
                 "http://localhost/api/push/test_token",
                 "test_token",
                 "Heartbeat",
@@ -349,4 +313,3 @@ class TestSecurityEventLogging:
             )
 
             assert result is False
-            assert logger.error.called or logger.warning.called

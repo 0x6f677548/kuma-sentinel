@@ -33,8 +33,7 @@ class TestAggregationLogic:
 
         assert status == "up"
         assert "2/2 healthy" in message
-        assert "check1: up" in message
-        assert "check2: up" in message
+        assert "UP: 'check1', 'check2'" in message
         assert duration_ms == 8000  # 5 + 3 seconds
 
     def test_compute_aggregated_result_any_down(self):
@@ -58,9 +57,8 @@ class TestAggregationLogic:
 
         assert status == "down"
         assert "2/3 healthy" in message
-        assert "check1: up" in message
-        assert "check2: down" in message
-        assert "check3: up" in message
+        assert "UP: 'check1', 'check3'" in message
+        assert "DOWN: 'check2'" in message
         assert duration_ms == 10000  # 5 + 2 + 3 seconds
 
     def test_compute_aggregated_result_all_down(self):
@@ -110,7 +108,7 @@ class TestAggregationLogic:
 
         assert status == "down"
         assert "0/1 healthy" in message
-        assert "only-check: down" in message
+        assert "DOWN: 'only-check'" in message
         assert duration_ms == 10000
 
 

@@ -4,7 +4,7 @@ import shlex
 import subprocess
 from typing import List, Optional, Tuple
 
-from kuma_scout.core.logger import get_logger, log_security_event
+from kuma_scout.core.logger import log_security_event
 
 
 class SSHConnectionError(Exception):
@@ -59,12 +59,10 @@ class SSHRunner:
 
         # Log security event if host key checking is disabled
         if not self.strict_host_key_checking:
-            logger = get_logger()
             log_security_event(
-                logger,
                 "ssh_host_key_checking_disabled",
                 f"SSH host key checking disabled for host {self.host} - connections may be vulnerable to man-in-the-middle attacks",
-                level="warning"
+                level="warning",
             )
 
     def build_ssh_command(self, remote_cmd: List[str]) -> List[str]:
@@ -132,13 +130,14 @@ class SSHRunner:
 
     def _log_ssh_auth_failure(self, stderr: str) -> None:
         """Log security event for SSH authentication failures."""
-        if "permission denied" in stderr.lower() or "authentication failed" in stderr.lower():
-            logger = get_logger()
+        if (
+            "permission denied" in stderr.lower()
+            or "authentication failed" in stderr.lower()
+        ):
             log_security_event(
-                logger,
                 "ssh_authentication_failed",
                 f"SSH authentication failed for user {self.user or 'current_user'}@{self.host}",
-                level="warning"
+                level="warning",
             )
 
     def run(
@@ -163,12 +162,10 @@ class SSHRunner:
             # to prevent password exposure in process lists (ps/top)
             import os
 
-            logger = get_logger()
             log_security_event(
-                logger,
                 "ssh_password_authentication_used",
                 f"SSH password authentication used for host {self.host} - consider using SSH key authentication instead",
-                level="warning"
+                level="warning",
             )
 
             # Try to use sshpass with environment variable (more secure than -p flag)

@@ -40,10 +40,10 @@ class KopiaSnapshotPlugin(Plugin):
         check_start = time.time()
 
         try:
-            self.logger.info("KopiaSnapshotStatus: Starting check")
+            self.output_handler.info("KopiaSnapshotStatus: Starting check", echo=False)
 
             if not config.path:
-                self.logger.error("No snapshot path configured")
+                self.output_handler.error("No snapshot path configured", echo=False)
                 return CheckResult(
                     check_name=config.name,
                     status="down",
@@ -56,8 +56,9 @@ class KopiaSnapshotPlugin(Plugin):
             try:
                 self._validate_snapshot_path(config.path)
             except ValueError as e:
-                self.logger.error(
-                    f"KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}"
+                self.output_handler.error(
+                    f"KopiaSnapshotStatus: Invalid snapshot path configuration: {str(e)}",
+                    echo=False,
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -67,16 +68,18 @@ class KopiaSnapshotPlugin(Plugin):
                     details={"error": str(e), "path": config.path},
                 )
 
-            self.logger.info(
-                f"KopiaSnapshotStatus: Checking snapshot path {config.path} (max age: {config.max_age_hours}h)"
+            self.output_handler.info(
+                f"KopiaSnapshotStatus: Checking snapshot path {config.path} (max age: {config.max_age_hours}h)",
+                echo=False,
             )
 
             # Get snapshot info
             age_hours, metadata = self._get_snapshot_info(config.path)
 
             if age_hours is None:
-                self.logger.error(
-                    f"KopiaSnapshotStatus: Failed to get snapshot info for {config.path}"
+                self.output_handler.error(
+                    f"KopiaSnapshotStatus: Failed to get snapshot info for {config.path}",
+                    echo=False,
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -90,8 +93,9 @@ class KopiaSnapshotPlugin(Plugin):
             check_duration = int(time.time() - check_start)
 
             if age_hours <= config.max_age_hours:
-                self.logger.info(
-                    f"KopiaSnapshotStatus: OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h"
+                self.output_handler.info(
+                    f"KopiaSnapshotStatus: OK ({config.path}): {age_hours:.1f}h <= {config.max_age_hours}h",
+                    echo=False,
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -105,8 +109,9 @@ class KopiaSnapshotPlugin(Plugin):
                     },
                 )
             else:
-                self.logger.warning(
-                    f"KopiaSnapshotStatus: TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h"
+                self.output_handler.warning(
+                    f"KopiaSnapshotStatus: TOO OLD ({config.path}): {age_hours:.1f}h > {config.max_age_hours}h",
+                    echo=False,
                 )
                 return CheckResult(
                     check_name=config.name,
@@ -122,9 +127,9 @@ class KopiaSnapshotPlugin(Plugin):
 
         except Exception as e:
             check_duration = int(time.time() - check_start)
-            self.logger.error(
+            self.output_handler.error(
                 "KopiaSnapshotStatus: Unexpected error during snapshot check",
-                exc_info=True,
+                echo=False,
             )
             return CheckResult(
                 check_name=config.name,
@@ -167,8 +172,9 @@ class KopiaSnapshotPlugin(Plugin):
         success, stdout, stderr, exit_code = self.run_command(cmd)
 
         if not success or not stdout:
-            self.logger.error(
-                f"KopiaSnapshotStatus: Failed to list snapshots for {snapshot_path}: {stderr}"
+            self.output_handler.error(
+                f"KopiaSnapshotStatus: Failed to list snapshots for {snapshot_path}: {stderr}",
+                echo=False,
             )
             return None, None
 
@@ -179,8 +185,9 @@ class KopiaSnapshotPlugin(Plugin):
                 snapshots = [snapshots]
 
             if not snapshots:
-                self.logger.warning(
-                    f"KopiaSnapshotStatus: No snapshots found for {snapshot_path}"
+                self.output_handler.warning(
+                    f"KopiaSnapshotStatus: No snapshots found for {snapshot_path}",
+                    echo=False,
                 )
                 return None, None
 
@@ -190,16 +197,18 @@ class KopiaSnapshotPlugin(Plugin):
             stats = latest_snapshot.get("stats", {})
             error_count = stats.get("errorCount", 0)
             if error_count > 0:
-                self.logger.error(
-                    f"KopiaSnapshotStatus: Snapshot for {snapshot_path} has {error_count} error(s)"
+                self.output_handler.error(
+                    f"KopiaSnapshotStatus: Snapshot for {snapshot_path} has {error_count} error(s)",
+                    echo=False,
                 )
                 return None, None
 
             # Extract endTime
             end_time_str = latest_snapshot.get("endTime")
             if not end_time_str:
-                self.logger.error(
-                    f"KopiaSnapshotStatus: Missing endTime in snapshot data for {snapshot_path}"
+                self.output_handler.error(
+                    f"KopiaSnapshotStatus: Missing endTime in snapshot data for {snapshot_path}",
+                    echo=False,
                 )
                 return None, None
 
@@ -217,7 +226,8 @@ class KopiaSnapshotPlugin(Plugin):
             return age_hours, metadata
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            self.logger.error(
-                f"KopiaSnapshotStatus: Failed to parse snapshot data for {snapshot_path}: {str(e)}"
+            self.output_handler.error(
+                f"KopiaSnapshotStatus: Failed to parse snapshot data for {snapshot_path}: {str(e)}",
+                echo=False,
             )
             return None, None

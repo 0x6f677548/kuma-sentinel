@@ -40,7 +40,7 @@ class TestZfsPoolExecution:
 
     def test_healthy_pool_success(self, plugin, config):
         """Test successful check with healthy pool."""
-        mock_output = "tank\t100G\t50G\t50G\t50%\tONLINE"
+        mock_output = "tank\t50%\tONLINE"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)
@@ -53,7 +53,7 @@ class TestZfsPoolExecution:
     def test_low_space_failure(self, plugin, config):
         """Test failure with low free space."""
         config.min_free_percent = 20
-        mock_output = "tank\t100G\t95G\t5G\t95%\tONLINE"
+        mock_output = "tank\t95%\tONLINE"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)
@@ -65,7 +65,7 @@ class TestZfsPoolExecution:
 
     def test_unhealthy_pool_failure(self, plugin, config):
         """Test failure with unhealthy pool."""
-        mock_output = "tank\t100G\t50G\t50G\t50%\tDEGRADED"
+        mock_output = "tank\t50%\tDEGRADED"
 
         with patch.object(plugin, "run_command") as mock_run:
             mock_run.return_value = (True, mock_output, "", 0)

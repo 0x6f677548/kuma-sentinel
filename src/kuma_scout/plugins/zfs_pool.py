@@ -149,7 +149,7 @@ class ZfsPoolPlugin(Plugin):
             "list",
             "-H",
             "-o",
-            "name,size,alloc,free,cap,health",
+            "name,cap,health",
             pool_name,
         ]
 
@@ -171,16 +171,16 @@ class ZfsPoolPlugin(Plugin):
                 )
                 return None, None
 
-            # Parse output: name\tsize\talloc\tfree\tcap\thealth
+            # Parse output: name\tcap\thealth
             parts = output.split("\t")
-            if len(parts) != 6:
+            if len(parts) != 3:
                 self.output_handler.error(
                     f"ZfsPoolStatus: Unexpected zpool output format for '{pool_name}': {output}",
                     echo=False,
                 )
                 return None, None
 
-            name, size, alloc, free, cap, health = parts
+            name, cap, health = parts
 
             if name != pool_name:
                 self.output_handler.error(

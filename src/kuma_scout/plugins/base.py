@@ -312,12 +312,16 @@ class Plugin(ABC):
                 result.returncode,
             )
         except subprocess.TimeoutExpired:
-            self.output_handler.warning(f"Command timed out after {timeout}s", echo=True)
+            self.output_handler.warning(
+                f"Command timed out after {timeout}s", echo=True
+            )
             return False, "", f"Command timed out after {timeout}s", -1
         except FileNotFoundError:
             self.output_handler.warning(f"Command not found: {cmd[0]}", echo=True)
             return False, "", f"Command not found: {cmd[0]}", -1
         except Exception as e:
             sanitized_error = DataSanitizer.sanitize_error_message(e)
-            self.output_handler.warning(f"Command execution failed: {sanitized_error}", echo=True)
+            self.output_handler.warning(
+                f"Command execution failed: {sanitized_error}", echo=True
+            )
             return False, "", f"Command execution failed: {sanitized_error}", -1

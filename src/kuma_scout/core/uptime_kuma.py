@@ -45,7 +45,9 @@ def send_push(
 
     # Validate required parameters
     if not uptime_kuma_url:
-        output_handler.warning(f"Cannot send {command} push: Uptime Kuma URL not configured", echo=True)
+        output_handler.warning(
+            f"Cannot send {command} push: Uptime Kuma URL not configured", echo=True
+        )
         return False
 
     if not push_token:
@@ -67,7 +69,9 @@ def send_push(
         with urllib.request.urlopen(push_url, timeout=timeout) as response:
             data = response.read().decode()
             if '{"ok":true}' in data:
-                output_handler.info(f"{command} push sent ({status}): {message}", echo=False)
+                output_handler.info(
+                    f"{command} push sent ({status}): {message}", echo=False
+                )
                 return True
             else:
                 # Check for authentication errors

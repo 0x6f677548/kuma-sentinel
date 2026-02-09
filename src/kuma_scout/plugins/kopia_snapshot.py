@@ -8,7 +8,7 @@ import json
 import re
 import time
 from datetime import datetime
-from typing import Dict, Optional, cast
+from typing import Optional, cast
 
 from pydantic import Field
 
@@ -74,7 +74,7 @@ class KopiaSnapshotPlugin(Plugin):
             )
 
             # Get snapshot info
-            age_hours, metadata = self._get_snapshot_info(config.path)
+            age_hours = self._get_snapshot_info(config.path)
 
             if age_hours is None:
                 self.output_handler.error(
@@ -155,9 +155,7 @@ class KopiaSnapshotPlugin(Plugin):
         if not (re.match(local_path, path) or re.match(ssh_path, path)):
             raise ValueError(f"Invalid snapshot path format: {path}")
 
-    def _get_snapshot_info(
-        self, snapshot_path: str
-    ) -> tuple[Optional[float], Optional[Dict]]:
+    def _get_snapshot_info(self, snapshot_path: str) -> Optional[float]:
         """Get snapshot information for a path."""
         cmd = [
             "kopia",
@@ -176,7 +174,7 @@ class KopiaSnapshotPlugin(Plugin):
                 f"KopiaSnapshotStatus: Failed to list snapshots for {snapshot_path}: {stderr}",
                 echo=False,
             )
-            return None, None
+            return None
 
         try:
             snapshots = json.loads(stdout)
@@ -189,7 +187,7 @@ class KopiaSnapshotPlugin(Plugin):
                     f"KopiaSnapshotStatus: No snapshots found for {snapshot_path}",
                     echo=False,
                 )
-                return None, None
+                return None
 
             latest_snapshot = snapshots[0]
 
@@ -201,7 +199,7 @@ class KopiaSnapshotPlugin(Plugin):
                     f"KopiaSnapshotStatus: Snapshot for {snapshot_path} has {error_count} error(s)",
                     echo=False,
                 )
-                return None, None
+                return None
 
             # Extract endTime
             end_time_str = latest_snapshot.get("endTime")
@@ -210,24 +208,18 @@ class KopiaSnapshotPlugin(Plugin):
                     f"KopiaSnapshotStatus: Missing endTime in snapshot data for {snapshot_path}",
                     echo=False,
                 )
-                return None, None
+                return None
 
             # Parse timestamp
             end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
             now = datetime.now(end_time.tzinfo)
             age_hours = (now - end_time).total_seconds() / 3600
 
-            metadata = {
-                "id": latest_snapshot.get("id"),
-                "stats": stats,
-                "retention_reason": latest_snapshot.get("retentionReason", []),
-            }
-
-            return age_hours, metadata
+            return age_hours
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             self.output_handler.error(
                 f"KopiaSnapshotStatus: Failed to parse snapshot data for {snapshot_path}: {str(e)}",
                 echo=False,
             )
-            return None, None
+            return None

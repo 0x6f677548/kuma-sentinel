@@ -15,7 +15,7 @@ class SSHConfig(BaseModel):
 
     host: str = Field(description="SSH host (user@host or host)")
     user: Optional[str] = Field(default=None, description="SSH username")
-    port: int = Field(default=22, description="SSH port")
+    port: Optional[int] = Field(default=None, description="SSH port")
     key_file: Optional[str] = Field(default=None, description="Path to SSH private key")
     password: Optional[str] = Field(
         default=None, description="SSH password (discouraged)"

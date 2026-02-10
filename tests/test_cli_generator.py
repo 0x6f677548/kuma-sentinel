@@ -264,6 +264,157 @@ class TestExecuteSingleCheck:
             assert "Failed to execute" in mock_output_handler.error.call_args[0][0]
 
 
+class TestExecuteCheckWithReporting:
+    """Test _execute_check_with_reporting method."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a CLIGenerator instance."""
+        return CLIGenerator()
+
+    @pytest.fixture
+    def mock_plugin_class(self):
+        """Create a mock plugin class."""
+        mock_plugin = Mock()
+        mock_plugin.name = "test_plugin"
+        mock_plugin.execute_with_heartbeat = Mock(
+            return_value=CheckResult(
+                check_name="test-check",
+                status="up",
+                message="Check passed",
+                duration_seconds=1,
+            )
+        )
+        return mock_plugin
+
+    @pytest.fixture
+    def mock_output_handler(self):
+        """Create a mock output handler."""
+        return Mock()
+
+    @pytest.fixture
+    def global_config(self):
+        """Create a global config."""
+        return GlobalConfig(uptime_kuma=UptimeKumaConfig(url="http://test.com"))
+
+    def test_ssh_parsing_user_host_port(
+        self, generator, mock_plugin_class, mock_output_handler, global_config
+    ):
+        """Test SSH parsing with user@host:port format."""
+        from kuma_scout.plugins.models import SSHConfig
+
+        check_config_obj = Mock()
+        check_config_obj.name = "test-check"
+        check_config_obj.timeout = 30
+        check_config_obj.tags = []
+        check_config_obj.ssh = SSHConfig(
+            host="backup@nas.example.com:2222",
+            user=None,  # Not explicitly set
+            key_file="/path/to/key",
+            password=None,
+            strict_host_key_checking=True,
+        )
+        check_config_obj.uptime_kuma = None
+
+        with patch("kuma_scout.cli.generator.execution_context_manager"), \
+             patch("kuma_scout.cli.generator.SSHRunner") as mock_ssh_runner, \
+             patch("kuma_scout.cli.generator.send_push", return_value=True):
+
+            result = generator._execute_check_with_reporting(
+                mock_plugin_class,
+                check_config_obj,
+                global_config,
+                mock_output_handler,
+            )
+
+            # Verify SSHRunner was created with parsed values
+            mock_ssh_runner.assert_called_once_with(
+                host="nas.example.com",
+                user="backup",
+                port=2222,
+                key_file="/path/to/key",
+                password=None,
+                strict_host_key_checking=True,
+            )
+            assert result is not None
+
+    def test_ssh_parsing_explicit_fields_override(
+        self, generator, mock_plugin_class, mock_output_handler, global_config
+    ):
+        """Test that explicit SSH user/port fields override parsed values."""
+        from kuma_scout.plugins.models import SSHConfig
+
+        check_config_obj = Mock()
+        check_config_obj.name = "test-check"
+        check_config_obj.timeout = 30
+        check_config_obj.tags = []
+        check_config_obj.ssh = SSHConfig(
+            host="backup@nas.example.com:2222",
+            user="explicit_user",  # Explicit user should win
+            port=3333,  # Explicit port should win
+            key_file="/path/to/key",
+            password=None,
+            strict_host_key_checking=True,
+        )
+        check_config_obj.uptime_kuma = None
+
+        with patch("kuma_scout.cli.generator.execution_context_manager"), \
+             patch("kuma_scout.cli.generator.SSHRunner") as mock_ssh_runner, \
+             patch("kuma_scout.cli.generator.send_push", return_value=True):
+
+            result = generator._execute_check_with_reporting(
+                mock_plugin_class,
+                check_config_obj,
+                global_config,
+                mock_output_handler,
+            )
+
+            # Verify SSHRunner was created with explicit values overriding parsed ones
+            mock_ssh_runner.assert_called_once_with(
+                host="nas.example.com",
+                user="explicit_user",  # Explicit user wins over parsed "backup"
+                port=3333,  # Explicit port wins over parsed 2222
+                key_file="/path/to/key",
+                password=None,
+                strict_host_key_checking=True,
+            )
+            assert result is not None
+
+    def test_ssh_parsing_invalid_host(
+        self, generator, mock_plugin_class, mock_output_handler, global_config
+    ):
+        """Test SSH parsing with invalid host string."""
+        from kuma_scout.plugins.models import SSHConfig
+
+        check_config_obj = Mock()
+        check_config_obj.name = "test-check"
+        check_config_obj.timeout = 30
+        check_config_obj.tags = []
+        check_config_obj.ssh = SSHConfig(
+            host="invalid::host::string",
+            user=None,
+            key_file=None,
+            password=None,
+            strict_host_key_checking=True,
+        )
+        check_config_obj.uptime_kuma = None
+
+        with patch("kuma_scout.cli.generator.execution_context_manager"), \
+             patch("kuma_scout.cli.generator.parse_ssh_connection_string", return_value=(None, None, None)):
+
+            result = generator._execute_check_with_reporting(
+                mock_plugin_class,
+                check_config_obj,
+                global_config,
+                mock_output_handler,
+            )
+
+            # Should return None and log error
+            assert result is None
+            mock_output_handler.error.assert_called_once()
+            assert "Failed to parse SSH host" in mock_output_handler.error.call_args[0][0]
+
+
 class TestPluginSubcommandGeneration:
     """Test plugin subcommand generation."""
 

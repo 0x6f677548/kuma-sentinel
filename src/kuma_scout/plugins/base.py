@@ -199,7 +199,7 @@ class Plugin(ABC):
         self.ssh_runner = SSHRunner(
             host=ssh_config.host,
             user=ssh_config.user,
-            port=ssh_config.port,
+            port=ssh_config.port or 22,
             key_file=ssh_config.key_file,
             password=ssh_config.password,
             strict_host_key_checking=ssh_config.strict_host_key_checking,

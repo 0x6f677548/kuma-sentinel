@@ -136,6 +136,18 @@ def _parse_checks(raw_config: dict) -> List[Tuple[str, dict]]:
         # Remove 'type' from check config
         check_config_data = {k: v for k, v in raw_check.items() if k != "type"}
 
+        # Parse SSH host in check config
+        if "ssh" in check_config_data and "host" in check_config_data["ssh"]:
+            parsed_host, parsed_user, parsed_port = parse_ssh_connection_string(
+                check_config_data["ssh"]["host"]
+            )
+            if parsed_host:
+                check_config_data["ssh"]["host"] = parsed_host
+            if parsed_user and "user" not in check_config_data["ssh"]:
+                check_config_data["ssh"]["user"] = parsed_user
+            if parsed_port is not None and "port" not in check_config_data["ssh"]:
+                check_config_data["ssh"]["port"] = parsed_port
+
         # Basic validation - ensure name is present
         if "name" not in check_config_data:
             raise ValueError(f"Check {i} missing required 'name' field")

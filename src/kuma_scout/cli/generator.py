@@ -548,7 +548,7 @@ class CLIGenerator:
                 ssh_runner = SSHRunner(
                     host=host,
                     user=user,
-                    port=port,
+                    port=port or 22,
                     key_file=ssh_config.key_file,
                     password=ssh_config.password,
                     strict_host_key_checking=ssh_config.strict_host_key_checking,

@@ -13,7 +13,12 @@ from typer.testing import CliRunner
 from kuma_scout.cli.app import app
 from kuma_scout.cli.generator import CLIGenerator
 from kuma_scout.core.output_handler import OutputHandler
-from kuma_scout.plugins.models import GlobalConfig, SSHConfig, UptimeKumaConfig
+from kuma_scout.plugins.models import (
+    GlobalConfig,
+    HeartbeatConfig,
+    SSHConfig,
+    UptimeKumaConfig,
+)
 
 runner = CliRunner()
 
@@ -71,7 +76,8 @@ def test_apply_command_line_overrides_expands_tokens():
 
         assert config.uptime_kuma is not None
         assert config.uptime_kuma.token == "expanded_token_value"
-        assert config.heartbeat.token == "expanded_heartbeat_value"
+        assert config.heartbeat.uptime_kuma is not None
+        assert config.heartbeat.uptime_kuma.token == "expanded_heartbeat_value"
     finally:
         # Clean up environment variables
         del os.environ["TEST_TOKEN"]
@@ -567,7 +573,7 @@ def test_merge_uptime_kuma_config_global_only():
     global_config.uptime_kuma = UptimeKumaConfig(
         url="http://global.com", token="global_token"
     )
-    check_config = {}
+    check_config: dict = {}
 
     result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
 
@@ -590,12 +596,44 @@ def test_merge_uptime_kuma_config_both_with_override():
     assert result == {"url": "http://check.com", "token": "global_token"}
 
 
+def test_merge_uptime_kuma_config_check_level_token_only():
+    """Test merging uptime_kuma config when check overrides only token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    check_config = {"uptime_kuma": {"token": "check_token"}}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    # Check-level token should override, but url should come from global
+    assert result == {"url": "http://global.com", "token": "check_token"}
+
+
+def test_merge_uptime_kuma_config_check_level_url_only():
+    """Test merging uptime_kuma config when check overrides only url."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    check_config = {"uptime_kuma": {"url": "http://check.com"}}
+
+    result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
+
+    # Check-level url should override, but token should come from global
+    assert result == {"url": "http://check.com", "token": "global_token"}
+
+
 def test_merge_uptime_kuma_config_none():
     """Test merging uptime_kuma config when neither exists."""
     from kuma_scout.cli.config_merger import ConfigMerger
 
     global_config = GlobalConfig()
-    check_config = {}
+    check_config: dict = {}
 
     result = ConfigMerger.merge_uptime_kuma_config(global_config, check_config)
 
@@ -621,7 +659,7 @@ def test_merge_ssh_config_global_only():
 
     global_config = GlobalConfig()
     global_config.ssh = SSHConfig(host="global_host", user="global_user", port=22)
-    check_config = {}
+    check_config: dict = {}
 
     result = ConfigMerger.merge_ssh_config(global_config, check_config)
 
@@ -664,9 +702,85 @@ def test_merge_ssh_config_none():
     from kuma_scout.cli.config_merger import ConfigMerger
 
     global_config = GlobalConfig()
-    check_config = {}
+    check_config: dict = {}
 
     result = ConfigMerger.merge_ssh_config(global_config, check_config)
+
+    assert result is None
+
+
+def test_merge_tag_uptime_kuma_config_token_only():
+    """Test merging tag uptime_kuma config when tag overrides only token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    tag_config = {"uptime_kuma": {"token": "tag_token"}}
+
+    result = ConfigMerger.merge_tag_uptime_kuma_config(global_config, tag_config)
+
+    # Tag-level token should override, but url should come from global
+    assert result == {"url": "http://global.com", "token": "tag_token"}
+
+
+def test_merge_tag_uptime_kuma_config_url_only():
+    """Test merging tag uptime_kuma config when tag overrides only url."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    tag_config = {"uptime_kuma": {"url": "http://tag.com"}}
+
+    result = ConfigMerger.merge_tag_uptime_kuma_config(global_config, tag_config)
+
+    # Tag-level url should override, but token should come from global
+    assert result == {"url": "http://tag.com", "token": "global_token"}
+
+
+def test_merge_tag_uptime_kuma_config_both():
+    """Test merging tag uptime_kuma config when tag overrides both url and token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    tag_config = {"uptime_kuma": {"url": "http://tag.com", "token": "tag_token"}}
+
+    result = ConfigMerger.merge_tag_uptime_kuma_config(global_config, tag_config)
+
+    # Tag-level should override both
+    assert result == {"url": "http://tag.com", "token": "tag_token"}
+
+
+def test_merge_tag_uptime_kuma_config_global_only():
+    """Test merging tag uptime_kuma config when only global config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.com", token="global_token"
+    )
+    tag_config: dict = {}
+
+    result = ConfigMerger.merge_tag_uptime_kuma_config(global_config, tag_config)
+
+    # Should use global config
+    assert result == {"url": "http://global.com", "token": "global_token"}
+
+
+def test_merge_tag_uptime_kuma_config_none():
+    """Test merging tag uptime_kuma config when neither exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    tag_config: dict = {}
+
+    result = ConfigMerger.merge_tag_uptime_kuma_config(global_config, tag_config)
 
     assert result is None
 
@@ -709,6 +823,91 @@ def test_apply_timeout_global_default_not_applied():
     assert "timeout" not in merged_config
 
 
+def test_merge_heartbeat_uptime_kuma_config_heartbeat_url_only():
+    """Test merging heartbeat config with heartbeat-specific URL."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(
+        uptime_kuma=UptimeKumaConfig(
+            url="http://global-kuma:3001/api/push",
+            token="global_token",
+        ),
+        heartbeat=HeartbeatConfig(
+            enabled=True,
+            uptime_kuma=UptimeKumaConfig(
+                url="http://heartbeat-kuma:3001/api/push",
+                token="heartbeat_token",
+            ),
+        ),
+    )
+
+    url, token = ConfigMerger.merge_heartbeat_uptime_kuma_config(global_config)
+
+    assert url == "http://heartbeat-kuma:3001/api/push"
+    assert token == "heartbeat_token"
+
+
+def test_merge_heartbeat_uptime_kuma_config_inherits_url_from_global():
+    """Test heartbeat inherits URL from global when not set."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(
+        uptime_kuma=UptimeKumaConfig(
+            url="http://global-kuma:3001/api/push",
+            token="global_token",
+        ),
+        heartbeat=HeartbeatConfig(
+            enabled=True,
+            uptime_kuma=UptimeKumaConfig(
+                token="heartbeat_token",
+                # url is None
+            ),
+        ),
+    )
+
+    url, token = ConfigMerger.merge_heartbeat_uptime_kuma_config(global_config)
+
+    # URL inherited from global, token is heartbeat-specific
+    assert url == "http://global-kuma:3001/api/push"
+    assert token == "heartbeat_token"
+
+
+def test_merge_heartbeat_uptime_kuma_config_no_token():
+    """Test heartbeat config with no token."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(
+        uptime_kuma=UptimeKumaConfig(
+            url="http://global-kuma:3001/api/push",
+        ),
+        heartbeat=HeartbeatConfig(
+            enabled=True,
+            uptime_kuma=None,
+        ),
+    )
+
+    url, token = ConfigMerger.merge_heartbeat_uptime_kuma_config(global_config)
+
+    # URL from global, token is None
+    assert url == "http://global-kuma:3001/api/push"
+    assert token is None
+
+
+def test_merge_heartbeat_uptime_kuma_config_empty():
+    """Test heartbeat config with no uptime_kuma config."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(
+        uptime_kuma=None,
+        heartbeat=HeartbeatConfig(enabled=True, uptime_kuma=None),
+    )
+
+    url, token = ConfigMerger.merge_heartbeat_uptime_kuma_config(global_config)
+
+    assert url is None
+    assert token is None
+
+
 def test_apply_cli_overrides_uptime_kuma():
     """Test applying CLI overrides for uptime_kuma config."""
     from kuma_scout.cli.config_merger import ConfigMerger
@@ -725,6 +924,7 @@ def test_apply_cli_overrides_uptime_kuma():
         log_level=None,
     )
 
+    assert global_config.uptime_kuma is not None
     assert global_config.uptime_kuma.url == "http://cli.com"
     assert global_config.uptime_kuma.token == "cli_token"
 
@@ -749,6 +949,7 @@ def test_apply_cli_overrides_uptime_kuma_existing_config():
     )
 
     # CLI should override existing config
+    assert global_config.uptime_kuma is not None
     assert global_config.uptime_kuma.url == "http://cli.com"
     assert global_config.uptime_kuma.token == "cli_token"
 
@@ -773,6 +974,7 @@ def test_apply_cli_overrides_uptime_kuma_url_only():
     )
 
     # URL should be overridden, token should remain
+    assert global_config.uptime_kuma is not None
     assert global_config.uptime_kuma.url == "http://cli.com"
     assert global_config.uptime_kuma.token == "existing_token"
 
@@ -793,7 +995,8 @@ def test_apply_cli_overrides_heartbeat_token():
         log_level=None,
     )
 
-    assert global_config.heartbeat.token == "cli_heartbeat_token"
+    assert global_config.heartbeat.uptime_kuma is not None
+    assert global_config.heartbeat.uptime_kuma.token == "cli_heartbeat_token"
 
 
 def test_apply_cli_overrides_timeout():
@@ -833,3 +1036,189 @@ def test_apply_cli_overrides_logging():
 
     assert global_config.logging.file == "/tmp/test.log"
     assert global_config.logging.level == "DEBUG"
+
+
+def test_merge_all_checks_configs_empty():
+    """Test merging checks when checks list is empty."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.test", token="global_token"
+    )
+    checks: list[tuple] = []
+
+    # Should not raise any errors
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    assert checks == []
+
+
+def test_merge_all_checks_configs_single_check_no_override():
+    """Test merging single check that has no uptime_kuma config.
+
+    When a check has no uptime_kuma config, it inherits the global config.
+    """
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.test", token="global_token"
+    )
+    checks: list[tuple] = [("cmdcheck", {"name": "test-check", "command": "echo test"})]
+
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    # Check should inherit global uptime_kuma since it had none initially
+    uptime = checks[0][1]["uptime_kuma"]
+    assert isinstance(uptime, dict)
+    assert uptime["url"] == "http://global.test"
+    assert uptime["token"] == "global_token"
+
+
+def test_merge_all_checks_configs_single_check_token_override():
+    """Test merging single check that overrides token only."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.test", token="global_token"
+    )
+    checks: list[tuple] = [
+        (
+            "cmdcheck",
+            {
+                "name": "test-check",
+                "command": "echo test",
+                "uptime_kuma": {"token": "check_token"},
+            },
+        )
+    ]
+
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    # Should merge: use check token but global URL
+    merged_uptime = checks[0][1]["uptime_kuma"]
+    assert isinstance(merged_uptime, dict)
+    assert merged_uptime["url"] == "http://global.test"
+    assert merged_uptime["token"] == "check_token"
+
+
+def test_merge_all_checks_configs_single_check_url_override():
+    """Test merging single check that overrides url only."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.test", token="global_token"
+    )
+    checks: list[tuple] = [
+        (
+            "cmdcheck",
+            {
+                "name": "test-check",
+                "command": "echo test",
+                "uptime_kuma": {"url": "http://check.test"},
+            },
+        )
+    ]
+
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    # Should merge: use check URL but global token
+    merged_uptime = checks[0][1]["uptime_kuma"]
+    assert isinstance(merged_uptime, dict)
+    assert merged_uptime["url"] == "http://check.test"
+    assert merged_uptime["token"] == "global_token"
+
+
+def test_merge_all_checks_configs_multiple_checks():
+    """Test merging multiple checks with different override patterns."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    global_config.uptime_kuma = UptimeKumaConfig(
+        url="http://global.test", token="global_token"
+    )
+    checks: list[tuple] = [
+        (
+            "cmdcheck",
+            {
+                "name": "check1",
+                "command": "echo 1",
+                "uptime_kuma": {"token": "token1"},
+            },
+        ),
+        (
+            "cmdcheck",
+            {
+                "name": "check2",
+                "command": "echo 2",
+                "uptime_kuma": {"url": "http://check2.test"},
+            },
+        ),
+        ("cmdcheck", {"name": "check3", "command": "echo 3"}),
+        (
+            "cmdcheck",
+            {
+                "name": "check4",
+                "command": "echo 4",
+                "uptime_kuma": {"url": "http://check4.test", "token": "token4"},
+            },
+        ),
+    ]
+
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    # Check 1: token override, global URL
+    uptime1 = checks[0][1]["uptime_kuma"]
+    assert isinstance(uptime1, dict)
+    assert uptime1["url"] == "http://global.test"
+    assert uptime1["token"] == "token1"
+
+    # Check 2: URL override, global token
+    uptime2 = checks[1][1]["uptime_kuma"]
+    assert isinstance(uptime2, dict)
+    assert uptime2["url"] == "http://check2.test"
+    assert uptime2["token"] == "global_token"
+
+    # Check 3: no uptime_kuma config initially, inherits global
+    uptime3 = checks[2][1]["uptime_kuma"]
+    assert isinstance(uptime3, dict)
+    assert uptime3["url"] == "http://global.test"
+    assert uptime3["token"] == "global_token"
+
+    # Check 4: both overridden
+    uptime4 = checks[3][1]["uptime_kuma"]
+    assert isinstance(uptime4, dict)
+    assert uptime4["url"] == "http://check4.test"
+    assert uptime4["token"] == "token4"
+
+
+def test_merge_all_checks_configs_no_global_config():
+    """Test merging checks when no global uptime_kuma config exists."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+    checks: list[tuple] = [
+        (
+            "cmdcheck",
+            {
+                "name": "check1",
+                "command": "echo 1",
+                "uptime_kuma": {"token": "token1", "url": "http://check1.test"},
+            },
+        ),
+        ("cmdcheck", {"name": "check2", "command": "echo 2"}),
+    ]
+
+    ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+    # Check 1: keeps its full config
+    uptime1 = checks[0][1]["uptime_kuma"]
+    assert isinstance(uptime1, dict)
+    assert uptime1["url"] == "http://check1.test"
+    assert uptime1["token"] == "token1"
+
+    # Check 2: no uptime_kuma config (removed since global also has none)
+    assert "uptime_kuma" not in checks[1][1]

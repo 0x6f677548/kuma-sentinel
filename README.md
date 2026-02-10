@@ -40,7 +40,7 @@ Result: ✅ UP (all checks pass) or ⚠️ DOWN (any check fails) in Uptime Kuma
 - **Port Scanning**: Scan TCP ports across IP ranges using nmap (portscan plugin)
 - **Backup Monitoring**: Monitor Kopia backup snapshot freshness (kopiasnapshotstatus plugin)
 - **Storage Monitoring**: Monitor ZFS pool health and free space (zfspoolstatus plugin)
-- **Heartbeat Monitoring**: Send periodic health signals during long operations
+- **Heartbeat Monitoring**: Send periodic health signals during long operations with configurable URL and token
 - **Pattern Matching**: Use regex patterns for flexible success/failure detection
 - **Multi-Check Support**: Run multiple checks with per-check configuration and tokens
 - **Tag-Based Aggregation**: Automatically aggregate check results by tag and report aggregated status to shared tokens
@@ -189,23 +189,38 @@ uptime_kuma:
 logging:
   level: INFO
 
+# Heartbeat configuration - sends periodic pings during long operations
+heartbeat:
+  enabled: true
+  interval: 300  # Send heartbeat every 5 minutes
+  uptime_kuma:
+    token: ${HEARTBEAT_TOKEN}
+    # URL is optional - if not set, inherits from global uptime_kuma.url
+
 # Tag-based result aggregation tokens
+# Each tag automatically aggregates results of all checks tagged with it
 tags:
   web:
-    token: ${WEB_AGGREGATION_TOKEN}
+    uptime_kuma:
+      token: ${WEB_AGGREGATION_TOKEN}
+      # Optional: override URL for this tag (inherits global URL if not set)
     description: "Aggregated status for web services"
   storage:
-    token: ${STORAGE_AGGREGATION_TOKEN}
+    uptime_kuma:
+      token: ${STORAGE_AGGREGATION_TOKEN}
     description: "Aggregated status for storage checks"
   backups:
-    token: ${BACKUP_AGGREGATION_TOKEN}
+    uptime_kuma:
+      token: ${BACKUP_AGGREGATION_TOKEN}
+      # Example: send this tag's results to a different Uptime Kuma instance
+      # url: "http://secondary-uptimekuma:3001/api/push"
     description: "Aggregated status for backup checks"
 
 checks:
   - name: nginx_health
     type: cmdcheck
     command: "systemctl is-active nginx"
-    tags: [web, critical]
+    tags: [web]
     
   - name: disk_space
     type: cmdcheck
@@ -218,6 +233,10 @@ checks:
     path: "/data"
     max_age_hours: 24
     tags: [backups]
+    # Optional: override Uptime Kuma token for this specific check
+    uptime_kuma:
+      token: ${BACKUP_SPECIFIC_TOKEN}
+      # URL inherits from global if not overridden
 ```
 
 ### Run
@@ -236,19 +255,58 @@ kuma-scout run /etc/kuma-scout/config.yaml
 
 Each check sends **two reports** automatically:
 
-1. **Individual Result** - to the global or check-specific Uptime Kuma token
-   - `nginx_health` → `${UPTIME_KUMA_TOKEN}` (individual result)
-   - `disk_space` → `${UPTIME_KUMA_TOKEN}` (individual result)
-   - `backup_check` → `${UPTIME_KUMA_TOKEN}` (individual result)
+1. **Individual Result** - to the check's Uptime Kuma token
+   - Uses the check's `uptime_kuma` config if set, otherwise inherits global `uptime_kuma`
+   - If check overrides `token` but not `url`, URL is inherited from global config
+   - Examples:
+     - `nginx_health` → `${UPTIME_KUMA_TOKEN}` (uses global URL + global token)
+     - `backup_check` → `${BACKUP_SPECIFIC_TOKEN}` @ global URL (token overridden, URL inherited)
 
 2. **Aggregated Result** - automatically combined by tag and sent to tag tokens
-   - `web` tag → `${WEB_AGGREGATION_TOKEN}` (combined nginx_health + any other web checks)
-   - `storage` tag → `${STORAGE_AGGREGATION_TOKEN}` (combined disk_space + any other storage checks)
-   - `backups` tag → `${BACKUP_AGGREGATION_TOKEN}` (combined backup_check + any other backup checks)
+   - Tag uses its `uptime_kuma` config if set, otherwise inherits global `uptime_kuma`
+   - If tag overrides `token` but not `url`, URL is inherited from global config
+   - Examples:
+     - `web` tag → `${WEB_AGGREGATION_TOKEN}` @ global URL (aggregated nginx_health)
+     - `storage` tag → `${STORAGE_AGGREGATION_TOKEN}` @ global URL (aggregated disk_space)
+     - `backups` tag → `${BACKUP_AGGREGATION_TOKEN}` @ global URL (aggregated backup_check)
 
-**Result:** 6 total API calls to Uptime Kuma (3 individual + 3 aggregated)
+**Example with all scenarios:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: DEFAULT_TOKEN
 
-**Why?** You get both granular per-check monitoring AND high-level tag-based monitoring in one run.
+tags:
+  web:
+    uptime_kuma:
+      token: WEB_TAG_TOKEN
+  backup:
+    uptime_kuma:
+      url: "http://secondary:3001/api/push"  # Override URL only
+      token: BACKUP_TAG_TOKEN
+
+checks:
+  - name: nginx
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    tags: [web]
+    # No uptime_kuma override - uses: DEFAULT_TOKEN @ http://uptimekuma:3001/api/push
+
+  - name: mysql
+    type: cmdcheck
+    command: "systemctl is-active mysql"
+    tags: [backup]
+    uptime_kuma:
+      token: MYSQL_CUSTOM_TOKEN
+      # URL not overridden - inherits: http://uptimekuma:3001/api/push
+```
+
+**Results sent:**
+- nginx individual: DEFAULT_TOKEN @ uptimekuma (no per-check override)
+- nginx tag aggregation: WEB_TAG_TOKEN @ uptimekuma (web tag, global URL)
+- mysql individual: MYSQL_CUSTOM_TOKEN @ uptimekuma (token overridden, URL inherited)
+- mysql tag aggregation: BACKUP_TAG_TOKEN @ secondary (backup tag, URL overridden)
+- **Total: 4 API calls** to Uptime Kuma (2 individual + 2 aggregated)
 
 Or schedule with cron:
 

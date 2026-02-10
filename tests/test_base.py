@@ -79,7 +79,9 @@ class TestPluginBase:
         return GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test-token"),
             heartbeat=HeartbeatConfig(
-                enabled=True, token="heartbeat-token", interval=60
+                enabled=True,
+                uptime_kuma=UptimeKumaConfig(token="heartbeat-token"),
+                interval=60,
             ),
             ssh=SSHConfig(host="example.com", user="testuser"),
         )
@@ -141,7 +143,7 @@ class TestPluginBase:
         self, global_config, mock_output_handler
     ):
         """Test heartbeat initialization with missing token."""
-        global_config.heartbeat.token = None
+        global_config.heartbeat.uptime_kuma = None
         plugin = MockPlugin.__new__(MockPlugin)
         plugin.global_config = global_config
         plugin.output_handler = mock_output_handler

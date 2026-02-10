@@ -132,7 +132,11 @@ class TestSendAggregatedResults:
         logger = mock_logger()
         global_config = GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test"),
-            tags={"other-tag": TagConfig(token="other-token")},
+            tags={
+                "other-tag": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="other-token")
+                )
+            },
         )
         results_by_tag: dict[str, list[CheckResult]] = {"tag1": []}
 
@@ -145,15 +149,22 @@ class TestSendAggregatedResults:
 
     def test_send_aggregated_results_success(self):
         """Test successful aggregation and reporting."""
+        from kuma_scout.cli.config_merger import ConfigMerger
+
         gen = CLIGenerator()
         logger = mock_logger()
         global_config = GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test"),
             tags={
-                "network": TagConfig(token="network-token"),
-                "backup": TagConfig(token="backup-token"),
+                "network": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="network-token")
+                ),
+                "backup": TagConfig(uptime_kuma=UptimeKumaConfig(token="backup-token")),
             },
         )
+
+        # Merge tag configs with global config (as done in _setup_run_command)
+        ConfigMerger.merge_all_tags_configs(global_config)
 
         results_by_tag: dict[str, list[CheckResult]] = {
             "network": [
@@ -210,7 +221,11 @@ class TestSendAggregatedResults:
         logger = mock_logger()
         global_config = GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test"),
-            tags={"network": TagConfig(token="network-token")},
+            tags={
+                "network": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="network-token")
+                )
+            },
         )
 
         results_by_tag: dict[str, list[CheckResult]] = {"network": []}
@@ -226,12 +241,21 @@ class TestSendAggregatedResults:
 
     def test_send_aggregated_results_send_fails(self):
         """Test error handling when sending to Uptime Kuma fails."""
+        from kuma_scout.cli.config_merger import ConfigMerger
+
         gen = CLIGenerator()
         logger = mock_logger()
         global_config = GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test"),
-            tags={"network": TagConfig(token="network-token")},
+            tags={
+                "network": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="network-token")
+                )
+            },
         )
+
+        # Merge tag configs with global config (as done in _setup_run_command)
+        ConfigMerger.merge_all_tags_configs(global_config)
 
         results_by_tag: dict[str, list[CheckResult]] = {
             "network": [
@@ -257,15 +281,24 @@ class TestSendAggregatedResults:
         This simulates the behavior after running checks without --tag filters.
         All tags present in executed checks are automatically aggregated.
         """
+        from kuma_scout.cli.config_merger import ConfigMerger
+
         gen = CLIGenerator()
         logger = mock_logger()
         global_config = GlobalConfig(
             uptime_kuma=UptimeKumaConfig(url="http://test.com", token="test"),
             tags={
-                "network": TagConfig(token="network-token"),
-                "critical": TagConfig(token="critical-token"),
+                "network": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="network-token")
+                ),
+                "critical": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="critical-token")
+                ),
             },
         )
+
+        # Merge tag configs with global config (as done in _setup_run_command)
+        ConfigMerger.merge_all_tags_configs(global_config)
 
         # Results from checks that have multiple tags
         results_by_tag: dict[str, list[CheckResult]] = {
@@ -361,22 +394,31 @@ class TestGlobalConfigTags:
         """Test GlobalConfig with tags."""
         config = GlobalConfig(
             tags={
-                "network": TagConfig(token="network-token"),
-                "backup": TagConfig(token="backup-token"),
+                "network": TagConfig(
+                    uptime_kuma=UptimeKumaConfig(token="network-token")
+                ),
+                "backup": TagConfig(uptime_kuma=UptimeKumaConfig(token="backup-token")),
             }
         )
         assert len(config.tags) == 2
-        assert config.tags["network"].token == "network-token"
-        assert config.tags["backup"].token == "backup-token"
+        assert config.tags["network"].uptime_kuma is not None
+        assert config.tags["network"].uptime_kuma.token == "network-token"
+        assert config.tags["backup"].uptime_kuma is not None
+        assert config.tags["backup"].uptime_kuma.token == "backup-token"
 
     def test_tag_config_with_description(self):
         """Test TagConfig with optional description."""
-        tag = TagConfig(token="test-token", description="Test description")
-        assert tag.token == "test-token"
+        tag = TagConfig(
+            uptime_kuma=UptimeKumaConfig(token="test-token"),
+            description="Test description",
+        )
+        assert tag.uptime_kuma is not None
+        assert tag.uptime_kuma.token == "test-token"
         assert tag.description == "Test description"
 
     def test_tag_config_description_optional(self):
         """Test TagConfig without description."""
-        tag = TagConfig(token="test-token")
-        assert tag.token == "test-token"
+        tag = TagConfig(uptime_kuma=UptimeKumaConfig(token="test-token"))
+        assert tag.uptime_kuma is not None
+        assert tag.uptime_kuma.token == "test-token"
         assert tag.description is None

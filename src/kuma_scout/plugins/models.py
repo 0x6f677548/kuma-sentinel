@@ -26,7 +26,10 @@ class SSHConfig(BaseModel):
 class UptimeKumaConfig(BaseModel):
     """Uptime Kuma configuration."""
 
-    url: str = Field(description="Uptime Kuma push API URL")
+    url: Optional[str] = Field(
+        default=None,
+        description="Uptime Kuma push API URL (can be overridden per check)",
+    )
     token: Optional[str] = Field(
         default=None, description="Uptime Kuma push token (can be overridden per check)"
     )
@@ -57,15 +60,19 @@ class HeartbeatConfig(BaseModel):
     interval: int = Field(
         default=300, ge=1, description="Heartbeat interval in seconds"
     )
-    token: Optional[str] = Field(
-        default=None, description="Uptime Kuma token for heartbeat"
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None,
+        description="Uptime Kuma config for heartbeat (url and token can be set, url inherits from global if not set)",
     )
 
 
 class TagConfig(BaseModel):
     """Tag-based result aggregation configuration."""
 
-    token: str = Field(description="Uptime Kuma token for aggregated results")
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None,
+        description="Uptime Kuma config for aggregated results (url and token can be overridden)",
+    )
     description: Optional[str] = Field(
         default=None, description="Description of what this tag monitors"
     )

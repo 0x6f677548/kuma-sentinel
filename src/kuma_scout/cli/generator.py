@@ -116,6 +116,12 @@ class CLIGenerator:
             verbose,
         )
 
+        # Merge uptime_kuma configs for all checks with global config (field-level merging)
+        ConfigMerger.merge_all_checks_configs(checks, global_config)
+
+        # Merge all tag configs with global config (field-level merging)
+        ConfigMerger.merge_all_tags_configs(global_config)
+
         # Update logging configuration with final config values
         setup_logging(
             global_config.logging.file,
@@ -331,12 +337,25 @@ class CLIGenerator:
                 echo=True,
             )
 
-            # Send to Uptime Kuma
+            # Validate tag has uptime_kuma config before sending
+            if not tag_config.uptime_kuma:
+                output_handler.debug(
+                    f"Tag '{tag_name}' has no uptime_kuma config, skipping aggregation",
+                    echo=False,
+                )
+                continue
+
+            if not tag_config.uptime_kuma.url or not tag_config.uptime_kuma.token:
+                output_handler.debug(
+                    f"Tag '{tag_name}' missing url or token, skipping aggregation",
+                    echo=False,
+                )
+                continue
+
+            # Send to Uptime Kuma (config already merged at load time)
             success = send_push(
-                uptime_kuma_url=(
-                    global_config.uptime_kuma.url if global_config.uptime_kuma else None
-                ),
-                push_token=tag_config.token,
+                uptime_kuma_url=tag_config.uptime_kuma.url,
+                push_token=tag_config.uptime_kuma.token,
                 message=sanitized_message,
                 command=f"tag-{tag_name}",
                 status=status,
@@ -397,9 +416,13 @@ class CLIGenerator:
         ssh_no_strict_host_key_checking: bool,
         output_handler: OutputHandler,
     ) -> None:
-        """Setup SSH configuration from command-line options."""
+        """Setup SSH configuration from command-line options.
+
+        This method handles CLI parsing and validation, then delegates
+        configuration application to ConfigMerger for consistency.
+        """
         if not ssh:
-            # Early return if no SSH host specified
+            # Validation: SSH options without host is an error
             if (
                 ssh_key_file
                 or ssh_password
@@ -414,39 +437,35 @@ class CLIGenerator:
                 raise typer.Exit(1)
             return
 
-        # Parse SSH host string using the utility function
+        # Parse SSH host string (CLI-specific parsing)
         host, user, port = parse_ssh_connection_string(ssh)
 
-        # Ensure host is not None (should not happen with valid input)
         if host is None:
             output_handler.error(
                 "Failed to parse SSH host from connection string", echo=True
             )
             raise typer.Exit(1)
 
-        if not global_config.ssh:
-            from kuma_scout.plugins.models import SSHConfig
-
-            global_config.ssh = SSHConfig(host=host, user=user, port=port or 22)
-        else:
-            global_config.ssh.host = host
-            if user:
-                global_config.ssh.user = user
-            if port:
-                global_config.ssh.port = port
-
-        # Set additional SSH options
-        if ssh_key_file:
-            global_config.ssh.key_file = ssh_key_file
-
+        # Expand environment variables in SSH password (CLI-specific)
+        expanded_password = None
         if ssh_password:
-            ssh_password = os.path.expandvars(ssh_password)
-            global_config.ssh.password = ssh_password
+            expanded_password = os.path.expandvars(ssh_password)
 
-        if ssh_strict_host_key_checking is not True or ssh_no_strict_host_key_checking:
-            global_config.ssh.strict_host_key_checking = (
-                ssh_strict_host_key_checking and not ssh_no_strict_host_key_checking
-            )
+        # Compute strict_host_key_checking from flags (CLI-specific logic)
+        compute_strict_checking = (
+            ssh_strict_host_key_checking and not ssh_no_strict_host_key_checking
+        )
+
+        # Apply merged SSH config using ConfigMerger
+        ConfigMerger.apply_cli_ssh_config(
+            global_config,
+            host=host,
+            user=user,
+            port=port,
+            key_file=ssh_key_file,
+            password=expanded_password,
+            strict_host_key_checking=compute_strict_checking,
+        )
 
     def _create_plugin_config(
         self, plugin_class, check_config: dict, global_config: GlobalConfig
@@ -546,17 +565,19 @@ class CLIGenerator:
             )
 
             # Send to Uptime Kuma if configured
-            uptime_config = check_config_obj.uptime_kuma or global_config.uptime_kuma
-            if (
-                uptime_config
-                and uptime_config.url
-                and uptime_config.token
-                and not uptime_config.token.startswith("${")
-            ):
+            # Config is already merged at load time, so uptime_kuma contains fallback values
+            uptime_url = None
+            uptime_token = None
+
+            if check_config_obj.uptime_kuma:
+                uptime_url = check_config_obj.uptime_kuma.url
+                uptime_token = check_config_obj.uptime_kuma.token
+
+            if uptime_url and uptime_token and not uptime_token.startswith("${"):
                 status = result.status
                 success = send_push(
-                    uptime_kuma_url=str(uptime_config.url),
-                    push_token=uptime_config.token,
+                    uptime_kuma_url=str(uptime_url),
+                    push_token=uptime_token,
                     message=result.message,
                     command=check_config_obj.name,
                     status=status,
@@ -1010,23 +1031,19 @@ class CLIGenerator:
             name = f"cli-check-{int(time.time())}"
 
         # Build config data from kwargs (plugin-specific parameters)
-        config_class = plugin_class.config_class
         check_config_data = self._build_check_config_data(
             name, retry_attempts, retry_delay_seconds, kwargs
         )
 
-        # Validate required fields
+        # Create plugin config with merged settings (uptime_kuma, ssh, timeout)
+        # Uses centralized _create_plugin_config for consistency with run command flow
         try:
-            check_config_obj = config_class(**check_config_data)
+            check_config_obj = self._create_plugin_config(
+                plugin_class, check_config_data, global_config
+            )
         except Exception as e:
             output_handler.error(f"Invalid configuration: {e}", echo=True)
             raise typer.Exit(1) from e
-
-        # Set uptime_kuma config if both URL and token are provided
-        if uptime_kuma_url and token:
-            check_config_obj.uptime_kuma = UptimeKumaConfig(
-                url=uptime_kuma_url, token=token
-            )
 
         # Show execution start
         if global_config.ssh and global_config.ssh.host:

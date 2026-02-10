@@ -89,18 +89,33 @@ uptime_kuma:
 heartbeat:
   enabled: true                          # Enable/disable heartbeat pings
   interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
-  token: ${HEARTBEAT_TOKEN}              # Uptime Kuma token for heartbeat
+  uptime_kuma:
+    token: ${HEARTBEAT_TOKEN}            # Uptime Kuma token for heartbeat (required)
+    # url: http://custom-kuma:3001/api/push  # Optional: override global URL for heartbeat
 ```
+
+**URL Inheritance for Heartbeat:**
+The heartbeat service uses the following logic to determine the Uptime Kuma URL:
+1. If `heartbeat.uptime_kuma.url` is set, use it
+2. Otherwise, inherit from global `uptime_kuma.url`
+3. If neither is set, heartbeat will be skipped with a warning
+
+The `heartbeat.uptime_kuma.token` is required for heartbeat to function. If missing, heartbeat will be skipped with a warning.
 
 **Tag-Based Result Aggregation:**
 ```yaml
 tags:
   network:
-    token: ${NETWORK_AGGREGATION_TOKEN}  # Token for aggregated network check results
+    uptime_kuma:
+      token: ${NETWORK_AGGREGATION_TOKEN}  # Token for aggregated network results
+      # url: http://uptimekuma:3001/api/push  # Optional: override global url
     description: "Aggregated status for all network checks"
   
   backup:
-    token: ${BACKUP_AGGREGATION_TOKEN}
+    uptime_kuma:
+      token: ${BACKUP_AGGREGATION_TOKEN}
+      # Can override url for different Uptime Kuma instance
+      url: "http://secondary-uptimekuma:3001/api/push"
     description: "Aggregated status for all backup checks"
 ```
 
@@ -109,21 +124,28 @@ tags:
 When checks are executed, results are automatically aggregated by tag. Each check sends TWO reports:
 
 1. **Individual Result**: Sent to the check's own Uptime Kuma token (if configured)
-2. **Aggregated Result**: Sent to the tag's aggregation token (in addition to individual report)
+2. **Aggregated Result**: Sent to the tag's aggregation config (in addition to individual report)
 
-**Token Priority for Individual Results:**
-1. Check-level `uptime_kuma.token` (if configured on the check itself)
-2. Global `uptime_kuma.token` (if configured at the top level)
+**Config Priority for Tag Aggregation:**
+1. Tag-level `uptime_kuma` config (if configured on the tag itself)
+2. Global `uptime_kuma` config (if configured at the top level)
 3. No report sent (if neither is configured)
 
-This means checks can have NO explicit token configured and still send results to the global token, which will also be aggregated by tag.
+**Partial Override Support for Tags:**
+Both `url` and `token` in the tag-level `uptime_kuma` config can be overridden independently:
+- If a tag specifies only `token`, the `url` is inherited from global config
+- If a tag specifies only `url`, the `token` is inherited from global config
+- If a tag specifies both, both are used for that tag (complete override to different instance)
+- If a tag specifies neither, both are inherited from global config
+
+This means tags can route aggregated results flexibly without repeating the full configuration.
 
 **Aggregation Logic:**
 - **Status**: "down" if ANY check in the tag is "down", otherwise "up"
 - **Message**: Combined summary of all checks in the tag with their individual statuses
 - **Duration**: Sum of all check durations in the tag (milliseconds)
 
-**Example Flow - Dual Reporting:**
+**Example Flow - Dual Reporting with Partial Overrides:**
 ```bash
 # Configuration
 uptime_kuma:
@@ -132,33 +154,52 @@ uptime_kuma:
 
 tags:
   network:
-    token: NETWORK_AGGREGATION_TOKEN
+    uptime_kuma:
+      token: NETWORK_AGGREGATION_TOKEN   # Aggregated results use global url
+  
+  backup:
+    uptime_kuma:
+      url: "http://secondary-uptimekuma:3001/api/push"  # Override url for this tag
+      token: BACKUP_SECONDARY_TOKEN      # Both override for backup aggregation
 
 checks:
   - name: internet-check
     type: cmdcheck
     command: "curl -f https://example.com"
     tags: [network]
-    # No check-level token, will use global token
+    # No check-level uptime_kuma config, will use global token and url
 
   - name: lan-ports
     type: portscan
     targets: "192.168.1.0/24"
     tags: [network]
     uptime_kuma:
-      token: PORTSCAN_CUSTOM_TOKEN   # Specific token for this check
+      token: PORTSCAN_CUSTOM_TOKEN   # Override only token, url from global
+
+  - name: remote-check
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    tags: [network, backup]
+    uptime_kuma:
+      url: "http://secondary-uptimekuma:3001/api/push"
+      token: "SECONDARY_CUSTOM_TOKEN"  # Override both url and token
 
 # Results sent to:
 # 1. internet-check result:
-#    - DEFAULT_GLOBAL_TOKEN (individual result)
-#    - NETWORK_AGGREGATION_TOKEN (as part of aggregated "network" tag)
+#    - DEFAULT_GLOBAL_TOKEN @ http://uptimekuma:3001/api/push (individual result)
+#    - network tag aggregation: NETWORK_AGGREGATION_TOKEN @ http://uptimekuma:3001/api/push
+#    - backup tag aggregation: BACKUP_SECONDARY_TOKEN @ http://secondary-uptimekuma:3001/api/push
 #
 # 2. lan-ports result:
-#    - PORTSCAN_CUSTOM_TOKEN (individual result, overrides global)
+#    - PORTSCAN_CUSTOM_TOKEN @ http://uptimekuma:3001/api/push (individual result, token override only)
+#    - network tag aggregation: NETWORK_AGGREGATION_TOKEN @ http://uptimekuma:3001/api/push
+#
+# 3. remote-check result:
+#    - SECONDARY_CUSTOM_TOKEN @ http://secondary-uptimekuma:3001/api/push (both overridden)
 #    - NETWORK_AGGREGATION_TOKEN (as part of aggregated "network" tag)
 #
-# 3. Aggregated "network" tag result:
-#    - NETWORK_AGGREGATION_TOKEN (combined status for both checks)
+# 4. Aggregated "network" tag result:
+#    - NETWORK_AGGREGATION_TOKEN @ http://uptimekuma:3001/api/push (all three checks aggregated)
 ```
 
 **Important Notes:**
@@ -1896,7 +1937,8 @@ uptime_kuma:
 
 heartbeat:
   enabled: true
-  token: ${MY_HEARTBEAT_TOKEN}    # Any variable name you choose
+  uptime_kuma:
+    token: ${MY_HEARTBEAT_TOKEN}    # Any variable name you choose
 
 ssh:
   key_file: ${SSH_KEY_PATH}       # Paths support expansion too
@@ -1922,36 +1964,37 @@ uptime_kuma:
 heartbeat:
   enabled: true
   interval: 300
-
-checks:
-  - name: heartbeat-check
-    type: cmdcheck
-    command: "echo heartbeat"
+  uptime_kuma:
     token: ${HEARTBEAT_TOKEN}
 
+checks:
   - name: nginx-check
     type: cmdcheck
     command: "systemctl is-active nginx"
-    token: ${CMDCHECK_TOKEN}
+    uptime_kuma:
+      token: ${CMDCHECK_TOKEN}
 
   - name: network-scan
     type: portscan
     ports: 80,443,22
     ip_ranges:
       - 192.168.1.0/24
-    token: ${PORTSCAN_TOKEN}
+    uptime_kuma:
+      token: ${PORTSCAN_TOKEN}
 
   - name: backup-check
     type: kopiasnapshotstatus
     paths:
       - /data/backups
-    token: ${KOPIASNAPSHOTSTATUS_TOKEN}
+    uptime_kuma:
+      token: ${KOPIASNAPSHOTSTATUS_TOKEN}
 
   - name: pool-check
     type: zfspoolstatus
     pools:
       - name: tank
-    token: ${ZFSPOOLSTATUS_TOKEN}
+    uptime_kuma:
+      token: ${ZFSPOOLSTATUS_TOKEN}
 ```
 
 ### Environment Variable Expansion in YAML

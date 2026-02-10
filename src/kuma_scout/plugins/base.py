@@ -148,8 +148,9 @@ class Plugin(ABC):
 
     def _initialize_heartbeat(self) -> None:
         """Initialize heartbeat service if configured."""
+        from kuma_scout.cli.config_merger import ConfigMerger
+
         heartbeat_config = self.global_config.heartbeat
-        uptime_config = self.global_config.uptime_kuma
 
         if not heartbeat_config.enabled:
             self.output_handler.debug(
@@ -157,14 +158,17 @@ class Plugin(ABC):
             )
             return
 
-        if not heartbeat_config.token:
+        # Get merged URL and token from heartbeat + global config
+        url, token = ConfigMerger.merge_heartbeat_uptime_kuma_config(self.global_config)
+
+        if not token:
             self.output_handler.warning(
                 "Heartbeat enabled but token missing - check will run without heartbeat notifications",
                 echo=False,
             )
             return
 
-        if not uptime_config or not uptime_config.url:
+        if not url:
             self.output_handler.warning(
                 "Heartbeat enabled but Uptime Kuma URL missing - check will run without heartbeat notifications",
                 echo=False,
@@ -173,8 +177,8 @@ class Plugin(ABC):
 
         self.heartbeat = HeartbeatService(
             self.output_handler,
-            str(uptime_config.url),
-            str(heartbeat_config.token),
+            str(url),
+            str(token),
             heartbeat_config.interval,
             check_name=self.name,
         )

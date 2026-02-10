@@ -44,23 +44,33 @@ heartbeat:
   enabled: true
   # Interval in seconds between heartbeat pings (default: 300)
   interval: 300
-  # Uptime Kuma token for heartbeat monitor
-  token: "${HEARTBEAT_TOKEN}"
+  # Uptime Kuma configuration for heartbeat (url inherits from global if not set)
+  uptime_kuma:
+    # Token is required for heartbeat to work
+    token: "${HEARTBEAT_TOKEN}"
+    # URL is optional - if not set, heartbeat uses the global uptime_kuma.url
+    # Uncomment to override the global URL for heartbeat only:
+    # url: "http://alternative-heartbeat-kuma:3001/api/push"
 
 # === TAG-BASED RESULT AGGREGATION ===
-# Configure tokens for aggregated check results by tag
-# When running with --tag flags, aggregated results are sent to these tokens
+# Configure uptime_kuma for aggregated check results by tag
+# When running with --tag flags, aggregated results are sent to these configurations
 # Individual check results still go to their specific tokens
 tags:
   services:
-    token: "${TAG_SERVICES_TOKEN}"
+    uptime_kuma:
+      token: "${TAG_SERVICES_TOKEN}"
     description: "Aggregated status for all service checks"
   web:
-    token: "${TAG_WEB_TOKEN}"
+    uptime_kuma:
+      token: "${TAG_WEB_TOKEN}"
     description: "Aggregated status for web service checks"
   backup:
-    token: "${TAG_BACKUP_TOKEN}"
-    description: "Aggregated status for backup checks"
+    # Example with URL override for secondary Uptime Kuma instance
+    uptime_kuma:
+      url: "http://secondary-uptimekuma:3001/api/push"
+      token: "${TAG_BACKUP_SECONDARY_TOKEN}"
+    description: "Aggregated status for backup checks sent to secondary instance"
 
 # === CHECKS ===
 # List of monitoring checks to execute
@@ -73,6 +83,7 @@ checks:
     timeout: 10
     tags: [services, web]
     uptime_kuma:
+      # Override token for this check only (url comes from global config)
       token: "${WEB_TOKEN}"
 
   - name: nginx_errors
@@ -80,6 +91,7 @@ checks:
     command: "grep -i error /var/log/nginx/error.log"
     timeout: 10
     tags: [services, web, logs]
+    # No check-level token, will use global token
 
   - name: app_pid_file
     type: cmdcheck
@@ -95,6 +107,7 @@ checks:
     timeout: 10
     tags: [services, database, critical]
     uptime_kuma:
+      # Override token for this check only
       token: "${POSTGRESQL_TOKEN}"
 
   - name: local_web_server
@@ -104,6 +117,7 @@ checks:
     timeout: 10
     tags: [services, web]
     uptime_kuma:
+      # Override token for this check only
       token: "${WEB_TOKEN}"
 
   - name: local_database
@@ -113,6 +127,7 @@ checks:
     timeout: 15
     tags: [services, database, critical]
     uptime_kuma:
+      # Override token for this check only
       token: "${DB_TOKEN}"
 
   # === REMOTE SERVICE CHECKS ===
@@ -125,6 +140,7 @@ checks:
     ssh:
       host: web-server.prod.example.com
     uptime_kuma:
+      # Override token for this check (url still from global)
       token: "${REMOTE_WEB_TOKEN}"
 
   - name: remote_database
@@ -137,7 +153,9 @@ checks:
       host: db-server.prod.example.com
       key_file: /etc/kuma-scout/prod_db_key
     uptime_kuma:
-      token: "${REMOTE_DB_TOKEN}"
+      # Override both URL and token for this check
+      url: "http://secondary-uptimekuma:3001/api/push"
+      token: "${SECONDARY_UPTIMEKUMA_TOKEN}"
 
   # === BACKUP CHECKS ===
   - name: backup_integrity

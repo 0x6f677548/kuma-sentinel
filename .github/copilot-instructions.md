@@ -116,6 +116,8 @@ All plugins support `--ssh user@host` for remote execution. SSH settings configu
   - if you find code that has ignored errors from code quality tools, try to fix the underlying issue instead of adding more ignores
   - never, ever, use solutions like ' # type: ignore[return]' or similar unless explicitly instructed
 - never use relative imports
+- imports should always be added at module level, never inside functions or classes, if possible. If you need to import something inside a function or class, it should be because of an import cycle, in which case you should try to refactor the code to avoid the import cycle instead of adding imports inside functions or classes
+- make sure to sort imports with isort, you can use hatch run lint --fix to do it automatically
 ## security
 - always use DataSanitizer to sanitize any output sent to Uptime Kuma
 ## documentation

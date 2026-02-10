@@ -43,7 +43,6 @@ class KopiaSnapshotPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message="No snapshot path configured",
-                duration_seconds=0,  # Will be set by decorator
                 details={"error": "no_path"},
             )
 
@@ -59,7 +58,6 @@ class KopiaSnapshotPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Invalid snapshot path: {str(e)}",
-                duration_seconds=0,  # Will be set by decorator
                 details={"error": str(e), "path": config.path},
             )
 
@@ -80,7 +78,6 @@ class KopiaSnapshotPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Failed to get snapshot info for {config.path}",
-                duration_seconds=0,  # Will be set by decorator
                 details={"error": "failed_to_get_info", "path": config.path},
             )
 
@@ -94,7 +91,6 @@ class KopiaSnapshotPlugin(Plugin):
                 check_name=config.name,
                 status="up",
                 message=f"Snapshot is fresh ({age_hours:.1f}h old)",
-                duration_seconds=0,  # Will be set by decorator
                 details={
                     "age_hours": age_hours,
                     "max_age_hours": config.max_age_hours,
@@ -110,7 +106,6 @@ class KopiaSnapshotPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Snapshot is too old ({age_hours:.1f}h > {config.max_age_hours}h)",
-                duration_seconds=0,  # Will be set by decorator
                 details={
                     "age_hours": age_hours,
                     "max_age_hours": config.max_age_hours,

@@ -21,7 +21,7 @@ class CheckResult:
     check_name: str
     status: str
     message: str
-    duration_seconds: int
+    duration_seconds: float = 0.0
     details: Dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     plugin_type: str = ""

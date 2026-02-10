@@ -92,7 +92,6 @@ class MyCheckPlugin(Plugin):
             check_name=config.name,
             status="up" if is_up else "down",
             message="Check passed" if is_up else "Check failed",
-            duration_seconds=0,  # Will be set by decorator
         )
 
     def _check_target(self, target: str) -> bool:

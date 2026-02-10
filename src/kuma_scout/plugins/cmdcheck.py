@@ -90,7 +90,6 @@ class CmdCheckPlugin(Plugin):
             check_name=config.name,
             status="up" if is_success else "down",
             message=message,
-            duration_seconds=0,  # Will be set by decorator
             details={"exit_code": exit_code, "stdout": stdout, "stderr": stderr},
         )
 

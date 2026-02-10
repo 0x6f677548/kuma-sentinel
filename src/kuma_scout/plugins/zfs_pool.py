@@ -44,7 +44,6 @@ class ZfsPoolPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message="No ZFS pool configured",
-                duration_seconds=0,  # Will be set by decorator
                 details={"error": "no_pool"},
             )
 
@@ -63,7 +62,6 @@ class ZfsPoolPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Failed to get status for pool '{config.pool}'",
-                duration_seconds=0,  # Will be set by decorator
                 details={"error": "status_unavailable", "pool": config.pool},
             )
 
@@ -77,7 +75,6 @@ class ZfsPoolPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Pool '{config.pool}' is not healthy (status: {health})",
-                duration_seconds=0,  # Will be set by decorator
                 details={
                     "health": health,
                     "free_percent": free_percent,
@@ -95,7 +92,6 @@ class ZfsPoolPlugin(Plugin):
                 check_name=config.name,
                 status="down",
                 message=f"Pool '{config.pool}' low on space ({free_percent:.1f}% free < {config.min_free_percent}%)",
-                duration_seconds=0,  # Will be set by decorator
                 details={
                     "health": health,
                     "free_percent": free_percent,
@@ -112,7 +108,6 @@ class ZfsPoolPlugin(Plugin):
                 check_name=config.name,
                 status="up",
                 message=f"Pool '{config.pool}' is healthy ({free_percent:.1f}% free)",
-                duration_seconds=0,  # Will be set by decorator
                 details={
                     "health": health,
                     "free_percent": free_percent,

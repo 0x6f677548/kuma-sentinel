@@ -82,7 +82,6 @@ class PortscanPlugin(Plugin):
                         check_name=config.name,
                         status="down",
                         message=f"Open ports found: {open_ports_str}",
-                        duration_seconds=0,  # Will be set by decorator
                         details={"open_hosts": hosts_with_ports},
                     )
                 else:
@@ -93,7 +92,7 @@ class PortscanPlugin(Plugin):
                         check_name=config.name,
                         status="up",
                         message="No open ports found",
-                        duration_seconds=0,  # Will be set by decorator
+                        details={"open_hosts": []},
                     )
             else:
                 error_msg = stderr.strip() if stderr else f"Exit code: {exit_code}"
@@ -104,7 +103,6 @@ class PortscanPlugin(Plugin):
                     check_name=config.name,
                     status="down",
                     message=f"Port scan execution failed: {error_msg}",
-                    duration_seconds=0,  # Will be set by decorator
                     details={"error": error_msg},
                 )
         finally:

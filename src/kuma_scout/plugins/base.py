@@ -48,9 +48,12 @@ def execute_with_timing(func):
 
         try:
             # Call the actual execute logic
-            return func(self, config)
+            result = func(self, config)
+            # Set the measured duration on the result
+            result.duration_seconds = time.time() - start_time
+            return result
         except Exception as e:
-            duration = int(time.time() - start_time)
+            duration = time.time() - start_time
             sanitized_error = DataSanitizer.sanitize_error_message(e)
             context = get_execution_context()
 

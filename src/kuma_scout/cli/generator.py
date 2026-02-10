@@ -639,14 +639,6 @@ class CLIGenerator:
                 "--ignore-file-permissions",
                 help="Ignore file permission checks on config file",
             ),
-            quiet: bool = typer.Option(
-                False, "--quiet", help="Suppress all console output"
-            ),
-            verbose: bool = typer.Option(
-                False,
-                "--verbose",
-                help="Enable verbose logging to console (DEBUG level)",
-            ),
             # Global options
             uptime_kuma_url: Optional[str] = typer.Option(
                 None,
@@ -692,6 +684,14 @@ class CLIGenerator:
             ),
             log_file: Optional[str] = typer.Option(
                 None, "--log-file", help="Log file path (overrides config)"
+            ),
+            quiet: bool = typer.Option(
+                False, "--quiet", help="Suppress all console output"
+            ),
+            verbose: bool = typer.Option(
+                False,
+                "--verbose",
+                help="Enable verbose logging to console (DEBUG level)",
             ),
         ) -> None:
             """Run checks from a configuration file."""
@@ -873,6 +873,14 @@ class CLIGenerator:
             log_file: Optional[str] = typer.Option(
                 "/var/log/kuma-scout.log", "--log-file", help="Log file path"
             ),
+            quiet: bool = typer.Option(
+                False, "--quiet", help="Suppress all console output"
+            ),
+            verbose: bool = typer.Option(
+                False,
+                "--verbose",
+                help="Enable verbose logging to console (DEBUG level)",
+            ),
             name: Optional[str] = typer.Option(
                 None, "--name", help="Check name (default: cli-check-<timestamp>)"
             ),
@@ -906,6 +914,8 @@ class CLIGenerator:
                 ssh_no_strict_host_key_checking,
                 retry_attempts,
                 retry_delay_seconds,
+                quiet,
+                verbose,
                 kwargs,
             )
 
@@ -934,20 +944,25 @@ class CLIGenerator:
         ssh_no_strict_host_key_checking: bool,
         retry_attempts: Optional[int],
         retry_delay_seconds: Optional[int],
-        kwargs: dict,
+        quiet: bool = False,
+        verbose: bool = False,
+        kwargs: dict = None,
     ) -> None:
         """Execute a single check with the provided parameters."""
+        if kwargs is None:
+            kwargs = {}
+
         # Initialize default logging first
         setup_default_logging()
 
         # Setup logging based on options
-        setup_logging(log_file, log_level)
+        setup_logging(log_file, log_level, verbose=verbose)
 
         # Create output handler for unified logging and echoing
-        output_handler = OutputHandler(Console())
+        output_handler = OutputHandler(Console(), quiet=quiet)
 
         # Create global config
-        global_config = GlobalConfig()
+        global_config = GlobalConfig(quiet=quiet, verbose=verbose)
 
         # Apply command-line overrides
         self._apply_command_line_overrides(
@@ -958,6 +973,8 @@ class CLIGenerator:
             timeout,
             log_file,
             log_level,
+            quiet,
+            verbose,
         )
 
         # Setup SSH configuration

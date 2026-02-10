@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+import kuma_scout
 from kuma_scout.cli.config_merger import ConfigMerger
 from kuma_scout.core.config_loader import load_config
 from kuma_scout.core.execution_context import execution_context_manager
@@ -89,6 +90,9 @@ class CLIGenerator:
 
         # Create output handler for unified logging and echoing
         output_handler = OutputHandler(Console(), quiet=quiet)
+
+        # Log program version
+        output_handler.info(f"Kuma Scout v{kuma_scout.__version__} starting", echo=True)
 
         # Load config with global options
         try:
@@ -960,6 +964,9 @@ class CLIGenerator:
 
         # Create output handler for unified logging and echoing
         output_handler = OutputHandler(Console(), quiet=quiet)
+
+        # Log program version
+        output_handler.info(f"Kuma Scout v{kuma_scout.__version__} starting", echo=True)
 
         # Create global config
         global_config = GlobalConfig(quiet=quiet, verbose=verbose)

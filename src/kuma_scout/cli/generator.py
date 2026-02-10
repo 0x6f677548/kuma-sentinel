@@ -2,7 +2,7 @@
 
 import inspect
 import os
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -946,7 +946,7 @@ class CLIGenerator:
         retry_delay_seconds: Optional[int],
         quiet: bool = False,
         verbose: bool = False,
-        kwargs: dict = None,
+        kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Execute a single check with the provided parameters."""
         if kwargs is None:

@@ -1,5 +1,6 @@
 """Tests for CLI generator critical methods."""
 
+from typing import Dict, List
 from unittest.mock import Mock, patch
 
 import pytest
@@ -696,8 +697,8 @@ class TestProcessResults:
     def test_process_results_no_results_by_tag(self, generator, global_config):
         """Test processing when there are no results by tag."""
         mock_output_handler = Mock()
-        results_by_tag = {}
-        all_results = [
+        results_by_tag: Dict[str, List[CheckResult]] = {}
+        all_results: List[CheckResult] = [
             CheckResult(
                 check_name="nginx-check",
                 status="up",
@@ -719,8 +720,8 @@ class TestProcessResults:
     def test_process_results_no_all_results(self, generator, global_config):
         """Test processing when there are no results at all."""
         mock_output_handler = Mock()
-        results_by_tag = {"web": []}
-        all_results = []
+        results_by_tag: Dict[str, List[CheckResult]] = {"web": []}
+        all_results: List[CheckResult] = []
 
         with patch.object(generator, "_send_aggregated_results") as mock_send:
             generator._process_results_and_report(

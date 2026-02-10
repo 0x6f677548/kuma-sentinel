@@ -83,7 +83,6 @@ def setup_default_logging():
     logger.handlers.clear()
 
     # Add handlers
-    # _add_console_handler(logger)  # Removed: console logging now handled by OutputHandler
     _add_syslog_handler(logger, silent=True)
 
     return logger

@@ -85,9 +85,6 @@ class CLIGenerator:
         # Initialize default logging first
         setup_default_logging()
 
-        # Setup logging based on options (do this early so logger is available for errors)
-        setup_logging(log_file, log_level)
-
         # Create output handler for unified logging and echoing
         output_handler = OutputHandler(Console())
 
@@ -110,6 +107,9 @@ class CLIGenerator:
             log_file,
             log_level,
         )
+
+        # Update logging configuration with final config values
+        setup_logging(global_config.logging.file, global_config.logging.level)
 
         # Setup SSH configuration
         self._setup_ssh_config(

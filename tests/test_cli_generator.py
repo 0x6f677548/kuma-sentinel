@@ -407,7 +407,7 @@ class TestSetupRunCommand:
             )
 
             mock_setup_default.assert_called_once()
-            mock_setup_logging.assert_called_once_with(None, None)
+            mock_setup_logging.assert_called_once_with(None, "INFO")
             mock_load_config.assert_called_once_with(
                 "test.yaml", ignore_file_permissions=False
             )
@@ -483,7 +483,7 @@ class TestSetupRunCommand:
             )
 
             mock_setup_default.assert_called_once()
-            mock_setup_logging.assert_called_once_with(None, None)
+            mock_setup_logging.assert_called_once_with(None, "INFO")
             mock_load_config.assert_called_once_with(
                 "test.yaml", ignore_file_permissions=False
             )

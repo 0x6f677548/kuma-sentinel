@@ -3,6 +3,7 @@
 import pytest
 
 from kuma_scout.core.models import CheckResult
+from kuma_scout.plugins.models import GlobalConfig
 
 
 class TestCheckResult:
@@ -134,3 +135,38 @@ class TestCheckResult:
 
         assert len(result.details["hosts"]) == 2
         assert result.details["summary"]["responsive"] == 2
+
+
+class TestGlobalConfig:
+    """Test GlobalConfig model."""
+
+    def test_global_config_quiet_false_verbose_false(self):
+        """Test GlobalConfig with both quiet and verbose false (default)."""
+        config = GlobalConfig(quiet=False, verbose=False)
+        assert config.quiet is False
+        assert config.verbose is False
+
+    def test_global_config_quiet_true(self):
+        """Test GlobalConfig with quiet enabled."""
+        config = GlobalConfig(quiet=True, verbose=False)
+        assert config.quiet is True
+        assert config.verbose is False
+
+    def test_global_config_verbose_true(self):
+        """Test GlobalConfig with verbose enabled."""
+        config = GlobalConfig(quiet=False, verbose=True)
+        assert config.quiet is False
+        assert config.verbose is True
+
+    def test_global_config_quiet_and_verbose_raises_error(self):
+        """Test that setting both quiet and verbose to True raises ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            GlobalConfig(quiet=True, verbose=True)
+
+        assert "Cannot set both 'quiet' and 'verbose'" in str(exc_info.value)
+
+    def test_global_config_defaults(self):
+        """Test GlobalConfig defaults for quiet and verbose."""
+        config = GlobalConfig()
+        assert config.quiet is False
+        assert config.verbose is False

@@ -10,11 +10,13 @@ class TestHeartbeatService:
 
     def test_heartbeat_init_defaults(self):
         """Test HeartbeatService initialization with defaults."""
-        logger = Mock()
+        output_handler = Mock()
 
-        service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
+        service = HeartbeatService(
+            output_handler, "http://localhost/api/push", "test_token"
+        )
 
-        assert service.logger is logger
+        assert service.output_handler is output_handler
         assert service.uptime_kuma_url == "http://localhost/api/push"
         assert service.heartbeat_token == "test_token"
         assert service.interval == 300
@@ -23,10 +25,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_init_custom_values(self):
         """Test HeartbeatService initialization with custom values."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger,
+            output_handler,
             "http://kuma.example.com/api/push",
             "custom_token",
             interval=60,
@@ -38,10 +40,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_start_creates_thread(self):
         """Test start() creates and starts a daemon thread."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=300
+            output_handler, "http://localhost/api/push", "test_token", interval=300
         )
 
         with patch.object(service, "_ping_loop"):
@@ -52,10 +54,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_start_skip_negative_interval(self):
         """Test start() skips when interval <= 0."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=0
+            output_handler, "http://localhost/api/push", "test_token", interval=-1
         )
 
         service.start()
@@ -64,10 +66,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_start_skip_negative_interval_value(self):
         """Test start() skips when interval is negative."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=-1
+            output_handler, "http://localhost/api/push", "test_token", interval=0
         )
 
         service.start()
@@ -76,10 +78,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_stop_waits_for_thread(self):
         """Test stop() signals thread to stop and waits."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=100
+            output_handler, "http://localhost/api/push", "test_token", interval=100
         )
 
         # Create a mock thread
@@ -94,10 +96,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_stop_handles_none_thread(self):
         """Test stop() handles case when thread is None."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=100
+            output_handler, "http://localhost/api/push", "test_token", interval=100
         )
 
         service.thread = None
@@ -107,9 +109,13 @@ class TestHeartbeatService:
 
     def test_heartbeat_send_message_success(self):
         """Test send_message() sends push notification."""
+        output_handler = Mock()
         logger = Mock()
+        output_handler.logger = logger
 
-        service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
+        service = HeartbeatService(
+            output_handler, "http://localhost/api/push", "test_token"
+        )
 
         with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
             mock_send.return_value = True
@@ -121,9 +127,13 @@ class TestHeartbeatService:
 
     def test_heartbeat_send_message_failure(self):
         """Test send_message() handles push failure."""
+        output_handler = Mock()
         logger = Mock()
+        output_handler.logger = logger
 
-        service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
+        service = HeartbeatService(
+            output_handler, "http://localhost/api/push", "test_token"
+        )
 
         with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
             mock_send.return_value = False
@@ -134,10 +144,15 @@ class TestHeartbeatService:
 
     def test_heartbeat_send_message_uses_correct_parameters(self):
         """Test send_message() uses correct parameters."""
+        output_handler = Mock()
         logger = Mock()
+        output_handler.logger = logger
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", check_name="PortScan"
+            output_handler,
+            "http://localhost/api/push",
+            "test_token",
+            check_name="PortScan",
         )
 
         with patch("kuma_scout.core.heartbeat.send_push") as mock_send:
@@ -147,26 +162,27 @@ class TestHeartbeatService:
 
             # Verify send_push was called with correct parameters
             call_args = mock_send.call_args
-            assert call_args[0][0] is logger
-            assert call_args[0][1] == "http://localhost/api/push"
-            assert call_args[0][2] == "test_token"
-            assert call_args[0][3] == "Custom status"
+            assert call_args[0][0] == "http://localhost/api/push"
+            assert call_args[0][1] == "test_token"
+            assert call_args[0][2] == "Custom status"
             assert call_args[1]["command"] == "heartbeat"
 
     def test_heartbeat_stop_event_initial_state(self):
         """Test stop_event is initially not set."""
-        logger = Mock()
+        output_handler = Mock()
 
-        service = HeartbeatService(logger, "http://localhost/api/push", "test_token")
+        service = HeartbeatService(
+            output_handler, "http://localhost/api/push", "test_token"
+        )
 
         assert not service.stop_event.is_set()
 
     def test_heartbeat_multiple_start_calls(self):
         """Test calling start() multiple times creates new thread."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=100
+            output_handler, "http://localhost/api/push", "test_token", interval=100
         )
 
         with patch.object(service, "_ping_loop"):
@@ -181,10 +197,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_zero_interval_prevents_thread(self):
         """Test interval of 0 prevents thread creation."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=0
+            output_handler, "http://localhost/api/push", "test_token", interval=0
         )
 
         with patch.object(service, "_ping_loop"):
@@ -194,10 +210,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_ping_loop_basic_functionality(self):
         """Test _ping_loop basic functionality with mocked sleep."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger,
+            output_handler,
             "http://localhost/api/push",
             "test_token",
             interval=1,
@@ -222,10 +238,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_ping_loop_respects_stop_event(self):
         """Test _ping_loop stops when stop_event is set."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger, "http://localhost/api/push", "test_token", interval=100
+            output_handler, "http://localhost/api/push", "test_token", interval=100
         )
 
         service.stop_event.set()
@@ -237,10 +253,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_message_includes_check_name(self):
         """Test message includes check name."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger,
+            output_handler,
             "http://localhost/api/push",
             "test_token",
             interval=1,
@@ -268,10 +284,10 @@ class TestHeartbeatService:
 
     def test_heartbeat_ping_loop_sends_formatted_message(self):
         """Test _ping_loop sends formatted message with check name."""
-        logger = Mock()
+        output_handler = Mock()
 
         service = HeartbeatService(
-            logger,
+            output_handler,
             "http://localhost/api/push",
             "test_token",
             interval=1,

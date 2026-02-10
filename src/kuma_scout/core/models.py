@@ -14,13 +14,17 @@ class CheckResult:
         message: Human-readable message
         duration_seconds: How long the check took to execute
         details: Additional metadata for the check (optional)
+        tags: Tags associated with this check for aggregation (optional)
+        plugin_type: Type of plugin that generated this result (optional)
     """
 
     check_name: str
     status: str
     message: str
-    duration_seconds: int
+    duration_seconds: float = 0.0
     details: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    plugin_type: str = ""
 
     def __post_init__(self):
         """Validate status field."""

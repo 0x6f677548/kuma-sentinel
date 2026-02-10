@@ -1,14 +1,14 @@
 """Uptime Kuma API integration."""
 
-import urllib.error
 import urllib.parse
 import urllib.request
-from logging import Logger
 from typing import Optional
+
+from kuma_scout.core.logger import log_security_event
+from kuma_scout.core.output_handler import OutputHandler
 
 # Timeout constants for different push types
 PUSH_TIMEOUT_HEARTBEAT = 5
-PUSH_TIMEOUT_ALERT = 10
 
 
 def url_encode(msg: str) -> str:
@@ -17,7 +17,6 @@ def url_encode(msg: str) -> str:
 
 
 def send_push(
-    logger: Logger,
     uptime_kuma_url: Optional[str],
     push_token: Optional[str],
     message: str,
@@ -25,11 +24,11 @@ def send_push(
     status: str = "up",
     timeout: int = PUSH_TIMEOUT_HEARTBEAT,
     ping_ms: Optional[int] = None,
+    output_handler: Optional[OutputHandler] = None,
 ) -> bool:
     """Send a generic push notification to Uptime Kuma.
 
     Args:
-        logger: Logger instance
         uptime_kuma_url: Base URL for Uptime Kuma API
         push_token: Push token for the monitor
         message: Notification message
@@ -41,15 +40,22 @@ def send_push(
     Returns:
         True if successful, False otherwise
     """
+    if output_handler is None:
+        output_handler = OutputHandler()
+
     # Validate required parameters
     if not uptime_kuma_url:
-        logger.warning(
-            f"⚠️  Cannot send {command} push: Uptime Kuma URL not configured"
+        output_handler.warning(
+            f"Cannot send {command} push: Uptime Kuma URL not configured", echo=True
         )
         return False
 
     if not push_token:
-        logger.warning(f"⚠️  Cannot send {command} push: push token not configured")
+        log_security_event(
+            "uptime_kuma_token_missing",
+            f"Push token not configured for {command} - cannot send status updates to Uptime Kuma",
+            level="warning",
+        )
         return False
 
     try:
@@ -63,11 +69,24 @@ def send_push(
         with urllib.request.urlopen(push_url, timeout=timeout) as response:
             data = response.read().decode()
             if '{"ok":true}' in data:
-                logger.info(f"✅ {command} push sent ({status}): {message}")
+                output_handler.info(
+                    f"{command} push sent ({status}): {message}", echo=False
+                )
                 return True
             else:
-                logger.error(f"❌ {command} push failed: {data}")
+                # Check for authentication errors
+                if (
+                    "unauthorized" in data.lower()
+                    or "forbidden" in data.lower()
+                    or "invalid token" in data.lower()
+                ):
+                    log_security_event(
+                        "uptime_kuma_authentication_failed",
+                        f"Uptime Kuma API authentication failed for {command} - check push token validity",
+                        level="error",
+                    )
+                output_handler.error(f"{command} push failed: {data}", echo=True)
                 return False
     except Exception as e:
-        logger.error(f"❌ {command} push failed: {str(e)}")
+        output_handler.warning(f"{command} push failed: {str(e)}", echo=True)
         return False

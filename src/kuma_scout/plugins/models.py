@@ -1,0 +1,118 @@
+"""
+Shared Pydantic models for Kuma-Scout configuration.
+
+These models define the structure for global configuration and shared components
+used across all plugins.
+"""
+
+from typing import Optional
+
+from pydantic import BaseModel, Field, model_validator
+
+
+class SSHConfig(BaseModel):
+    """SSH connection configuration."""
+
+    host: str = Field(description="SSH host (user@host or host)")
+    user: Optional[str] = Field(default=None, description="SSH username")
+    port: Optional[int] = Field(default=None, description="SSH port")
+    key_file: Optional[str] = Field(default=None, description="Path to SSH private key")
+    password: Optional[str] = Field(
+        default=None, description="SSH password (discouraged)"
+    )
+    strict_host_key_checking: bool = Field(default=True, description="Verify host keys")
+
+
+class UptimeKumaConfig(BaseModel):
+    """Uptime Kuma configuration."""
+
+    url: Optional[str] = Field(
+        default=None,
+        description="Uptime Kuma push API URL (can be overridden per check)",
+    )
+    token: Optional[str] = Field(
+        default=None, description="Uptime Kuma push token (can be overridden per check)"
+    )
+
+
+class LoggingConfig(BaseModel):
+    """Logging configuration."""
+
+    level: str = Field(default="INFO", description="Logging level")
+    file: Optional[str] = Field(default=None, description="Log file path")
+
+
+class RetryConfig(BaseModel):
+    """Retry configuration."""
+
+    attempts: int = Field(
+        default=0, ge=0, le=10, description="Number of retry attempts on failure"
+    )
+    delay_seconds: int = Field(
+        default=5, ge=0, le=300, description="Delay between retry attempts (seconds)"
+    )
+
+
+class HeartbeatConfig(BaseModel):
+    """Heartbeat service configuration."""
+
+    enabled: bool = Field(default=True, description="Enable heartbeat pings")
+    interval: int = Field(
+        default=300, ge=1, description="Heartbeat interval in seconds"
+    )
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None,
+        description="Uptime Kuma config for heartbeat (url and token can be set, url inherits from global if not set)",
+    )
+
+
+class TagConfig(BaseModel):
+    """Tag-based result aggregation configuration."""
+
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None,
+        description="Uptime Kuma config for aggregated results (url and token can be overridden)",
+    )
+    description: Optional[str] = Field(
+        default=None, description="Description of what this tag monitors"
+    )
+
+
+class GlobalConfig(BaseModel):
+    """
+    Global configuration loaded from YAML.
+
+    These settings apply to all checks unless overridden.
+    """
+
+    uptime_kuma: Optional[UptimeKumaConfig] = Field(
+        default=None, description="Uptime Kuma settings"
+    )
+    logging: LoggingConfig = Field(
+        default_factory=lambda: LoggingConfig(), description="Logging settings"
+    )
+    ignore_file_permissions: bool = Field(
+        default=False, description="Skip permission checks"
+    )
+    ssh: Optional[SSHConfig] = Field(default=None, description="Default SSH settings")
+    heartbeat: HeartbeatConfig = Field(
+        default_factory=HeartbeatConfig, description="Heartbeat settings"
+    )
+    timeout: int = Field(default=300, description="Global timeout for checks (seconds)")
+    tags: dict[str, TagConfig] = Field(
+        default_factory=dict, description="Tag-based result aggregation configuration"
+    )
+    checks: list[dict] = Field(
+        default_factory=list, description="List of check configurations"
+    )
+    quiet: bool = Field(default=False, description="Suppress all console output")
+    verbose: bool = Field(
+        default=False, description="Enable verbose logging to console (DEBUG level)"
+    )
+
+    @model_validator(mode="after")
+    def validate_quiet_verbose_exclusive(self) -> "GlobalConfig":
+        """Ensure quiet and verbose are not both True."""
+        if self.quiet and self.verbose:
+            raise ValueError("Cannot set both 'quiet' and 'verbose' options")
+        return self

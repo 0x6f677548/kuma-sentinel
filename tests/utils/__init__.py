@@ -69,6 +69,20 @@ class TestDataSanitizer:
         assert "[REDACTED_DB_CONNECTION]" in result
         assert "mysql://user:password" not in result
 
+    def test_sanitize_ssh_connection_string_with_port(self):
+        """Test SSH connection string sanitization with port."""
+        text = "ssh://user:password@server.example.com:22 failed"
+        result = DataSanitizer.sanitize(text, sanitize_ssh_strings=True)
+        assert "ssh://[REDACTED]@server.example.com:22" in result
+        assert "user:password" not in result
+
+    def test_sanitize_ssh_connection_string_no_port(self):
+        """Test SSH connection string sanitization without port."""
+        text = "ssh://admin:secret@backup-server failed"
+        result = DataSanitizer.sanitize(text, sanitize_ssh_strings=True)
+        assert "ssh://[REDACTED]@backup-server" in result
+        assert "admin:secret" not in result
+
     def test_sanitize_postgresql_connection(self):
         """Test PostgreSQL connection string sanitization."""
         text = "Error: postgres://admin:secretpass@db.local:5432/prod"

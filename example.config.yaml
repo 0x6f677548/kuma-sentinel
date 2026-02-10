@@ -1,175 +1,281 @@
-# Kuma Scout Configuration (YAML)
+# Kuma Scout Configuration (New Format)
 # This is the main configuration file for kuma-scout monitoring agent
 
-logging:
-  # Log file path (default: /var/log/kuma-scout.log)
-  log_file: /var/log/kuma-scout.log
-  
-  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
-  log_level: INFO
-  
-  # Skip validation that config file has restricted permissions (0o600)
-  # Only set to true for development/testing in environments like Docker
-  # In production, always ensure config file has permissions 0o600
-  # Default: false (permissions are validated)
-  ignore_file_permissions: false
-
-# === SHARED CONFIGURATION ===
-# Settings used across all monitoring commands
+# === GLOBAL SETTINGS ===
+# These settings apply to all checks unless overridden per-check
 
 uptime_kuma:
-  # Uptime Kuma API base URL
+  # Uptime Kuma API base URL (required)
   url: http://uptimekuma:3001/api/push
+  # Global push token (can be overridden per-check)
+  token: "${UPTIME_KUMA_TOKEN}"
 
+logging:
+  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
+  level: INFO
+  # Log file path (default: stdout only)
+  file: /var/log/kuma-scout.log
+
+# Skip validation that config file has restricted permissions (0o600)
+# Only set to true for development/testing in environments like Docker
+# In production, always ensure config file has permissions 0o600
+# Default: false (permissions are validated)
+ignore_file_permissions: false
+
+# Global timeout for checks in seconds (default: 300)
+# Individual checks can override this with their own timeout setting
+timeout: 300
+
+# === GLOBAL SSH CONFIGURATION ===
+# Default SSH settings for remote execution (can be overridden per-check)
+ssh:
+  # SSH host (user@host or host)
+  host: backup-server.example.com
+  # Path to SSH private key (recommended over password)
+  key_file: /etc/kuma-scout/ssh_key
+  # SSH password (discouraged, use key_file instead)
+  # password: "${SSH_PASSWORD}"
+  # Verify SSH host keys (default: true, recommended for security)
+  strict_host_key_checking: true
+
+# === HEARTBEAT CONFIGURATION ===
 heartbeat:
   # Enable heartbeat pings during checks (default: true)
   enabled: true
-  
   # Interval in seconds between heartbeat pings (default: 300)
   interval: 300
-  
+  # Uptime Kuma configuration for heartbeat (url inherits from global if not set)
   uptime_kuma:
-    # Push token for heartbeat monitor
-    token: your_heartbeat_token_here
+    # Token is required for heartbeat to work
+    token: "${HEARTBEAT_TOKEN}"
+    # URL is optional - if not set, heartbeat uses the global uptime_kuma.url
+    # Uncomment to override the global URL for heartbeat only:
+    # url: "http://alternative-heartbeat-kuma:3001/api/push"
 
-# === COMMAND CHECK CONFIGURATION ===
-# Execute arbitrary shell commands and monitor the results
-# Commands are always stored as a list, even for single commands.
-# 
-# IMPORTANT SECURITY NOTE:
-# Commands are executed WITHOUT shell interpretation (shell=False) to prevent
-# command injection attacks. This means shell metacharacters are NOT evaluated.
-# See CONFIGURATION_GUIDE.md for supported command syntax and migration guide.
+# === TAG-BASED RESULT AGGREGATION ===
+# Configure uptime_kuma for aggregated check results by tag
+# When running with --tag flags, aggregated results are sent to these configurations
+# Individual check results still go to their specific tokens
+tags:
+  services:
+    uptime_kuma:
+      token: "${TAG_SERVICES_TOKEN}"
+    description: "Aggregated status for all service checks"
+  web:
+    uptime_kuma:
+      token: "${TAG_WEB_TOKEN}"
+    description: "Aggregated status for web service checks"
+  backup:
+    # Example with URL override for secondary Uptime Kuma instance
+    uptime_kuma:
+      url: "http://secondary-uptimekuma:3001/api/push"
+      token: "${TAG_BACKUP_SECONDARY_TOKEN}"
+    description: "Aggregated status for backup checks sent to secondary instance"
 
-cmdcheck:
-  uptime_kuma:
-    # Push token for cmdcheck command
-    token: your_cmdcheck_token_here
-  
-  # Commands list (required) - always a list, even for single command
-  commands:
-    # ✅ SUPPORTED: Simple command with arguments
-    - command: "systemctl is-active nginx"
-      name: "nginx_status"
-      timeout: 10
-      expect_exit_code: 0
-      capture_output: true
-    
-    # ✅ SUPPORTED: Command with quoted arguments
-    - command: "grep -i error /var/log/nginx/error.log"
-      name: "nginx_errors"
-      timeout: 10
-    
-    # ✅ SUPPORTED: File existence test
-    - command: "test -f /var/run/app.pid"
-      name: "app_pid_file"
-      timeout: 5
-      expect_exit_code: 0
-    
-    # ✅ SUPPORTED: Pattern matching on output
-    # - command: "systemctl status nginx"
-    #   name: "nginx_detailed"
-    #   failure_pattern: "failed|error"
-    #   success_pattern: "active.*running"
-    #   timeout: 10
-    
-    # ❌ NOT SUPPORTED: Shell pipes, operators, substitution
-    # ❌ DON'T USE: "systemctl is-active nginx | grep active"
-    # ❌ DON'T USE: "systemctl is-active nginx && echo 'OK'"
-    # ❌ DON'T USE: "echo $(whoami)"
-    # See CONFIGURATION_GUIDE.md for how to handle complex commands
-  
-  # Default timeout for all commands in seconds (used if not specified per-command)
-  timeout: 30
-  
-  # Default expected exit code (used if not specified per-command)
-  expect_exit_code: 0
-  
-  # Default output capture (last 500 chars sent to Uptime Kuma)
-  capture_output: true
-  
-  # Automatically sanitize sensitive data from output (default: true)
-  # Masks passwords, API keys, tokens, emails, credit cards, DB strings
-  sanitize_output: true
-  
-  # Optional: Pattern matching for output (takes precedence over exit code)
-  # These are default patterns; can be overridden per-command
-  success_pattern: null
-  failure_pattern: null
-  
-  # Optional: Capture command output by default (default: true)
-  capture_output: true
+# === CHECKS ===
+# List of monitoring checks to execute
+checks:
+  # === SERVICE HEALTH CHECKS ===
+  - name: nginx_status
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    expect_exit_code: 0
+    timeout: 10
+    tags: [services, web]
+    uptime_kuma:
+      # Override token for this check only (url comes from global config)
+      token: "${WEB_TOKEN}"
 
-# === PORT SCAN COMMAND CONFIGURATION ===
+  - name: nginx_errors
+    type: cmdcheck
+    command: "grep -i error /var/log/nginx/error.log"
+    timeout: 10
+    tags: [services, web, logs]
+    # No check-level token, will use global token
 
-portscan:
-  uptime_kuma:
-    # Push token for port scan alert monitor
-    token: your_portscan_token_here
-  
-  nmap:
-    # Nmap timing level: T0-T5 (default: T3)
-    # T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane
-    timing: T5
-    
-    # Nmap scan timeout in seconds (default: 3600)
+  - name: app_pid_file
+    type: cmdcheck
+    command: "test -f /var/run/app.pid"
+    expect_exit_code: 0
+    timeout: 5
+    tags: [services, app]
+
+  - name: database_status
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    expect_exit_code: 0
+    timeout: 10
+    tags: [services, database, critical]
+    uptime_kuma:
+      # Override token for this check only
+      token: "${POSTGRESQL_TOKEN}"
+
+  - name: local_web_server
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    expect_exit_code: 0
+    timeout: 10
+    tags: [services, web]
+    uptime_kuma:
+      # Override token for this check only
+      token: "${WEB_TOKEN}"
+
+  - name: local_database
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    expect_exit_code: 0
+    timeout: 15
+    tags: [services, database, critical]
+    uptime_kuma:
+      # Override token for this check only
+      token: "${DB_TOKEN}"
+
+  # === REMOTE SERVICE CHECKS ===
+  - name: remote_web_server
+    type: cmdcheck
+    command: "systemctl is-active apache2"
+    expect_exit_code: 0
+    timeout: 10
+    tags: [services, web, remote]
+    ssh:
+      host: web-server.prod.example.com
+    uptime_kuma:
+      # Override token for this check (url still from global)
+      token: "${REMOTE_WEB_TOKEN}"
+
+  - name: remote_database
+    type: cmdcheck
+    command: "systemctl is-active mysql"
+    expect_exit_code: 0
+    timeout: 15
+    tags: [services, database, remote, critical]
+    ssh:
+      host: db-server.prod.example.com
+      key_file: /etc/kuma-scout/prod_db_key
+    uptime_kuma:
+      # Override both URL and token for this check
+      url: "http://secondary-uptimekuma:3001/api/push"
+      token: "${SECONDARY_UPTIMEKUMA_TOKEN}"
+
+  # === BACKUP CHECKS ===
+  - name: backup_integrity
+    type: cmdcheck
+    command: "test -f /backups/latest.tar.gz"
+    expect_exit_code: 0
+    timeout: 30
+    retry:
+      attempts: 3
+      delay_seconds: 5
+    tags: [backups, critical]
+    ssh:
+      host: backup@nas.prod.example.com:2222
+      key_file: /etc/kuma-scout/backup_key
+    uptime_kuma:
+      token: "${BACKUP_TOKEN}"
+
+  # === ROUTINE SYSTEM CHECKS ===
+  - name: log_directory_check
+    type: cmdcheck
+    command: "test -d /var/log"
+    expect_exit_code: 0
+    timeout: 5
+    tags: [system, logs]
+
+  - name: system_load
+    type: cmdcheck
+    command: "uptime"
+    timeout: 5
+    tags: [system, monitoring]
+
+  # === PATTERN MATCHING EXAMPLES ===
+  - name: nginx_detailed
+    type: cmdcheck
+    command: "systemctl status nginx"
+    success_pattern: "active.*running"
+    failure_pattern: "failed|error"
+    timeout: 10
+    tags: [services, web, detailed]
+  # === PORT SCAN CHECKS ===
+  - name: lan_ports
+    type: portscan
+    targets: ["192.168.100.110-199"]
+    ports: "1-1000"
     timeout: 3600
-    
-    # Additional nmap arguments as a list
-    arguments: []
-    
-    # Keep nmap XML output file (default: false)
-    keep_xml_output: false
-  
-  # Port range to scan (default: 1-1000)
-  ports: 1-1000
-  
-  # IPs/ranges to exclude from scan (as list)
-  # Example: ["192.168.1.1", "192.168.2.0/24"]
-  exclude: []
-  
-  # IP ranges to scan as a list
-  # Example: ["192.168.1.0/24", "10.0.0.0/8"]
-  ip_ranges:
-    - 192.168.100.110-199
+    timing: "T5"
+    tags: [network, security]
+    uptime_kuma:
+      token: "${PORTSCAN_TOKEN}"
+    ssh:
+      host: nas-server.local
 
-# === KOPIA SNAPSHOT COMMAND CONFIGURATION ===
+  - name: dmz_ports
+    type: portscan
+    targets: ["10.0.0.0/24"]
+    ports: "1-1000"
+    timeout: 3600
+    timing: "T3"
+    tags: [network, security, dmz]
+    uptime_kuma:
+      token: "${PORTSCAN_TOKEN}"
 
-kopiasnapshotstatus:
-  uptime_kuma:
-    # Push token for kopia snapshot status alerts
-    token: your_kopiasnapshotstatus_token_here
-  
-  # List of snapshots with per-path maximum age thresholds
-  # Format: each snapshot has 'path' and optional 'max_age_hours'
-  # If 'max_age_hours' is omitted, uses the default value below
-  snapshots:
-    - path: /data
-      max_age_hours: 24
-    - path: /backups
-      max_age_hours: 48
-  
-  # Global default maximum age in hours for snapshots (default: 24)
-  # Used for any snapshot path that doesn't specify max_age_hours
-  max_age_hours: 24
+  - name: internal_ports
+    type: portscan
+    targets: ["192.168.1.0/24"]
+    ports: "22,80,443,3389"
+    timeout: 1800
+    timing: "T3"
+    tags: [network, security, internal]
+    uptime_kuma:
+      token: "${PORTSCAN_TOKEN}"
 
-# === ZFS POOL STATUS COMMAND CONFIGURATION ===
-# Monitor ZFS pool health and free space
+  # === KOPIA SNAPSHOT CHECKS ===
+  - name: data_backup
+    type: kopiasnapshotstatus
+    path: "/data"
+    max_age_hours: 24
+    tags: [backups, data]
+    uptime_kuma:
+      token: "${KOPIA_TOKEN}"
+    ssh:
+      host: kopia-server.local
 
-zfspoolstatus:
-  uptime_kuma:
-    # Push token for ZFS pool status alerts
-    token: your_zfspoolstatus_token_here
-  
-  # List of pools to monitor
-  # Each pool can have its own free space threshold
-  pools:
-    - name: tank
-      free_space_percent_min: 10      # Alert if less than 10% free
-    - name: backup
-      free_space_percent_min: 20      # Alert if less than 20% free
-    # - name: archive                  # Will use global default
-  
-  # Global default minimum free space percentage (default: 10)
-  # Used for pools without explicit threshold
-  free_space_percent_default: 10
+  - name: archive_backup
+    type: kopiasnapshotstatus
+    path: "/backups"
+    max_age_hours: 48
+    tags: [backups, archive]
+    uptime_kuma:
+      token: "${KOPIA_TOKEN}"
+    ssh:
+      host: kopia-server.local
+
+  # === ZFS POOL CHECKS ===
+  - name: primary_pool
+    type: zfspoolstatus
+    pool: "tank"
+    min_free_percent: 10
+    tags: [storage, zfs, critical]
+    uptime_kuma:
+      token: "${ZFS_TOKEN}"
+    ssh:
+      host: zfs-server.local
+
+  - name: backup_pool
+    type: zfspoolstatus
+    pool: "backup"
+    min_free_percent: 20
+    tags: [storage, zfs, backups]
+    uptime_kuma:
+      token: "${ZFS_TOKEN}"
+    ssh:
+      host: zfs-server.local
+
+  - name: archive_pool
+    type: zfspoolstatus
+    pool: "archive"
+    min_free_percent: 5
+    tags: [storage, zfs, archive]
+    uptime_kuma:
+      token: "${ZFS_TOKEN}"
+    ssh:
+      host: zfs-server.local

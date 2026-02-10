@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kuma-scout"
-version = "0.1.0"
+version = "0.2.0"
 description = "Uptime Kuma monitoring agent for internal server monitoring. Execute custom checks, scan ports, monitor backups and storage—then report to Uptime Kuma via push API."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Hugo Batista", email = "mail@hugobatista.com" }
+    { name = "Hugo Batista", email = "code@hugobatista.com" }
 ]
 keywords = ["uptime-kuma-agent", "uptime-kuma", "monitoring-agent", "uptime-monitoring", "server-monitoring", "port-scanner", "network-monitoring", "system-monitoring", "nmap", "backup-monitoring"]
 classifiers = [
@@ -30,8 +30,10 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "click>=8.0.0",
+    "typer>=0.9.0",
+    "rich>=10.0.0",
     "pyyaml>=6.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +43,7 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "types-PyYAML>=6.0",
 ]
 
 [project.urls]
@@ -55,8 +58,16 @@ kuma-scout = "kuma_scout.cli.app:cli"
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuma_scout"]
 
-[tool.setuptools.package-data]
-kuma_scout = ["py.typed"]
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/doc",
+    "LICENSE",
+    "README.md",
+    "MANIFEST.in",
+]
+
+
 
 [tool.black]
 line-length = 88
@@ -102,6 +113,7 @@ select = [
 ]
 ignore = [
     "E501",  # line too long, handled by black
+    "B008",  # allow typer.Option in argument defaults (common pattern for CLI frameworks)
 ]
 
 [tool.ruff.lint.isort]
@@ -115,6 +127,8 @@ warn_redundant_casts = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+mypy_path = "src"
+exclude = ["test_venv", ".venv"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -129,6 +143,7 @@ dependencies = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "types-PyYAML>=6.0",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -139,5 +154,5 @@ format-check = "black --check src tests"
 check = [
     "ruff check src tests",
     "black --check src tests",
-    "mypy src tests",
+    "mypy src",
 ]

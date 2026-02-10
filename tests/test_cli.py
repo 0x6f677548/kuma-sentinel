@@ -1,6 +1,7 @@
 """Tests for CLI application."""
 
 import os
+import re
 import sys
 from io import StringIO
 from unittest.mock import Mock
@@ -23,6 +24,12 @@ from kuma_scout.plugins.models import (
 runner = CliRunner()
 
 
+def strip_ansi(text: str) -> str:
+    """Strip ANSI escape sequences from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
+
+
 def test_cli_version():
     """Test CLI version flag."""
     result = runner.invoke(app, ["--version"])
@@ -42,16 +49,17 @@ def test_subcommand_common_options():
     """Test that check subcommands have all common options available."""
     result = runner.invoke(app, ["portscan", "--help"])
     assert result.exit_code == 0
+    output = strip_ansi(result.output)
     # Check for common options that should appear in check subcommands
-    assert "--log-file" in result.output
-    assert "--log-level" in result.output
-    assert "--uptime-kuma-url" in result.output
-    assert "--token" in result.output
-    assert "--retry-attempts" in result.output
-    assert "--retry-delay-seconds" in result.output
+    assert "--log-file" in output
+    assert "--log-level" in output
+    assert "--uptime-kuma-url" in output
+    assert "--token" in output
+    assert "--retry-attempts" in output
+    assert "--retry-delay-seconds" in output
     # Check for plugin-specific options
-    assert "TAR" in result.output
-    assert "--ports" in result.output
+    assert "TAR" in output
+    assert "--ports" in output
 
 
 def test_apply_command_line_overrides_expands_tokens():

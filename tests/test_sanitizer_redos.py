@@ -4,8 +4,6 @@ import time
 
 from src.kuma_scout.core.utils.sanitizer import (
     DataSanitizer,
-    SanitizerMonitor,
-    get_sanitizer_monitor,
 )
 
 
@@ -56,13 +54,6 @@ class TestReDoSProtection:
         # Should have multiple redactions
         assert result.count("[REDACTED]") > 100
 
-    def test_circuit_breaker_timeout(self):
-        """Test circuit breaker activates on timeout."""
-        result = DataSanitizer.sanitize_with_circuit_breaker(
-            "normal input", max_processing_time=0.001
-        )
-        assert result == "normal input"
-
     def test_fallback_on_regex_failure(self):
         """Test fallback behavior when regex operations fail."""
         # Test with a pattern that might cause issues
@@ -81,33 +72,6 @@ class TestReDoSProtection:
 
         # Should not replace all occurrences due to MAX_REPLACEMENTS limit
         assert len(result) < len(input_str) * 2  # Should not grow excessively
-
-    def test_monitor_functionality(self):
-        """Test sanitizer monitor functionality."""
-        monitor = SanitizerMonitor()
-
-        # Record some sanitizations
-        monitor.record_sanitization(100, 0.05, True, False)  # Normal
-        monitor.record_sanitization(1000, 0.2, True, False)  # Slow
-        monitor.record_sanitization(500, 0.1, False, False)  # Failed
-        monitor.record_sanitization(200, 1.5, False, True)  # Timeout
-
-        stats = monitor.get_stats()
-
-        assert stats["total"] == 4
-        assert stats["failed"] == 1
-        assert stats["slow"] == 1
-        assert stats["timeouts"] == 1
-        assert stats["failure_rate"] == 0.25
-
-    def test_global_monitor_access(self):
-        """Test global monitor access."""
-        monitor = get_sanitizer_monitor()
-        assert isinstance(monitor, SanitizerMonitor)
-
-        # Should return the same instance
-        monitor2 = get_sanitizer_monitor()
-        assert monitor is monitor2
 
     def test_length_limits_in_patterns(self):
         """Test that length limits in patterns prevent excessive matching."""
@@ -199,44 +163,6 @@ class TestReDoSProtection:
             # Should return the fallback error message
             assert result == "[SANITIZATION_FAILED]"
 
-    def test_sanitize_with_circuit_breaker_slow_operation_logging(self):
-        """Test that slow operations are logged in circuit breaker."""
-        # Create input that will be slow to process (many replacements)
-        slow_input = " ".join([f"password=secret{i}" for i in range(50)])
-
-        result = DataSanitizer.sanitize_with_circuit_breaker(
-            slow_input, max_processing_time=10.0  # High timeout
-        )
-
-        # Should still work and return sanitized result
-        assert "[REDACTED]" in result
-        assert "password=" not in result
-
-    def test_sanitize_with_circuit_breaker_exception_handling(self):
-        """Test exception handling in sanitize_with_circuit_breaker."""
-        # Mock the sanitize method to raise an exception
-        import unittest.mock
-
-        with unittest.mock.patch.object(DataSanitizer, "sanitize") as mock_sanitize:
-            mock_sanitize.side_effect = RuntimeError("Mocked sanitize exception")
-
-            result = DataSanitizer.sanitize_with_circuit_breaker(
-                "password=secret", max_processing_time=1.0
-            )
-            # Should return fallback redaction (all non-space chars become *)
-            assert result == "*" * len("password=secret")
-
-    def test_sanitize_with_circuit_breaker_timeout_fallback(self):
-        """Test timeout fallback in sanitize_with_circuit_breaker."""
-        # Create a scenario that might timeout (though unlikely in test)
-        # We'll simulate by setting a very low timeout
-        result = DataSanitizer.sanitize_with_circuit_breaker(
-            "normal text", max_processing_time=0.000001  # Very low timeout
-        )
-
-        # Should either return normal result or timeout indicator
-        assert isinstance(result, str)
-
     def test_safe_sub_fallback_without_timeout(self):
         """Test _safe_sub fallback path when REGEX_TIMEOUT is None."""
         # Temporarily set REGEX_TIMEOUT to None to test fallback path
@@ -310,31 +236,3 @@ class TestReDoSProtection:
         assert "user:pass" not in result
         assert "host.com" in result
         assert ":2222" in result
-
-    def test_sanitize_with_circuit_breaker_empty_text(self):
-        """Test sanitize_with_circuit_breaker with empty/None text."""
-        result = DataSanitizer.sanitize_with_circuit_breaker(None)
-        assert result == ""
-
-        result = DataSanitizer.sanitize_with_circuit_breaker("")
-        assert result == ""
-
-    def test_sanitize_with_circuit_breaker_timeout_return(self):
-        """Test the timeout return path in sanitize_with_circuit_breaker."""
-        # Mock sanitize to raise an exception after taking longer than max_processing_time
-        import time
-        import unittest.mock
-
-        def slow_sanitize(*args, **kwargs):
-            time.sleep(0.01)  # Sleep for 10ms
-            raise RuntimeError("Mocked timeout")
-
-        with unittest.mock.patch.object(
-            DataSanitizer, "sanitize", side_effect=slow_sanitize
-        ):
-            result = DataSanitizer.sanitize_with_circuit_breaker(
-                "test", max_processing_time=0.005  # 5ms timeout
-            )
-
-            # Should return timeout since sanitize took longer than 5ms and raised exception
-            assert result == "[SANITIZATION_TIMEOUT]"

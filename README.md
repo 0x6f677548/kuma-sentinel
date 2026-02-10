@@ -1,96 +1,52 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/kuma-scout.svg)](https://pypi.org/project/kuma-scout)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kuma-scout.svg)](https://pypi.org/project/kuma-scout)
-[![Deploy to ghcr.io](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/ghcr.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/ghcr.yml)
-[![Deploy to PyPI](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/pypi.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/pypi.yml)
-[![Lint](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml)
+[![GitHub Tag](https://img.shields.io/github/v/tag/hugobatista/kuma-scout?logo=github&label=latest)](https://go.hugobatista.com/gh/kuma-scout/releases)
+[![GHCR Tag](https://img.shields.io/github/v/tag/hugobatista/kuma-scout?logo=docker&logoColor=white&label=GHCR)](https://go.hugobatista.com/gh/kuma-scout/packages)
 [![Test](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/test.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/test.yml)
-[![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/hugobatista/kuma-scout)](https://gitmcp.io/hugobatista/kuma-scout)
-
+[![Lint](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml/badge.svg)](https://go.hugobatista.com/gh/kuma-scout/actions/workflows/lint.yml)
 
 # Kuma-Scout 🧭
 
-**Uptime Kuma's agent-less monitoring with SSH remote execution.** Deploy locally or centrally—monitor servers, firewalls, switches, and appliances without installing agents.
+**Uptime Kuma's monitoring agent.** Execute custom checks locally or remotely via SSH and report results to Uptime Kuma's push API.
 
-**The flexible monitoring agent for Uptime Kuma.** Deploy on individual servers for traditional local checks, or use SSH to monitor your entire infrastructure from a central host. Scouts internal system conditions that Uptime Kuma cannot natively monitor.
+Monitor anything that can be checked with a shell command: system health, backups, storage, ports, network devices, and custom scripts. Deploy via cron, systemd timer, or Docker.
 
-While [Uptime Kuma](https://github.com/louislam/uptime-kuma) excels at external monitoring (HTTP, Ping, TCP), it lacks native agents for internal system states, processes, or custom checking scripts.
-
-**Kuma-Scout adapts to your deployment strategy.** A CLI utility that becomes a powerful system scout when deployed via cron, systemd, or Docker. Execute arbitrary commands, check backups, monitor storage, and scan ports—locally or remotely via SSH—all reported back to Uptime Kuma.
-
-**Scout ANY condition**: If you can check it with a shell command, Kuma-Scout can monitor it. Execute status commands on firewalls, switches, and appliances to ensure network health.
-
-## Quick Example
+## Quick Start
 
 ```bash
-# Monitor via YAML config (supports multiple commands - recommended)
-kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml
+# Install
+pip install kuma-scout
 
-# Or monitor single condition via CLI
-kuma-scout cmdcheck \
-  --command "systemctl is-active nginx" \
+# Single check via CLI
+kuma-scout cmdcheck "systemctl is-active nginx" \
   --uptime-kuma-url http://uptime-kuma:3001/api/push \
-  --heartbeat-token heartbeat-token \
-  --token cmdcheck-token
+  --token YOUR_TOKEN \
 
-# Or monitor remotely via SSH
-kuma-scout cmdcheck \
-  --ssh root@remote-server \
-  --command "systemctl is-active nginx" \
+# Multiple checks via YAML config
+kuma-scout run /etc/kuma-scout/config.yaml
+
+# Remote execution via SSH
+kuma-scout cmdcheck "systemctl is-active nginx" \
+  --ssh user@remote-server \
   --uptime-kuma-url http://uptime-kuma:3001/api/push \
-  --token cmdcheck-token
+  --token YOUR_TOKEN \
 ```
 
-If all checks pass → Uptime Kuma shows **UP**. If any fail → shows **DOWN** and triggers alerts.
-
-Deploy via `cron`, `systemd timer`, or `Docker` to run periodically on your servers.
-
-For multiple commands, use YAML config with `cmdcheck.commands` list.
+Result: ✅ UP (all checks pass) or ⚠️ DOWN (any check fails) in Uptime Kuma dashboard.
 
 ## Features
 
-- **Command Execution**: Execute arbitrary shell commands on local or remote systems and push results to Uptime Kuma (cmdcheck)
-- **SSH Remote Execution**: Run any check remotely via SSH - execute commands, port scans, backup checks, and storage monitoring on remote servers (all commands support `--ssh` option)
-- **Pattern Matching**: Use regex patterns for flexible success/failure detection in command output
-- **Multi-Command Support**: Run multiple independent checks and aggregate results, with per-command Uptime Kuma tokens for individual monitoring
-- **Port Scanning**: Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists
-- **Backup Monitoring**: Monitor Kopia backup snapshot freshness, detect stale or missing snapshots
-- **Storage Monitoring**: Monitor ZFS pool health and free space with per-pool thresholds
-- **Heartbeat Monitoring**: Sends periodic heartbeat pings during long operations to signal agent health and activity
-- **Uptime Kuma Integration**: Reports monitoring results and health status to Uptime Kuma push monitors
-- **Flexible Configuration**: Support for YAML config files, environment variables for tokens only, and CLI arguments with clear priority
-- **Multi-Source Configuration**:
-  1. Command-line arguments (highest priority)
-  2. YAML config file
-  3. Token environment variables only (authentication tokens only)
-  4. Hardcoded defaults (lowest priority)
-- **Comprehensive Logging**: File, console, and syslog/journalctl output
-- **Security First**: Commands executed without shell interpretation to prevent injection attacks; SSH with strict host key checking
-- **Extensible Architecture**: Built to support additional monitoring checks
-
-## Diagram
-
-```plaintext
-┌─────────────────────────────┐       ┌─────────────────────────────┐
-│   Local Monitoring Host     │       │   Remote Target Servers     │
-│   (Kuma-Scout Deployed)     │       │   (Commands executed via    │
-│                             │       │    SSH from monitoring host) │
-│  • Command Execution        │◄──────┼───• Command Execution        │
-│  • Port Scanning (nmap)     │       │  • Port Scanning (nmap)     │
-│  • Backup Monitoring (Kopia)│       │  • Backup Monitoring (Kopia)│
-│  • Storage Monitoring (ZFS) │       │  • Storage Monitoring (ZFS) │
-└────────────┬────────────────┘       └─────────────────────────────┘
-             │ Scout reports
-             │ findings via HTTP
-             ▼
-┌─────────────────────────────┐
-│     Uptime Kuma (Central)   │
-│     - Monitoring Hub        │
-│                             │
-│  • Monitor Status           │
-│  • Send Alerts              │
-│  • Track Metrics            │
-└─────────────────────────────┘
-```
+- **Command Execution**: Execute arbitrary shell commands and monitor results (cmdcheck plugin)
+- **SSH Remote Execution**: Run checks remotely on any SSH-accessible system
+- **Port Scanning**: Scan TCP ports across IP ranges using nmap (portscan plugin)
+- **Backup Monitoring**: Monitor Kopia backup snapshot freshness (kopiasnapshotstatus plugin)
+- **Storage Monitoring**: Monitor ZFS pool health and free space (zfspoolstatus plugin)
+- **Heartbeat Monitoring**: Send periodic health signals during long operations with configurable URL and token
+- **Pattern Matching**: Use regex patterns for flexible success/failure detection
+- **Multi-Check Support**: Run multiple checks with per-check configuration and tokens
+- **Tag-Based Aggregation**: Automatically aggregate check results by tag and report aggregated status to shared tokens
+- **Plugin Architecture**: Extensible system with auto-discovery
+- **Flexible Configuration**: YAML config files, environment variables, CLI arguments
+- **Security First**: Commands executed safely without shell injection; SSH with host key verification
 
 ## Installation
 
@@ -108,1177 +64,288 @@ cd kuma-scout
 pip install -e .
 ```
 
-### Development installation
-
-```bash
-pip install -e ".[dev]"
-```
-
 ### Docker
 
-You can run Kuma Scout in a Docker container for isolated execution and easy deployment.
+See [doc/DOCKER.md](doc/DOCKER.md) for Docker installation and usage.
 
-#### Using docker-compose (Recommended)
+## Documentation
 
-1. Create your configuration file:
-
-```bash
-cp example.config.yaml config.yaml
-```
-
-2. Edit `config.yaml` with your settings
-
-3. Build and run:
-
-```bash
-docker-compose up --build -it
-```
-
-#### Using docker run directly
-
-```bash
-docker build -t kuma-scout:latest .
-
-# Linux/macOS
-docker run -it --rm \
-  -v $(pwd)/config.yaml:/etc/kuma-scout/config.yaml:ro \
-  -v $(pwd)/kuma-scout.log:/var/log/kuma-scout.log \
-  -e KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token \
-  -e KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token \
-  kuma-scout:latest \
-  portscan \
-    --ip-range 192.168.100.110-199 \
-    --uptime-kuma-url http://uptimekuma:3001/api/push \
-    --heartbeat-token your-heartbeat-token \
-    --token your-portscan-token
-
-# Windows (PowerShell)
-docker run -it --rm `
-  -v ${pwd}/config.yaml:/etc/kuma-scout/config.yaml:ro `
-  -v ${pwd}/kuma-scout.log:/var/log/kuma-scout.log `
-  -e KUMA_SCOUT_HEARTBEAT_TOKEN=your-heartbeat-token `
-  -e KUMA_SCOUT_PORTSCAN_TOKEN=your-portscan-token `
-  kuma-scout:latest `
-  portscan `
-    --ip-range 192.168.100.110-199 `
-    --uptime-kuma-url http://uptimekuma:3001/api/push `
-    --heartbeat-token your-heartbeat-token `
-    --token your-portscan-token
-```
-
-## Usage
-
-### Command Execution (cmdcheck)
-
-Execute arbitrary shell commands on remote systems and push results to Uptime Kuma. The cornerstone feature enabling unlimited monitoring scenarios.
-
-**Single command check (CLI):**
-```bash
-kuma-scout cmdcheck \
-  --command "systemctl is-active nginx" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-cmdcheck-token
-```
-
-**Multiple independent checks with per-command tokens (YAML config only):**
-```yaml
-# In config file: /etc/kuma-scout/config.yaml
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: "web_server"
-      token: "web-server-token"  # Individual monitor for this command
-      timeout: 10
-    - command: "test -f /var/run/app.pid"
-      name: "app_pid"
-      timeout: 5
-      # No token - participates in aggregated result only
-    - command: "df /"
-      name: "disk_space"
-      token: "disk-space-token"  # Individual monitor for this command
-      success_pattern: "(\\d{2,}|[1-9]\\d{5,})"  # Match if available space exists
-      timeout: 10
-  uptime_kuma:
-    token: your-cmdcheck-token  # Aggregated result for all commands
-```
-
-**With regex pattern matching (CLI):**
-```bash
-kuma-scout cmdcheck \
-  --command "tail -n 100 /var/log/app.log" \
-  --failure-pattern "ERROR|CRITICAL|PANIC" \
-  --success-pattern "healthy" \
-  --timeout 10 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-cmdcheck-token
-```
-
-**Using configuration file (recommended for multiple commands):**
-```bash
-kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml
-```
-
-**Note**: CLI supports single commands only. For multiple commands, use YAML configuration with `cmdcheck.commands` list.
-
-See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for comprehensive cmdcheck examples and security considerations.
-
-## Upgrading Between Versions
-
-When upgrading Kuma-Scout between major versions, please see [doc/MIGRATION.md](doc/MIGRATION.md) for any breaking changes and migration instructions.
-
-### Port Scan
-
-Scans TCP open ports across IP ranges using nmap with configurable ports, timing profiles, and exclusion lists.
-
-**Basic usage:**
-```bash
-kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
-```
-
-**With custom ports and timing:**
-```bash
-kuma-scout portscan \
-  --ip-range 192.168.100.0/24 \
-  --ports 22,80,443,3389 \
-  --timing T4 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
-```
-
-**Multiple IP ranges:**
-```bash
-kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --ip-range 10.0.0.0/8 \
-  --ip-range 172.16.0.0/12 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
-```
-
-**With exclusions:**
-```bash
-kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --exclude 192.168.1.1 \
-  --exclude 192.168.1.254 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
-```
-
-**Using configuration file (recommended):**
-```bash
-kuma-scout portscan --config /etc/kuma-scout/config.yaml
-```
-
-**Nmap Timing Profiles:**
-The `--timing` parameter controls scan speed and network load:
-- `T0`: Paranoid - Very slow, useful for IDS evasion
-- `T1`: Sneaky - Slow, IDS evasion
-- `T2`: Polite - Slowed to minimize network load
-- `T3`: Normal - Default, no delays
-- `T4`: Aggressive - Fast, assumes reasonable network
-- `T5`: Insane - Very fast, assumes excellent network
-
-### Kopia Snapshot Status
-
-Monitor Kopia backup snapshot freshness with per-path age thresholds:
-
-```bash
-# Using configuration file (recommended)
-kuma-scout kopiasnapshotstatus --config /etc/kuma-scout/config.yaml
-
-# Or with CLI arguments (comma-separated format: path,hours)
-kuma-scout kopiasnapshotstatus \
-  --snapshot /data,24 \
-  --snapshot /backups,48 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
-```
-
-Multiple snapshots with different age requirements:
-```bash
-kuma-scout kopiasnapshotstatus \
-  --snapshot /data,24 \
-  --snapshot /backups,48 \
-  --snapshot /archive,168 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
-```
-
-Monitor server/user specific snapshot locations:
-```bash
-kuma-scout kopiasnapshotstatus \
-  --snapshot "/data,24" \
-  --snapshot "root@fileserver:/mnt/shares,48" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-kopia-token
-```
-
-### SSH Remote Execution
-
-Execute any command remotely via SSH. All commands support the `--ssh` option for remote execution:
-
-**Basic SSH execution:**
-```bash
-# Check kopia snapshots on remote backup server
-kuma-scout kopiasnapshotstatus \
-  --ssh root@backup-server \
-  --snapshot /data,24 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-kopia-token
-
-# Monitor ZFS pool on remote NAS
-kuma-scout zfspoolstatus \
-  --ssh root@nas-server \
-  --pool tank,10 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-zfs-token
-
-# Run command check on remote server
-kuma-scout cmdcheck \
-  --ssh monitoring@web-server \
-  --command "systemctl is-active nginx" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-cmdcheck-token
-
-# Port scan from a jump host
-kuma-scout portscan \
-  --ssh root@jump-host \
-  --ip-range 192.168.1.0/24 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-portscan-token
-```
-
-**With SSH key:**
-```bash
-kuma-scout kopiasnapshotstatus \
-  --ssh root@backup-server \
-  --ssh-key-file /etc/kuma-scout/ssh_key \
-  --snapshot /data,24 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token your-kopia-token
-```
-
-**SSH Options:**
-- `--ssh connection-string` - SSH connection string (formats: `ssh://user@host:port`, `user@host:port`, `user@host`, `host:port`, or `host`)
-- `--ssh-key-file path` - Path to SSH private key
-- `--ssh-password password` - SSH password (discouraged, use keys)
-- `--ssh-strict-host-key-checking/--ssh-no-strict-host-key-checking` - Host key verification (default: enabled)
-
-**Security Notes:**
-- Strict host key checking is enabled by default for security
-- SSH key files must have proper permissions (600) for security - fix permissions instead of bypassing validation
-- SSH passwords are supported but discouraged; use key-based authentication
-- SSH key agents (e.g., KeePassXC) are supported for client-side authentication when no key file is specified
-- All SSH settings can be configured via YAML config file
-
-See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for SSH configuration examples and security best practices.
-
-### ZFS Pool Status
-
-Monitor ZFS pool health and free space with per-pool thresholds:
-
-```bash
-# Using configuration file (recommended)
-kuma-scout zfspoolstatus --config /etc/kuma-scout/config.yaml
-
-# Or with CLI arguments (comma-separated format: name,percent)
-kuma-scout zfspoolstatus \
-  --pool tank,10 \
-  --pool backup,20 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
-```
-
-Multiple pools with different free space thresholds:
-```bash
-kuma-scout zfspoolstatus \
-  --pool tank,10 \
-  --pool backup,20 \
-  --pool archive,30 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-zfs-token
-```
+- **[Configuration Guide](doc/CONFIGURATION_GUIDE.md)** - Detailed configuration reference with all options and examples
+- **[CLI Usage](doc/CLI.md)** - Command-line interface documentation and examples
+- **[Security](doc/SECURITY.md)** - Security considerations and best practices
+- **[Docker](doc/DOCKER.md)** - Docker installation and containerized deployment
+- **[Migration Guide](doc/MIGRATION.md)** - Upgrading between versions
+- **[Development](doc/DEVELOPMENT.md)** - Plugin development and contributing
 
 ## Use Cases
 
-### Universal Monitoring via Command Execution
+### Universal Monitoring
 
-Monitor ANY condition on remote systems using standard shell commands. From service health to custom business logic, deploy once and monitor everything.
-
-**Scenario**: You need to monitor diverse conditions across your infrastructure - service health, database connectivity, custom application checks, disk space, log patterns, and more. Instead of building custom monitoring for each scenario, use cmdcheck to execute any shell command.
-
-**Traditional approach**: Build specialized monitoring tools and extensions for each unique condition.
-
-**With Kuma Scout cmdcheck**: Write a shell command that returns exit code 0 for "healthy" and non-zero for "unhealthy". Deploy once, monitor anything.
-
-**Example setup on monitoring machine** (using YAML config for multiple checks):
-```yaml
-# In config file: /etc/kuma-scout/config.yaml
-cmdcheck:
-  commands:
-    - command: "systemctl is-active nginx"
-      name: "web_server"
-    - command: "systemctl is-active postgresql"
-      name: "database"
-    - command: "test -f /var/lock/app.running"
-      name: "app_running"
-  timeout: 10
-  uptime_kuma:
-    token: your-cmdcheck-token
-```
-
-Then run: `kuma-scout cmdcheck --config /etc/kuma-scout/config.yaml`
-
-**Additional examples** (single command via CLI):
-```bash
-# Check service status
-kuma-scout cmdcheck \
-  --command "systemctl is-active nginx"
-
-# Check health endpoint
-kuma-scout cmdcheck \
-  --command "curl -sf http://localhost:8080/health"
-
-# Check log file for errors (using failure pattern)
-kuma-scout cmdcheck \
-  --command "tail -n 100 /var/log/app.log" \
-  --failure-pattern "ERROR|CRITICAL"
-
-# Database connectivity check
-kuma-scout cmdcheck \
-  --command "psql -h db.example.com -U monitoring -d health_check -c SELECT 1"
-
-# Custom script execution
-kuma-scout cmdcheck \
-  --command "/usr/local/bin/custom-health-check.sh"
-```
-
-**Note**: Commands are executed without shell interpretation for security. Simple commands work great. For complex logic (pipes, operators), wrap your commands in shell scripts. See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md#command-execution-limitations) for details.
-
-**Result**:
-- ✅ If all checks pass (exit 0) → Uptime Kuma shows UP
-- ⚠️ If any check fails (non-zero exit) → Uptime Kuma shows DOWN and triggers alerts
-- 🔍 Pattern matching for advanced scenarios: detect specific error messages, parse output, etc.
-
-**Benefits**:
-- Unlimited monitoring scenarios with a single tool
-- No specialized monitoring code needed
-- Leverage existing scripts and tools (systemctl, curl, grep, custom apps)
-- Easy to test locally before deploying
-- Version control your monitoring logic
-
-See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md#command-monitoring-cmdcheck) for comprehensive cmdcheck documentation including security considerations, multi-command scenarios, and pattern matching.
-
-### Per-Command Visibility in Uptime Kuma Dashboard
-
-One of the challenges with traditional monitoring is getting enough detail to troubleshoot quickly. Kuma Scout sends rich, human-readable status messages that show exactly which commands passed or failed.
-
-**Example - Single Command Result**:
-```
-✓ Success pattern detected: 'healthy' | Output: active (running)
-```
-Uptime Kuma dashboard shows the exact status in one line without needing to SSH and inspect logs.
-
-**Note**: Any sensitive data in the actual output (passwords, tokens, connection strings) would be automatically sanitized before display, even though raw output is shown in documentation examples for clarity.
-
-**Example - Multiple Commands Result**:
-```
-✗ 2/3 passed, 1/3 failed: nginx (exit 1); postgresql ✓; cache ✓
-```
-Immediately see which service is down and why (exit code, pattern not found, timeout, etc.).
-
-**Example - Diagnostic Output**:
-```
-✗ 0/5 passed, 5/5 failed: web (exit 1); db (timeout); cache (pattern not found); backup (error); app (exit 127)
-```
-The top 3 failures are shown inline; check logs for remaining failures. Each failure includes the specific error reason.
-
-**Benefits of rich status messages**:
-- ✅ One-glance status visibility without logs
-- ✅ Identify problematic services immediately
-- ✅ See failure reasons (exit code, pattern mismatch, timeout, etc.)
-- ✅ Reduced MTTR (mean time to resolution) through instant diagnosis
-- ✅ Works perfectly with Uptime Kuma's dashboard and alert messages
-
-**Logging for Deep Debugging**:
-When you need full details, check logs:
-```
-[2024-01-15 14:32:15] cmdcheck executing 5 commands
-[2024-01-15 14:32:15] [nginx: ✓] [postgresql: ✗ timeout] [cache: ✗ exit 1] [backup: ✓] [app: ✗ pattern not found]
-[2024-01-15 14:32:15] Result: 2/5 passed, 3/5 failed
-```
-
-### Network Security Monitoring
-
-Monitor ports on your network to ensure no unauthorized ports are exposed. Deploy Kuma Scout on your watchdog/monitoring machines and schedule it to run periodically via cron or systemd timer to push results to your central Uptime Kuma instance.
-
-**Scenario**: You have multiple machines in your infrastructure that you want to monitor for exposed ports. Your watchdog machine should periodically scan a range of machines to ensure only expected ports are open.
-
-**Traditional approach**: Set up individual TCP port monitors in Uptime Kuma for each machine/port combination, which becomes difficult to manage at scale.
-
-**With Kuma Scout**: Install on your watchdog machine and run a portscan check that scans your infrastructure and reports back to your central Uptime Kuma instance.
-
-**Example setup on a watchdog machine**:
-```bash
-# Deploy in Docker
-docker-compose up -d
-
-# Schedule with cron to run every 30 minutes
-*/30 * * * * kuma-scout portscan \
-  --ip-range 192.168.1.0/24 \
-  --exclude 192.168.1.1 \
-  --exclude 192.168.1.10 \
-  --ports 22,3389,80,443 \
-  --uptime-kuma-url http://uptime-kuma-instance:3001/api/push \
-  --heartbeat-token your-heartbeat-token \
-  --token your-portscan-token
-```
-
-**Result**: 
-- ✅ If all scanned ports are in expected state → Uptime Kuma shows UP
-- ⚠️ If unexpected open ports are detected → Uptime Kuma shows DOWN and triggers alerts
-
-### Backup Monitoring
-
-Monitor Kopia backup snapshot freshness across multiple backup paths with different age requirements. Ensure your backups are running on schedule and alert if backups become stale.
-
-**Scenario**: You have multiple critical data paths being backed up with Kopia at different intervals, and you need to ensure backups complete regularly without manual intervention.
-
-**Traditional approach**: Manually check backup timestamps or SSH into the machine to verify backup age.
-
-**With Kuma Scout**: Deploy on your backup server and run periodic Kopia snapshot status checks that report to Uptime Kuma.
-
-**Example setup on a backup server**:
-```bash
-# Deploy in Docker
-docker-compose up -d
-
-# Schedule with cron to run every 6 hours
-0 */6 * * * kuma-scout kopiasnapshotstatus --config /etc/kuma-scout/config.yaml
-```
-
-**Configuration example** (`/etc/kuma-scout/config.yaml`):
-```yaml
-kopiasnapshotstatus:
-  uptime_kuma:
-    token: your-kopia-token
-  
-  snapshots:
-    - path: /data
-      max_age_hours: 24      # Critical data - must be backed up daily
-    - path: /backups
-      max_age_hours: 48      # Important - allow 2 days
-    - path: /archive
-      max_age_hours: 168     # Archive - allow 1 week
-  max_age_hours: 24          # Global default
-```
-
-**See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced Kopia snapshot configuration options**
-
-**Result**:
-- ✅ If all snapshots are fresh (within their thresholds) → Uptime Kuma shows UP
-- ⚠️ If any snapshot is stale → Uptime Kuma shows DOWN and triggers alerts
-- 📊 Details include age of each snapshot and its threshold for visibility
-
-### Storage Health Monitoring
-
-Monitor ZFS pool health and free space across multiple pools with different thresholds. Ensure pools remain operational and have adequate free space for continued operation.
-
-**Scenario**: You have multiple ZFS pools with different purposes and acceptable minimum free space levels. A data pool should always have at least 10% free, while an archive pool can tolerate 30% free space.
-
-**Traditional approach**: Manually check pool status via SSH or rely on generic disk space alerts.
-
-**With Kuma Scout**: Deploy on your storage server and run periodic ZFS pool status checks that report to Uptime Kuma.
-
-**Example setup on a storage server**:
-```bash
-# Deploy in Docker
-docker-compose up -d
-
-# Schedule with cron to run every hour
-0 * * * * kuma-scout zfspoolstatus --config /etc/kuma-scout/config.yaml
-```
-
-**Configuration example** (`/etc/kuma-scout/config.yaml`):
-```yaml
-zfspoolstatus:
-  uptime_kuma:
-    token: your-zfs-token
-  
-  pools:
-    - name: tank
-      free_space_percent_min: 10      # Critical: must stay operational
-    - name: backup
-      free_space_percent_min: 20      # Important: needs space for incremental backups
-    - name: archive
-      free_space_percent_min: 30      # Archive: more relaxed threshold
-  free_space_percent_default: 10
-```
-
-**See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced ZFS pool configuration options**
-
-**Result**:
-- ✅ If all pools are ONLINE with sufficient free space → Uptime Kuma shows UP
-- ⚠️ If any pool is unhealthy (DEGRADED, FAULTED, OFFLINE, etc.) → Uptime Kuma shows DOWN and triggers alerts
-- ⚠️ If any pool has insufficient free space → Uptime Kuma shows DOWN and triggers alerts
-- 📊 Details include health status and free space for each pool
+Monitor any condition using shell commands:
+- Service health: `systemctl is-active nginx`
+- Database connectivity: `psql -c "SELECT 1"`
+- Health endpoints: `curl -sf http://api:8080/health`
+- Custom scripts: `/usr/local/bin/custom-check.sh`
 
 ### Remote Infrastructure Monitoring
 
-Monitor distributed infrastructure from a central location without deploying agents everywhere. Use SSH to execute checks on remote servers, databases, and network devices from a single monitoring host.
+Monitor systems remotely via SSH without installing agents:
 
-**Scenario**: You have a heterogeneous infrastructure with servers, databases, and network devices spread across different locations. You want centralized monitoring without installing monitoring agents on every system.
-
-**Traditional approach**: Deploy monitoring agents on each server or rely on external monitoring that can't access internal system states.
-
-**With Kuma Scout SSH**: Deploy Kuma Scout on one central monitoring server and use SSH to execute checks on all your remote infrastructure.
-
-**Example setup on a central monitoring server**:
+**CLI - Single remote check:**
 ```bash
-# Monitor web server health remotely
-kuma-scout cmdcheck \
-  --ssh monitoring@web-server \
-  --command "systemctl is-active nginx" \
-  --success-pattern "active" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token web-server-token
-
-# Monitor database server remotely
-kuma-scout cmdcheck \
-  --ssh monitoring@db-server \
-  --command "pg_isready -h localhost" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token db-server-token
-
-# Monitor backup server remotely
-kuma-scout kopiasnapshotstatus \
-  --ssh root@backup-server \
-  --config /etc/kuma-scout/remote-backup-config.yaml
+kuma-scout cmdcheck "systemctl is-active nginx" \
+  --ssh admin@remote-server \
+  --uptime-kuma-url http://uptime-kuma:3001/api/push \
+  --token YOUR_TOKEN \
 ```
 
-**Benefits**:
-- ✅ **Single monitoring host** - Deploy once, monitor everywhere
-- ✅ **No remote agent installation** - Use existing SSH access
-- ✅ **Leverage existing infrastructure** - No additional software on target servers
-- ✅ **Secure access** - Use SSH keys with restricted permissions
-- ✅ **Flexible authentication** - SSH keys, passwords, or agent forwarding
-
-### Cross-Platform Monitoring
-
-Monitor Windows, Linux, macOS, and network devices from a single monitoring platform. Execute platform-specific commands remotely via SSH.
-
-**Scenario**: Your infrastructure includes Windows servers, Linux systems, and network devices. You need to monitor all of them but prefer a single monitoring solution.
-
-**Traditional approach**: Use platform-specific monitoring tools or external monitoring that can't execute internal commands.
-
-**With Kuma Scout SSH**: Use SSH to execute platform-appropriate commands on each system type.
-
-**Example monitoring different platforms**:
-```bash
-# Linux server monitoring
-kuma-scout cmdcheck \
-  --ssh monitoring@linux-server \
-  --command "systemctl is-active apache2" \
-  --success-pattern "active" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token linux-server-token
-
-# Windows server monitoring (using OpenSSH for Windows)
-kuma-scout cmdcheck \
-  --ssh administrator@windows-server \
-  --command "sc query w3svc" \
-  --success-pattern "RUNNING" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token windows-server-token
-
-# Network device monitoring (if SSH enabled)
-kuma-scout cmdcheck \
-  --ssh admin@network-switch \
-  --command "show interface status" \
-  --success-pattern "up" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token network-switch-token
-```
-
-**Benefits**:
-- ✅ **Unified monitoring** - Single tool for all platforms
-- ✅ **Platform-appropriate checks** - Use native commands for each system
-- ✅ **No platform-specific agents** - SSH works across all platforms
-- ✅ **Network device support** - Monitor switches, routers, and appliances
-- ✅ **Flexible command execution** - Any command that works via SSH
-
-### Secure Remote Backup Monitoring
-
-Monitor backup systems in secure environments where direct access is restricted. Use SSH to check backup status without exposing backup systems to the network.
-
-**Scenario**: Your backup servers are in a secure network segment with limited access. You need to monitor backup freshness but can't deploy monitoring agents in the secure zone.
-
-**Traditional approach**: Limited monitoring options or complex VPN setups for each check.
-
-**With Kuma Scout SSH**: Deploy monitoring on a jump host or DMZ server and use SSH to check backup status remotely.
-
-**Example secure backup monitoring**:
-```bash
-# Monitor from jump host to secure backup server
-kuma-scout kopiasnapshotstatus \
-  --ssh backup-user@jump-host \
-  --snapshot /secure/backup/path,24 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token secure-backup-token
-
-# Multi-hop SSH for complex network topologies
-kuma-scout zfspoolstatus \
-  --ssh admin@jump-host \
-  --pool secure-backup-pool,15 \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token secure-storage-token
-```
-
-**Benefits**:
-- ✅ **Secure access** - Monitor without exposing secure systems
-- ✅ **Jump host support** - Work with existing network security
-- ✅ **Multi-hop connections** - Navigate complex network topologies
-- ✅ **Restricted permissions** - Use dedicated SSH keys with minimal access
-- ✅ **Network isolation** - Monitor secure systems without direct network access
-
-### Network Device and Appliance Monitoring
-
-Monitor network infrastructure where traditional agents cannot be installed. Use SSH to check router status, switch configurations, and appliance health on devices that only provide SSH access.
-
-**Scenario**: Your network infrastructure includes ISP routers, managed switches, firewalls, and other appliances where you cannot install monitoring agents. These devices only provide SSH access for management.
-
-**Traditional approach**: Limited to external monitoring (ping, TCP port checks) or vendor-specific monitoring tools that may not integrate with your central monitoring system.
-
-**With Kuma Scout SSH**: Deploy monitoring on a management server and use SSH to execute status checks on network devices.
-
-**Example monitoring network infrastructure**:
-```bash
-# Monitor ISP router connectivity and interface status
-kuma-scout cmdcheck \
-  --ssh admin@isp-router \
-  --command "show ip interface brief" \
-  --success-pattern "up.*up" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token isp-router-token
-
-# Monitor firewall policy status
-kuma-scout cmdcheck \
-  --ssh fw-admin@firewall \
-  --command "show firewall policy" \
-  --success-pattern "enabled" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token firewall-token
-
-# Monitor switch port utilization
-kuma-scout cmdcheck \
-  --ssh switch-admin@core-switch \
-  --command "show interfaces status" \
-  --success-pattern "connected|up" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token switch-token
-
-# Monitor UPS battery health (if SSH enabled)
-kuma-scout cmdcheck \
-  --ssh admin@ups-appliance \
-  --command "battery.test.result" \
-  --success-pattern "PASSED" \
-  --uptime-kuma-url http://uptimekuma:3001/api/push \
-  --token ups-token
-```
-
-**Benefits**:
-- ✅ **Agent-less monitoring** - No software installation on network devices
-- ✅ **Vendor agnostic** - Works with any device that supports SSH
-- ✅ **Management integration** - Use existing administrative SSH access
-- ✅ **Centralized visibility** - Monitor all network devices from one dashboard
-- ✅ **Custom checks** - Execute device-specific commands for detailed monitoring
-
-### Help
-
-```bash
-kuma-scout --help
-kuma-scout portscan --help
-kuma-scout kopiasnapshotstatus --help
-kuma-scout zfspoolstatus --help
-```
-
-## Configuration
-
-### YAML File Format (Recommended)
-
-Default location: `/etc/kuma-scout/config.yaml`
-
-**For detailed configuration options and examples, see [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md)**
-
-Basic structure:
-
+**YAML - Multiple remote servers:**
 ```yaml
-logging:
-  log_file: /var/log/kuma-scout.log
-  log_level: INFO
-
-heartbeat:
-  enabled: true
-  interval: 300                          # Seconds between heartbeats (default: 300 = 5 min)
-  uptime_kuma:
-    token: your-heartbeat-token
-
 uptime_kuma:
-  url: http://uptimekuma:3001/api/push
+  url: http://uptime-kuma:3001/api/push
+  token: ${UPTIME_KUMA_TOKEN}
 
-# SSH configuration for remote execution (optional)
 ssh:
-  # Default SSH settings for all remote checks
-  connection: "monitoring@remote-server"        # SSH connection string (user@host format)
-  key_file: ~/.ssh/id_rsa                        # SSH private key file path
-  password: null                                 # SSH password (discouraged, use keys)
-  strict_host_key_checking: true                 # Verify host keys (default: true)
+  host: app-server.prod.example.com
+  user: monitoring
+  key_file: /root/.ssh/prod_key
 
-# Command-specific SSH overrides (optional)
-cmdcheck:
-  ssh:
-    connection: "web-admin@web-server"           # Override SSH connection for cmdcheck
-    key_file: ~/.ssh/web_server_key             # Different key for web server
-
-portscan:
-  ssh:
-    connection: "scan-user@jump-host"            # Use jump host for port scanning
-
-portscan:
-  uptime_kuma:
-    token: your-portscan-token
-  
-  nmap:
-    timing: T3
-    arguments: []
-    keep_xml_output: false
-    timeout: 3600
-  
-  ports: 1-1000
-  exclude: [192.168.1.1, 192.168.1.254]
-  ip_ranges:
-    - 192.168.1.0/24
-    - 10.0.0.0/8
-
-kopiasnapshotstatus:
-  uptime_kuma:
-    token: your-kopia-token
-  
-  snapshots:
-    - path: /data
-      max_age_hours: 24
-    - path: /backups
-      max_age_hours: 48
-  max_age_hours: 24
-
-zfspoolstatus:
-  uptime_kuma:
-    token: your-zfs-token
-  
-  pools:
-    - name: tank
-      free_space_percent_min: 10
-    - name: backup
-      free_space_percent_min: 20
-  free_space_percent_default: 10
+checks:
+  - name: app_service
+    type: cmdcheck
+    command: "systemctl is-active myapp"
+    
+  - name: db_health
+    type: cmdcheck
+    command: "systemctl is-active postgresql"
+    ssh:
+      host: db-server.prod.example.com
 ```
 
-See [doc/CONFIGURATION_GUIDE.md](doc/CONFIGURATION_GUIDE.md) for advanced configuration with per-pool thresholds and all command examples.
+### Backup Monitoring
 
-## Security
-
-### Command Execution Security
-
-Kuma Scout is designed with **security as a core principle**:
-
-- ✅ **No Shell Injection**: Commands are executed without shell interpretation. Shell metacharacters are treated as literal arguments, preventing injection attacks.
-- ✅ **Safe from Chaining**: Semicolons, pipes, operators (`&&`, `||`, etc.) cannot be used to chain commands or inject new ones.
-- ✅ **Safe Configuration**: Configuration files (YAML) are the only input mechanism for commands - never accept commands from untrusted sources.
-
-**Example - What's Protected:**
-
+Ensure backups are running on schedule with Kopia snapshot checks:
 ```yaml
-# ✅ Shell metacharacters are safely rejected (treated as literal arguments)
-commands:
-  - command: "systemctl is-active nginx; rm -rf /"  # Semicolon is literal, not a separator
+checks:
+  - name: daily_backup
+    type: kopiasnapshotstatus
+    path: "/data"
+    max_age_hours: 24
 ```
 
-With shell=False, the semicolon is passed as a literal argument to systemctl, which rejects it as invalid.
+### Storage Health
 
-**⚠️ What's NOT Protected:**
-
-If an attacker gains write access to the config file, they can replace the entire command:
+Monitor ZFS pools and ensure adequate free space:
 ```yaml
-# ❌ This IS a threat if config file is compromised
-commands:
-  - command: "rm -rf /"  # Attacker can replace command directly
+checks:
+  - name: tank_pool
+    type: zfspoolstatus
+    pool: "tank"
+    min_free_percent: 10
 ```
 
-**Real Protection**: Secure your configuration files with proper file permissions (see "Configuration File Permissions" below).
+### Network Security
 
-### Running as Non-Root
+Monitor exposed ports on your infrastructure:
+```bash
+kuma-scout portscan 192.168.1.0/24 \
+  --uptime-kuma-url http://uptime-kuma:3001/api/push \
+  --token YOUR_TOKEN \
+```
 
-⚠️ **Always run Kuma Scout as a dedicated, low-privilege user**:
+## How It Works
+
+1. **Define checks** in YAML config or via CLI
+2. **Run checks** locally or remotely via SSH
+3. **Get results** as UP/DOWN status in Uptime Kuma dashboard
+4. **Receive alerts** when checks fail
+
+## Help
 
 ```bash
-useradd -r -s /bin/false kuma-scout
-chown kuma-scout:kuma-scout /etc/kuma-scout/config.yaml
-chmod 600 /etc/kuma-scout/config.yaml
-```
-
-If specific commands require elevated privileges, use sudo with **minimal, read-only access**:
-
-```bash
-# In sudoers (restrict to specific commands)
-kuma-scout ALL=(root) NOPASSWD: /usr/bin/systemctl is-active
-kuma-scout ALL=(root) NOPASSWD: /usr/sbin/zpool status
-```
-
-### Configuration File Permissions
-
-Always restrict access to configuration files:
-
-```bash
-chmod 600 /etc/kuma-scout/config.yaml
-chown kuma-scout:kuma-scout /etc/kuma-scout/config.yaml
-```
-
-Configuration files may contain authentication tokens - they should only be readable by the service user.
-
-### Handling Sensitive Data
-
-Command output is **automatically sanitized by default** to prevent credential leakage:
-
-- ✅ **Automatic Masking**: Passwords, API keys, tokens, emails, and database connection strings are automatically masked
-- ✅ **Truncation**: Output is truncated to 500 characters before transmission
-- ✅ **Error Sanitization**: Exception messages are sanitized to remove sensitive data
-
-**Patterns Automatically Masked:**
-- Passwords: `password=...`, `secret: ...`, `api_key=...`
-- Tokens: Bearer tokens, AWS keys, GitHub tokens
-- Emails: `user@example.com` → `[REDACTED_EMAIL]`
-- Credit cards: `[REDACTED_CARD]`
-- Database URLs: Connection strings → `[REDACTED_DB_CONNECTION]`
-
-**Example:**
-```
-Command output: Connected to mysql://root:password@localhost
-After sanitization: Connected to [REDACTED_DB_CONNECTION]
-```
-
-**Disable Sanitization (if needed for debugging):**
-```yaml
-cmdcheck:
-  sanitize_output: false  # Default: true - NOT recommended for production
-```
-
-**Best Practices:**
-- ⚠️ **Avoid outputting secrets** - Rely on exit codes and pattern matching when possible
-- ⚠️ **Sanitize scripts** - Remove debug output containing sensitive data
-- ⚠️ **Use pattern matching** - Match on status indicators instead of capturing full output
-
-Example - Better approach using pattern matching:
-
-Since `shell=False` prevents piping, use pattern matching in your config instead:
-
-```yaml
-# In config file - check API health with pattern matching
-cmdcheck:
-  commands:
-    - command: "curl -s http://api.internal:8080/health"
-      name: "api_health"
-      success_pattern: '"status":"ok"'    # Match only this pattern
-      failure_pattern: '"error"'           # Fail if error detected
-      timeout: 10
-  uptime_kuma:
-    token: your-cmdcheck-token
-```
-
-**Why this is better:**
-- ✅ Only the matched pattern determines pass/fail, not the full output
-- ✅ Sensitive details in the response are masked by default (sanitization)
-- ✅ Clear intent: you care about status success, not the full API response
-- ✅ Works with `shell=False` (no pipes needed)
-
-**For complex logic that needs pipes**: Wrap your command in a shell script:
-```bash
-# myscript.sh
-#!/bin/bash
-curl -s http://api.internal:8080/health | jq -e '.status == "ok"' > /dev/null
-
-# Then in config:
-commands:
-  - command: "/usr/local/bin/myscript.sh"
-    name: "api_health"
-```
-
-### Further Reading
-
-For comprehensive security guidance, see [doc/CONFIGURATION_GUIDE.md - Security Considerations](doc/CONFIGURATION_GUIDE.md#security-considerations)
-
-## Remote Execution Requirements
-
-When using SSH for remote execution (`--ssh` option), keep these important requirements in mind:
-
-### Commands Must Exist on Target Machines
-
-**Kuma Scout does NOT copy, install, or transfer commands to remote systems.** All commands you specify must already be installed and available on the target machine.
-
-**Example - What works:**
-```bash
-# ✅ systemctl exists on most Linux systems
-kuma-scout cmdcheck --ssh user@remote-server --command "systemctl is-active nginx"
-
-# ✅ zpool exists on systems with ZFS
-kuma-scout zfspoolstatus --ssh user@remote-server --pool tank
-
-# ✅ nmap exists on systems with nmap installed
-kuma-scout portscan --ssh user@remote-server --ip-range 10.0.0.0/24
-```
-
-**Example - What doesn't work:**
-```bash
-# ❌ kubectl not installed on target
-kuma-scout cmdcheck --ssh user@web-server --command "kubectl get pods"
-
-# ❌ Custom script not present on target
-kuma-scout cmdcheck --ssh user@remote-server --command "/opt/custom/check.sh"
-```
-
-**Solution**: Ensure required commands are pre-installed on target systems, or use commands that are universally available (like `systemctl`, `df`, `ps`, etc.).
-
-### SSH Access Requirements
-
-- ✅ **SSH service running** on target machine (default port 22, or custom port)
-- ✅ **Valid authentication** - SSH key, password, or SSH agent
-- ✅ **Network connectivity** - SSH port accessible from monitoring host
-- ✅ **User permissions** - SSH user must have permission to execute the specified commands
-
-### Authentication Methods
-
-**SSH Key Authentication (Recommended):**
-```bash
-# Generate key pair
-ssh-keygen -t ed25519 -f ~/.ssh/kuma_scout_key
-
-# Copy public key to target
-ssh-copy-id -i ~/.ssh/kuma_scout_key.pub user@target-server
-
-# Use in Kuma Scout
-kuma-scout cmdcheck --ssh user@target-server --ssh-key ~/.ssh/kuma_scout_key --command "uptime"
-```
-
-**Password Authentication (Less Secure):**
-```bash
-kuma-scout cmdcheck --ssh user@target-server --ssh-password "your-password" --command "uptime"
-```
-
-**SSH Agent Forwarding:**
-```bash
-# Start SSH agent and add key
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/kuma_scout_key
-
-# Kuma Scout will use agent automatically
-kuma-scout cmdcheck --ssh user@target-server --command "uptime"
-```
-
-### Authentication Tokens (Environment Variables Only)
-
-Only authentication tokens are supported via environment variables for security reasons. All other configuration must use YAML files or CLI arguments.
-
-**Supported token environment variables:**
-- `KUMA_SCOUT_HEARTBEAT_TOKEN` - Heartbeat push token
-- `KUMA_SCOUT_CMDCHECK_TOKEN` - Command check push token
-- `KUMA_SCOUT_PORTSCAN_TOKEN` - Port scan push token
-- `KUMA_SCOUT_KOPIASNAPSHOTSTATUS_TOKEN` - Kopia snapshot push token
-- `KUMA_SCOUT_ZFSPOOLSTATUS_TOKEN` - ZFS pool status push token
-
-**Configuration Priority** (highest to lowest): CLI arguments > YAML file > Token environment variables > Defaults
-
-### CLI Arguments
-
-```bash
-kuma-scout portscan \
-  --ports 22,80,443 \
-  --timing T4 \
-  --exclude 192.168.1.1 \
-  --log-file /tmp/scan.log \
-  192.168.1.0/24 \
-  http://uptimekuma:3001/api/push \
-  your-heartbeat-token \
-  your-portscan-token
-```
-
-## Cron Job Example
-
-```bash
-# Run scan every 30 minutes
-*/30 * * * * kuma-scout portscan --config /etc/kuma-scout/config.yaml
-```
-
-### Systemd Timer Example
-
-Create `/etc/systemd/system/kuma-scout.service`:
-
-```ini
-[Unit]
-Description=Kuma Scout System Scout
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/kuma-scout portscan --config /etc/kuma-scout/config.yaml
-StandardOutput=journal
-StandardError=journal
-```
-
-Create `/etc/systemd/system/kuma-scout.timer`:
-
-```ini
-[Unit]
-Description=Kuma Scout Timer
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=30min
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-Then enable and start:
-
-```bash
-systemctl enable kuma-scout.timer
-systemctl start kuma-scout.timer
-systemctl status kuma-scout.timer
-```
-
-## Uptime Kuma Push Tokens
-
-### Creating Monitors
-
-1. In Uptime Kuma, create two new Push monitors:
-   - **Heartbeat Monitor**: Reports agent health every X seconds (shared across all commands)
-   - **Port-Scan Monitor**: Reports port scan results (UP=all ports closed, DOWN=open ports found)
-
-2. Configure with appropriate heartbeat intervals (suggest 10-15 minutes for heartbeat monitor)
-
-3. Copy the push tokens to your configuration
-
-## Logging
-
-Logs are written to:
-
-1. **File**: Configured in `log_file` (default: `/var/log/kuma-scout.log`)
-2. **Level**: Configured in `log_level` (default: `INFO`, options: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
-3. **Console**: Standard output for direct execution
-4. **Journalctl**: Syslog integration for systemd systems
-
-Example log output:
-
-```
-[2024-01-18 14:30:00] 🔍 PORT SCANNER CONFIGURATION SUMMARY
-[2024-01-18 14:30:00] 📝 Nmap Configuration:
-[2024-01-18 14:30:00]    Ports: 1-1000
-[2024-01-18 14:30:00]    Timing: T3
-[2024-01-18 14:30:00] 🔍 Running: nmap -p 1-1000 -T3 -oX /tmp/nmap_output.xml 192.168.1.0/24
-[2024-01-18 14:30:15] ✅ Heartbeat sent: Port scan in progress...
-[2024-01-18 14:35:00] ✅ Nmap scan completed successfully
-[2024-01-18 14:35:00] ✅ Parsed XML: found 3 hosts with open ports
-[2024-01-18 14:35:00] ⚠️  Open ports found: 192.168.1.10:22/tcp,80/tcp, 192.168.1.11:443/tcp
-[2024-01-18 14:35:01] ✅ Port alert sent (down): Open ports found: 192.168.1.10:22/tcp,80/tcp, 192.168.1.11:443/tcp (5m)
-[2024-01-18 14:35:02] ✅ Port scanner complete (5m)
+kuma-scout --help                      # Show available commands
+kuma-scout cmdcheck --help             # Show command execution options
+kuma-scout run --help                  # Show run command options
 ```
 
 ## Requirements
 
 - Python 3.10+
-- typer (installed automatically)
+- nmap (for port scanning)
+- Kopia (for backup monitoring)
+- ZFS tools (for storage monitoring)
 
-**Per-Command Requirements:**
-- **portscan**: nmap (must be installed on system and in PATH)
-- **kopiasnapshotstatus**: Kopia backup tool (must be installed and configured on system)
-- **zfspoolstatus**: ZFS tools (zpool command, available with ZFS installation)
+## Quick Example
 
-## Development
+### Configuration File
 
-For detailed development instructions, see [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md).
+Create `/etc/kuma-scout/config.yaml`:
 
-### Quick Setup
+```yaml
+uptime_kuma:
+  url: http://uptime-kuma:3001/api/push
+  token: ${UPTIME_KUMA_TOKEN}
 
-```bash
-git clone https://go.hugobatista.com/gh/kuma-scout.git
-cd kuma-scout
-pip install -e ".[dev]"
+logging:
+  level: INFO
+
+# Heartbeat configuration - sends periodic pings during long operations
+heartbeat:
+  enabled: true
+  interval: 300  # Send heartbeat every 5 minutes
+  uptime_kuma:
+    token: ${HEARTBEAT_TOKEN}
+    # URL is optional - if not set, inherits from global uptime_kuma.url
+
+# Tag-based result aggregation tokens
+# Each tag automatically aggregates results of all checks tagged with it
+tags:
+  web:
+    uptime_kuma:
+      token: ${WEB_AGGREGATION_TOKEN}
+      # Optional: override URL for this tag (inherits global URL if not set)
+    description: "Aggregated status for web services"
+  storage:
+    uptime_kuma:
+      token: ${STORAGE_AGGREGATION_TOKEN}
+    description: "Aggregated status for storage checks"
+  backups:
+    uptime_kuma:
+      token: ${BACKUP_AGGREGATION_TOKEN}
+      # Example: send this tag's results to a different Uptime Kuma instance
+      # url: "http://secondary-uptimekuma:3001/api/push"
+    description: "Aggregated status for backup checks"
+
+checks:
+  - name: nginx_health
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    tags: [web]
+    
+  - name: disk_space
+    type: cmdcheck
+    command: "df -h / | grep -E '^/'"
+    tags: [storage]
+    timeout: 10
+    
+  - name: backup_check
+    type: kopiasnapshotstatus
+    path: "/data"
+    max_age_hours: 24
+    tags: [backups]
+    # Optional: override Uptime Kuma token for this specific check
+    uptime_kuma:
+      token: ${BACKUP_SPECIFIC_TOKEN}
+      # URL inherits from global if not overridden
 ```
 
-### Quick Commands
-
-**Run tests:**
-```bash
-hatch run test
-hatch run test --cov=src/kuma_scout
-hatch run test -v
-```
-
-**Code quality checks:**
-```bash
-hatch run check  # Run ruff, black, and mypy
-ruff check src/ tests/
-black src/ tests/
-mypy src/ tests/
-```
-
-### Building Package
-
-See [DEVELOPMENT.md](DEVELOPMENT.md#building-the-package) for package build instructions.
+### Run
 
 ```bash
-python -m pip install build
-python -m build
+export UPTIME_KUMA_TOKEN=your-push-token
+export WEB_AGGREGATION_TOKEN=your-web-aggregation-token
+export STORAGE_AGGREGATION_TOKEN=your-storage-aggregation-token
+export BACKUP_AGGREGATION_TOKEN=your-backup-aggregation-token
+
+# Run all checks - results aggregate by tag automatically
+kuma-scout run /etc/kuma-scout/config.yaml
 ```
+
+**What happens:**
+
+Each check sends **two reports** automatically:
+
+1. **Individual Result** - to the check's Uptime Kuma token
+   - Uses the check's `uptime_kuma` config if set, otherwise inherits global `uptime_kuma`
+   - If check overrides `token` but not `url`, URL is inherited from global config
+   - Examples:
+     - `nginx_health` → `${UPTIME_KUMA_TOKEN}` (uses global URL + global token)
+     - `backup_check` → `${BACKUP_SPECIFIC_TOKEN}` @ global URL (token overridden, URL inherited)
+
+2. **Aggregated Result** - automatically combined by tag and sent to tag tokens
+   - Tag uses its `uptime_kuma` config if set, otherwise inherits global `uptime_kuma`
+   - If tag overrides `token` but not `url`, URL is inherited from global config
+   - Examples:
+     - `web` tag → `${WEB_AGGREGATION_TOKEN}` @ global URL (aggregated nginx_health)
+     - `storage` tag → `${STORAGE_AGGREGATION_TOKEN}` @ global URL (aggregated disk_space)
+     - `backups` tag → `${BACKUP_AGGREGATION_TOKEN}` @ global URL (aggregated backup_check)
+
+**Example with all scenarios:**
+```yaml
+uptime_kuma:
+  url: http://uptimekuma:3001/api/push
+  token: DEFAULT_TOKEN
+
+tags:
+  web:
+    uptime_kuma:
+      token: WEB_TAG_TOKEN
+  backup:
+    uptime_kuma:
+      url: "http://secondary:3001/api/push"  # Override URL only
+      token: BACKUP_TAG_TOKEN
+
+checks:
+  - name: nginx
+    type: cmdcheck
+    command: "systemctl is-active nginx"
+    tags: [web]
+    # No uptime_kuma override - uses: DEFAULT_TOKEN @ http://uptimekuma:3001/api/push
+
+  - name: mysql
+    type: cmdcheck
+    command: "systemctl is-active mysql"
+    tags: [backup]
+    uptime_kuma:
+      token: MYSQL_CUSTOM_TOKEN
+      # URL not overridden - inherits: http://uptimekuma:3001/api/push
+```
+
+**Results sent:**
+- nginx individual: DEFAULT_TOKEN @ uptimekuma (no per-check override)
+- nginx tag aggregation: WEB_TAG_TOKEN @ uptimekuma (web tag, global URL)
+- mysql individual: MYSQL_CUSTOM_TOKEN @ uptimekuma (token overridden, URL inherited)
+- mysql tag aggregation: BACKUP_TAG_TOKEN @ secondary (backup tag, URL overridden)
+- **Total: 4 API calls** to Uptime Kuma (2 individual + 2 aggregated)
+
+Or schedule with cron:
+
+```bash
+# Run every 5 minutes
+*/5 * * * * kuma-scout run /etc/kuma-scout/config.yaml
+```
+
+## Security
+
+⚠️ **Key Points:**
+- Configuration files contain authentication tokens - restrict permissions to `600`
+- Run as non-root user with minimal privileges when possible
+- Commands executed without shell interpretation (injection-safe)
+- SSH strict host key checking enabled by default
+
+See [doc/SECURITY.md](doc/SECURITY.md) for comprehensive security guidance.
+
+## Upgrading
+
+For migration notes between versions, see [doc/MIGRATION.md](doc/MIGRATION.md).
 
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details
 
-## Author
-
-Hugo Batista - [GitHub](https://go.hugobatista.com/gh)
-
 ## Contributing
 
-Contributions are welcome! See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for development setup and guidelines.
+Contributions welcome! See [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) for development setup.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run tests and linting: `hatch run check`
-6. Submit a pull request
+1. Fork and create a feature branch
+2. Make your changes with tests
+3. Run `hatch run check` to validate
+4. Submit a pull request
 
 ## Issues
 
-Found a bug? Report it on [GitHub Issues](https://go.hugobatista.com/gh/kuma-scout/issues)
+Report bugs on [GitHub Issues](https://go.hugobatista.com/gh/kuma-scout/issues)
 
-## Related Projects
+## Related
 
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma) - Self-hosted monitoring tool

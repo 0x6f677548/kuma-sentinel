@@ -48,8 +48,11 @@ def _add_file_handler(logger: logging.Logger, log_file: str) -> None:
 
     Args:
         logger: Logger instance to add handler to
-        log_file: Path to log file
+        log_file: Path to log file (None to skip file logging)
     """
+    if not log_file:
+        return  # Skip file logging if no file specified
+
     try:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,22 +83,25 @@ def setup_default_logging():
     logger.handlers.clear()
 
     # Add handlers
-    _add_console_handler(logger)
     _add_syslog_handler(logger, silent=True)
 
     return logger
 
 
-def setup_logging(log_file, log_level="INFO"):
+def setup_logging(log_file, log_level=None, verbose=False):
     """Configure logging with file, stdout, and journalctl.
 
     Args:
         log_file: Path to log file
-        log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL), or None for default
+        verbose: If True, add console handler for verbose logging output
     """
     logger = logging.getLogger("kuma_scout")
     # Convert string log level to logging constant
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    if log_level:
+        level = getattr(logging, log_level.upper(), logging.INFO)
+    else:
+        level = logging.INFO
     logger.setLevel(level)
 
     # Remove existing handlers to avoid duplicates
@@ -103,8 +109,11 @@ def setup_logging(log_file, log_level="INFO"):
 
     # Add handlers
     _add_file_handler(logger, log_file)
-    _add_console_handler(logger)
     _add_syslog_handler(logger, silent=False)
+
+    # Add console handler if verbose mode is enabled
+    if verbose:
+        _add_console_handler(logger)
 
     return logger
 
@@ -115,7 +124,10 @@ def get_logger():
 
 
 def log_security_event(
-    logger: logging.Logger, event_type: str, details: str, level: str = "warning"
+    event_type: str,
+    details: str,
+    level: str = "warning",
+    echo: bool = False,
 ) -> None:
     """Log a security-relevant event with consistent formatting.
 
@@ -124,18 +136,19 @@ def log_security_event(
     infrastructure while providing clear visibility of security-critical events.
 
     Args:
-        logger: Logger instance to use
         event_type: Type of security event (e.g., "dangerous_command_detected",
                    "permission_bypass", "token_validation_failed")
         details: Description of the event with relevant context
         level: Log level as string ("warning", "error", "info"). Default: "warning"
+        echo: Whether to echo to console. Default: False
 
     Examples:
-        log_security_event(logger, "dangerous_command_detected",
+        log_security_event("dangerous_command_detected",
                           "Command 'rm -rf' matches dangerous pattern")
-        log_security_event(logger, "permission_bypass",
+        log_security_event("permission_bypass",
                           "Config file permissions ignored via flag", level="error")
     """
+    logger = get_logger()
     prefix = "[SECURITY-EVENT]"
     message = f"{prefix} {event_type}: {details}"
 

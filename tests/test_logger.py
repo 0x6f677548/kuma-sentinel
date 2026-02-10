@@ -228,13 +228,17 @@ class TestSetupDefaultLogging:
         assert logger.level == logging.INFO
 
     def test_setup_default_logging_adds_console_handler(self):
-        """Test that console handler is added."""
+        """Test that no console handler is added (console logging removed)."""
         logger = setup_default_logging()
 
         console_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.StreamHandler)
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler)
+            and hasattr(h, "stream")
+            and h.stream in (sys.stdout, sys.stderr)
         ]
-        assert len(console_handlers) > 0
+        assert len(console_handlers) == 0
 
     def test_setup_default_logging_clears_existing_handlers(self):
         """Test that existing handlers are cleared before adding new ones."""
@@ -335,14 +339,18 @@ class TestSetupLogging:
         assert len(file_handlers) > 0
 
     def test_setup_logging_adds_console_handler(self, tmp_path):
-        """Test that console handler is added."""
+        """Test that no console handler is added (console logging removed)."""
         log_file = tmp_path / "app.log"
         logger = setup_logging(str(log_file))
 
         console_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.StreamHandler)
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler)
+            and hasattr(h, "stream")
+            and h.stream in (sys.stdout, sys.stderr)
         ]
-        assert len(console_handlers) > 0
+        assert len(console_handlers) == 0
 
     def test_setup_logging_clears_existing_handlers(self, tmp_path):
         """Test that existing handlers are cleared."""
@@ -416,7 +424,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "test details")
+        log_security_event("test_event", "test details")
 
         assert "[SECURITY-EVENT]" in caplog.text
         assert "test_event" in caplog.text
@@ -427,7 +435,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_info")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "test details", level="info")
+        log_security_event("test_event", "test details", level="info")
 
         assert "[SECURITY-EVENT]" in caplog.text
         assert "test_event: test details" in caplog.text
@@ -437,7 +445,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_warning")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "test details", level="warning")
+        log_security_event("test_event", "test details", level="warning")
 
         assert "[SECURITY-EVENT]" in caplog.text
         assert "test_event: test details" in caplog.text
@@ -447,7 +455,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_error")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "test details", level="error")
+        log_security_event("test_event", "test details", level="error")
 
         assert "[SECURITY-EVENT]" in caplog.text
         assert "test_event: test details" in caplog.text
@@ -457,7 +465,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_format")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "dangerous_command_detected", "rm -rf /")
+        log_security_event("dangerous_command_detected", "rm -rf /")
 
         expected_message = "[SECURITY-EVENT] dangerous_command_detected: rm -rf /"
         assert expected_message in caplog.text
@@ -467,7 +475,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_case")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "details", level="ERROR")
+        log_security_event("test_event", "details", level="ERROR")
 
         assert "[SECURITY-EVENT]" in caplog.text
 
@@ -476,7 +484,7 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_invalid")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "test_event", "details", level="INVALID")
+        log_security_event("test_event", "details", level="INVALID")
 
         assert "[SECURITY-EVENT]" in caplog.text
 
@@ -484,36 +492,40 @@ class TestLogSecurityEvent:
         """Test security event logging with mocked logger."""
         mock_logger = MagicMock(spec=logging.Logger)
 
-        log_security_event(mock_logger, "permission_bypass", "config ignored")
+        with patch("kuma_scout.core.logger.get_logger", return_value=mock_logger):
+            log_security_event("permission_bypass", "config ignored")
 
-        mock_logger.warning.assert_called_once()
-        call_args = mock_logger.warning.call_args[0][0]
-        assert "[SECURITY-EVENT]" in call_args
-        assert "permission_bypass" in call_args
+            mock_logger.warning.assert_called_once()
+            call_args = mock_logger.warning.call_args[0][0]
+            assert "[SECURITY-EVENT]" in call_args
+            assert "permission_bypass" in call_args
 
     def test_log_security_event_error_calls_logger_error(self):
         """Test that ERROR level calls logger.error()."""
         mock_logger = MagicMock(spec=logging.Logger)
 
-        log_security_event(mock_logger, "critical_event", "details", level="error")
+        with patch("kuma_scout.core.logger.get_logger", return_value=mock_logger):
+            log_security_event("critical_event", "details", level="error")
 
-        mock_logger.error.assert_called_once()
+            mock_logger.error.assert_called_once()
 
     def test_log_security_event_info_calls_logger_info(self):
         """Test that INFO level calls logger.info()."""
         mock_logger = MagicMock(spec=logging.Logger)
 
-        log_security_event(mock_logger, "info_event", "details", level="info")
+        with patch("kuma_scout.core.logger.get_logger", return_value=mock_logger):
+            log_security_event("info_event", "details", level="info")
 
-        mock_logger.info.assert_called_once()
+            mock_logger.info.assert_called_once()
 
     def test_log_security_event_warning_calls_logger_warning(self):
         """Test that WARNING level calls logger.warning()."""
         mock_logger = MagicMock(spec=logging.Logger)
 
-        log_security_event(mock_logger, "warning_event", "details", level="warning")
+        with patch("kuma_scout.core.logger.get_logger", return_value=mock_logger):
+            log_security_event("warning_event", "details", level="warning")
 
-        mock_logger.warning.assert_called_once()
+            mock_logger.warning.assert_called_once()
 
     def test_log_security_event_with_special_characters(self, caplog):
         """Test that special characters in event details are preserved."""
@@ -521,7 +533,7 @@ class TestLogSecurityEvent:
         logger.setLevel(logging.DEBUG)
 
         special_details = "Command: rm -rf / && echo 'danger'"
-        log_security_event(logger, "dangerous_cmd", special_details)
+        log_security_event("dangerous_cmd", special_details)
 
         assert special_details in caplog.text
 
@@ -530,9 +542,9 @@ class TestLogSecurityEvent:
         logger = logging.getLogger("test_security_multi")
         logger.setLevel(logging.DEBUG)
 
-        log_security_event(logger, "event1", "details1")
-        log_security_event(logger, "event2", "details2", level="error")
-        log_security_event(logger, "event3", "details3", level="info")
+        log_security_event("event1", "details1")
+        log_security_event("event2", "details2", level="error")
+        log_security_event("event3", "details3", level="info")
 
         assert "event1" in caplog.text
         assert "event2" in caplog.text
@@ -566,7 +578,7 @@ class TestLoggerIntegration:
         assert len(logger2.handlers) >= 2
 
     def test_logger_outputs_to_multiple_destinations(self, tmp_path, capsys):
-        """Test that logger outputs to both file and console."""
+        """Test that logger outputs to file only (console logging removed)."""
         log_file = tmp_path / "app.log"
         logger = setup_logging(str(log_file), log_level="INFO")
 
@@ -578,9 +590,9 @@ class TestLoggerIntegration:
         file_content = log_file.read_text()
         assert test_message in file_content
 
-        # Check console output
+        # Check no console output (console handler removed)
         captured = capsys.readouterr()
-        assert test_message in captured.out
+        assert test_message not in captured.out
 
     def test_security_event_with_configured_logger(self, tmp_path, caplog):
         """Test security event logging with fully configured logger."""

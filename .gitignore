@@ -133,3 +133,6 @@ dmypy.json
 nmap_output_*.xml
 *.nmap
 test.config.yaml
+doc/newarchitecture.md
+new-format.config.yaml
+REVIEW.md

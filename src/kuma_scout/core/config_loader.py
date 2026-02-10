@@ -12,6 +12,7 @@ from typing import Any, List, Tuple
 import yaml
 
 from kuma_scout.core.logger import log_security_event
+from kuma_scout.core.utils.ssh_runner import parse_ssh_connection_string
 from kuma_scout.plugins.models import GlobalConfig
 
 
@@ -96,11 +97,15 @@ def _load_yaml_config(config_file: Path) -> dict:
 def _parse_ssh_host(raw_config: dict) -> None:
     """Parse SSH host for user@host format."""
     if "ssh" in raw_config and "host" in raw_config["ssh"]:
-        host = raw_config["ssh"]["host"]
-        if "@" in host and "user" not in raw_config["ssh"]:
-            user, host = host.split("@", 1)
-            raw_config["ssh"]["user"] = user
-            raw_config["ssh"]["host"] = host
+        parsed_host, parsed_user, parsed_port = parse_ssh_connection_string(
+            raw_config["ssh"]["host"]
+        )
+        if parsed_host:
+            raw_config["ssh"]["host"] = parsed_host
+        if parsed_user and "user" not in raw_config["ssh"]:
+            raw_config["ssh"]["user"] = parsed_user
+        if parsed_port is not None and "port" not in raw_config["ssh"]:
+            raw_config["ssh"]["port"] = parsed_port
 
 
 def _parse_global_config(raw_config: dict) -> GlobalConfig:

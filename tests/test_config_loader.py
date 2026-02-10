@@ -13,6 +13,7 @@ from kuma_scout.core.config_loader import (
     _expand_env_vars,
     _load_yaml_config,
     _parse_checks,
+    _parse_ssh_host,
     load_config,
 )
 
@@ -339,3 +340,65 @@ uptime_kuma:
             )
         finally:
             Path(temp_path).unlink()
+
+
+class TestParseSSHHost:
+    """Test SSH host parsing functionality."""
+
+    def test_parse_user_at_host(self):
+        """Test parsing user@host format."""
+        raw_config = {"ssh": {"host": "user@example.com"}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert raw_config["ssh"]["user"] == "user"
+
+    def test_parse_host_with_port(self):
+        """Test parsing host:port format."""
+        raw_config = {"ssh": {"host": "example.com:2222"}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert raw_config["ssh"]["port"] == 2222
+
+    def test_parse_user_at_host_with_port(self):
+        """Test parsing user@host:port format."""
+        raw_config = {"ssh": {"host": "user@example.com:2222"}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert raw_config["ssh"]["user"] == "user"
+        assert raw_config["ssh"]["port"] == 2222
+
+    def test_parse_host_only(self):
+        """Test parsing host only."""
+        raw_config = {"ssh": {"host": "example.com"}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert "user" not in raw_config["ssh"]
+        assert "port" not in raw_config["ssh"]
+
+    def test_no_override_existing_user(self):
+        """Test that existing user is not overridden."""
+        raw_config = {"ssh": {"host": "user@example.com", "user": "existing_user"}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert raw_config["ssh"]["user"] == "existing_user"
+
+    def test_no_override_existing_port(self):
+        """Test that existing port is not overridden."""
+        raw_config = {"ssh": {"host": "example.com:2222", "port": 22}}
+        _parse_ssh_host(raw_config)
+        assert raw_config["ssh"]["host"] == "example.com"
+        assert raw_config["ssh"]["port"] == 22
+
+    def test_no_ssh_section(self):
+        """Test no modification when no ssh section."""
+        raw_config = {"other": "value"}
+        original = raw_config.copy()
+        _parse_ssh_host(raw_config)
+        assert raw_config == original
+
+    def test_no_host_in_ssh(self):
+        """Test no modification when no host in ssh section."""
+        raw_config = {"ssh": {"user": "user"}}
+        original = raw_config.copy()
+        _parse_ssh_host(raw_config)
+        assert raw_config == original

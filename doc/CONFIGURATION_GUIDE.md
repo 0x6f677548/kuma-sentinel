@@ -222,10 +222,13 @@ logging:
 ssh:
   # SSH connection string (recommended approach)
   # Supported formats: ssh://user@host:port, user@host:port, user@host, host:port, host
-  host: backup-server.example.com
+  host: root@backup-server.example.com:2222  # Full connection string parsed automatically
   
-  user: root                             # SSH username
-  port: 22                               # SSH port
+  # Alternatively, specify components separately:
+  # host: backup-server.example.com
+  # user: root
+  # port: 2222
+  
   key_file: /root/.ssh/id_rsa            # Path to SSH private key
   password: "${SSH_PASSWORD}"            # SSH password (discouraged, use keys)
   strict_host_key_checking: true         # Verify host keys (default: true)

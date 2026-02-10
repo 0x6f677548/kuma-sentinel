@@ -7,7 +7,7 @@ used across all plugins.
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SSHConfig(BaseModel):
@@ -98,3 +98,14 @@ class GlobalConfig(BaseModel):
     checks: list[dict] = Field(
         default_factory=list, description="List of check configurations"
     )
+    quiet: bool = Field(default=False, description="Suppress all console output")
+    verbose: bool = Field(
+        default=False, description="Enable verbose logging to console (DEBUG level)"
+    )
+
+    @model_validator(mode="after")
+    def validate_quiet_verbose_exclusive(self) -> "GlobalConfig":
+        """Ensure quiet and verbose are not both True."""
+        if self.quiet and self.verbose:
+            raise ValueError("Cannot set both 'quiet' and 'verbose' options")
+        return self

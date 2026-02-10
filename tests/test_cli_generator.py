@@ -404,10 +404,12 @@ class TestSetupRunCommand:
                 ssh_password=None,
                 ssh_strict_host_key_checking=True,
                 ssh_no_strict_host_key_checking=False,
+                quiet=False,
+                verbose=False,
             )
 
             mock_setup_default.assert_called_once()
-            mock_setup_logging.assert_called_once_with(None, "INFO")
+            mock_setup_logging.assert_called_once_with(None, "INFO", verbose=False)
             mock_load_config.assert_called_once_with(
                 "test.yaml", ignore_file_permissions=False
             )
@@ -443,6 +445,8 @@ class TestSetupRunCommand:
                     ssh_password=None,
                     ssh_strict_host_key_checking=True,
                     ssh_no_strict_host_key_checking=False,
+                    quiet=False,
+                    verbose=False,
                 )
 
             mock_output_handler.error.assert_called_once_with(
@@ -480,10 +484,12 @@ class TestSetupRunCommand:
                 ssh_password="secret",
                 ssh_strict_host_key_checking=False,
                 ssh_no_strict_host_key_checking=False,
+                quiet=False,
+                verbose=False,
             )
 
             mock_setup_default.assert_called_once()
-            mock_setup_logging.assert_called_once_with(None, "INFO")
+            mock_setup_logging.assert_called_once_with(None, "INFO", verbose=False)
             mock_load_config.assert_called_once_with(
                 "test.yaml", ignore_file_permissions=False
             )

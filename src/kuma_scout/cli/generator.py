@@ -80,13 +80,15 @@ class CLIGenerator:
         ssh_password: Optional[str],
         ssh_strict_host_key_checking: bool,
         ssh_no_strict_host_key_checking: bool,
+        quiet: bool = False,
+        verbose: bool = False,
     ) -> tuple:
         """Setup phase for run command: logging, config loading, overrides, SSH."""
         # Initialize default logging first
         setup_default_logging()
 
         # Create output handler for unified logging and echoing
-        output_handler = OutputHandler(Console())
+        output_handler = OutputHandler(Console(), quiet=quiet)
 
         # Load config with global options
         try:
@@ -106,10 +108,16 @@ class CLIGenerator:
             timeout,
             log_file,
             log_level,
+            quiet,
+            verbose,
         )
 
         # Update logging configuration with final config values
-        setup_logging(global_config.logging.file, global_config.logging.level)
+        setup_logging(
+            global_config.logging.file,
+            global_config.logging.level,
+            verbose=global_config.verbose,
+        )
 
         # Setup SSH configuration
         self._setup_ssh_config(
@@ -352,6 +360,8 @@ class CLIGenerator:
         timeout: int,
         log_file: Optional[str],
         log_level: Optional[str],
+        quiet: bool = False,
+        verbose: bool = False,
     ) -> None:
         """Apply command-line overrides to global configuration."""
         # Expand environment variables in tokens
@@ -369,6 +379,8 @@ class CLIGenerator:
             timeout,
             log_file,
             log_level,
+            quiet,
+            verbose,
         )
 
     def _setup_ssh_config(
@@ -627,6 +639,14 @@ class CLIGenerator:
                 "--ignore-file-permissions",
                 help="Ignore file permission checks on config file",
             ),
+            quiet: bool = typer.Option(
+                False, "--quiet", help="Suppress all console output"
+            ),
+            verbose: bool = typer.Option(
+                False,
+                "--verbose",
+                help="Enable verbose logging to console (DEBUG level)",
+            ),
             # Global options
             uptime_kuma_url: Optional[str] = typer.Option(
                 None,
@@ -690,6 +710,8 @@ class CLIGenerator:
                 ssh_password,
                 ssh_strict_host_key_checking,
                 ssh_no_strict_host_key_checking,
+                quiet,
+                verbose,
             )
 
             # Log configuration summary

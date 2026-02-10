@@ -88,12 +88,13 @@ def setup_default_logging():
     return logger
 
 
-def setup_logging(log_file, log_level=None):
+def setup_logging(log_file, log_level=None, verbose=False):
     """Configure logging with file, stdout, and journalctl.
 
     Args:
         log_file: Path to log file
         log_level: Logging level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL), or None for default
+        verbose: If True, add console handler for verbose logging output
     """
     logger = logging.getLogger("kuma_scout")
     # Convert string log level to logging constant
@@ -109,6 +110,10 @@ def setup_logging(log_file, log_level=None):
     # Add handlers
     _add_file_handler(logger, log_file)
     _add_syslog_handler(logger, silent=False)
+
+    # Add console handler if verbose mode is enabled
+    if verbose:
+        _add_console_handler(logger)
 
     return logger
 

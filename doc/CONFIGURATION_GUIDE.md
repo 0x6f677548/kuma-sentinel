@@ -2018,9 +2018,27 @@ kuma-scout run config.yaml --log-level DEBUG
 
 # Set log file via CLI
 kuma-scout run config.yaml --log-file /var/log/custom.log
+
+# Suppress all console output (file and syslog logging still work)
+kuma-scout run config.yaml --quiet
+
+# Enable verbose logging with console output (sets log level to DEBUG)
+kuma-scout run config.yaml --verbose
 ```
 
-**Note:** Logging configuration supports variable expansion (e.g., `${LOG_LEVEL}`) in YAML files.
+**Quiet Mode (`--quiet`):**
+- Suppresses all console/terminal output
+- File and syslog logging continue to work normally
+- Useful for running checks from cron jobs or automated systems where you only want logs, not console noise
+
+**Verbose Mode (`--verbose`):**
+- Enables DEBUG level logging
+- Adds console handler to output logs to stdout/stderr
+- Useful for troubleshooting issues or seeing detailed execution flow
+- Automatically sets log level to DEBUG (can be overridden with explicit `--log-level`)
+- **Note:** Quiet and verbose are mutually exclusive
+
+**Note:** Logging configuration supports variable expansion (e.g., `${LOG_LEVEL}`) in YAML files. Quiet and verbose modes cannot be set in YAML; they must be specified via CLI arguments.
 
 ### Heartbeat (Uptime Kuma monitoring)
 ```yaml

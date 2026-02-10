@@ -101,6 +101,32 @@ class ConfigMerger:
             merged_config["timeout"] = global_config.timeout
 
     @staticmethod
+    def apply_quiet_verbose_overrides(
+        global_config: GlobalConfig,
+        quiet: bool,
+        verbose: bool,
+        log_level: Optional[str],
+    ) -> None:
+        """Apply quiet and verbose flags to global configuration.
+
+        Args:
+            global_config: Global configuration to update
+            quiet: CLI-provided quiet flag
+            verbose: CLI-provided verbose flag
+            log_level: CLI-provided log level (may affect verbose behavior)
+
+        Note:
+            quiet and verbose are mutually exclusive and validated by GlobalConfig.
+        """
+        if quiet:
+            global_config.quiet = True
+        if verbose:
+            global_config.verbose = True
+            # Verbose mode sets log level to DEBUG if not already explicitly set
+            if log_level is None:
+                global_config.logging.level = "DEBUG"
+
+    @staticmethod
     def apply_cli_overrides(
         global_config: GlobalConfig,
         uptime_kuma_url: Optional[str],
@@ -109,6 +135,8 @@ class ConfigMerger:
         timeout: int,
         log_file: Optional[str],
         log_level: Optional[str],
+        quiet: bool = False,
+        verbose: bool = False,
     ) -> None:
         """Apply CLI argument overrides to global configuration.
 
@@ -120,10 +148,13 @@ class ConfigMerger:
             timeout: CLI-provided timeout in seconds
             log_file: CLI-provided log file path
             log_level: CLI-provided log level
+            quiet: CLI-provided quiet flag
+            verbose: CLI-provided verbose flag
 
         Note:
             CLI arguments represent the highest priority in config hierarchy.
             They completely override YAML config values where specified.
+            quiet and verbose are mutually exclusive and validated by GlobalConfig.
         """
         if uptime_kuma_url:
             if not global_config.uptime_kuma:
@@ -146,3 +177,8 @@ class ConfigMerger:
 
         if log_level is not None:
             global_config.logging.level = log_level
+
+        # Apply quiet/verbose overrides
+        ConfigMerger.apply_quiet_verbose_overrides(
+            global_config, quiet, verbose, log_level
+        )

@@ -124,6 +124,9 @@ kuma-scout zfspoolstatus "tank" \
 | `--ssh CONNECTION` | ✗ | Remote SSH execution | `--ssh user@server` or `--ssh user@server:2222` |
 | `--timeout SECONDS` | ✗ | Operation timeout | `--timeout 600` |
 | `--log-level LEVEL` | ✗ | Debug output | `--log-level DEBUG` |
+| `--log-file PATH` | ✗ | Log file path | `--log-file /var/log/kuma-scout.log` |
+| `--quiet` | ✗ | Suppress console output | `--quiet` |
+| `--verbose` | ✗ | Enable verbose logging with console output | `--verbose` |
 
 ## Configuration Priority
 
@@ -138,6 +141,41 @@ Settings are resolved in order:
 export MY_TOKEN=my-token-value
 kuma-scout run config.yaml --token "${MY_TOKEN}"  # CLI token wins
 ```
+
+## Output Control
+
+### Quiet Mode (`--quiet`)
+
+Suppress all console output while maintaining file and syslog logging:
+
+```bash
+# Run silently, only logs go to file/syslog
+kuma-scout run config.yaml --quiet --log-file /var/log/kuma-scout.log
+```
+
+Useful for:
+- Cron jobs and automated systems
+- Running checks in background without terminal output
+- Clean Docker/container execution
+
+### Verbose Mode (`--verbose`)
+
+Enable debug-level logging with console output:
+
+```bash
+# Show detailed execution flow
+kuma-scout run config.yaml --verbose
+
+# Verbose with custom log file
+kuma-scout run config.yaml --verbose --log-file /var/log/debug.log
+```
+
+Useful for:
+- Troubleshooting check failures
+- Understanding execution flow
+- Debugging configuration issues
+
+**Note:** Quiet and verbose modes are mutually exclusive. Using both will result in an error.
 
 ## Variable Expansion
 

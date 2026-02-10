@@ -22,9 +22,10 @@ class OutputHandler:
     when available via get_execution_context().
     """
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Optional[Console] = None, quiet: bool = False):
         self.logger = get_logger()
         self.console = console
+        self.quiet = quiet
 
     def _enrich_message(self, message: str) -> str:
         """Enrich message with execution context if available.
@@ -62,17 +63,23 @@ class OutputHandler:
         return json.dumps(details, separators=(",", ":"))
 
     def info(self, message: str, echo: bool = False) -> None:
-        """Log info message and optionally echo to console."""
+        """Log info message and optionally echo to console.
+
+        In quiet mode, console output is suppressed.
+        """
         enriched = self._enrich_message(message)
         self.logger.info(enriched)
-        if echo and self.console:
+        if echo and self.console and not self.quiet:
             self.console.print(message)
 
     def debug(self, message: str, echo: bool = False) -> None:
-        """Log debug message and optionally echo to console."""
+        """Log debug message and optionally echo to console.
+
+        In quiet mode, console output is suppressed.
+        """
         enriched = self._enrich_message(message)
         self.logger.debug(enriched)
-        if echo and self.console:
+        if echo and self.console and not self.quiet:
             self.console.print(message)
 
     def warning(self, message: str, echo: bool = False) -> None:
@@ -80,6 +87,7 @@ class OutputHandler:
 
         When execution context is available, includes full context details (timing,
         config, etc.) to aid troubleshooting.
+        In quiet mode, console output is suppressed.
         """
         enriched = self._enrich_message(message)
         context_details = self._get_full_context_details()
@@ -90,7 +98,7 @@ class OutputHandler:
             log_message = enriched
 
         self.logger.warning(log_message)
-        if echo and self.console:
+        if echo and self.console and not self.quiet:
             self.console.print(f"[yellow]{message}[/yellow]")
 
     def error(self, message: str, echo: bool = False) -> None:
@@ -98,6 +106,7 @@ class OutputHandler:
 
         When execution context is available, includes full context details (timing,
         config, etc.) to aid troubleshooting.
+        In quiet mode, console output is suppressed.
         """
         enriched = self._enrich_message(message)
         context_details = self._get_full_context_details()
@@ -108,10 +117,13 @@ class OutputHandler:
             log_message = enriched
 
         self.logger.error(log_message)
-        if echo and self.console:
+        if echo and self.console and not self.quiet:
             self.console.print(f"[red]{message}[/red]")
 
     def print_table(self, table: Table, echo: bool = True) -> None:
-        """Print a Rich table to console if echo is True."""
-        if echo and self.console:
+        """Print a Rich table to console if echo is True.
+
+        In quiet mode, console output is suppressed.
+        """
+        if echo and self.console and not self.quiet:
             self.console.print(table)

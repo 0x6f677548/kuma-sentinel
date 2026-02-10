@@ -316,9 +316,11 @@ class TestExecuteCheckWithReporting:
         )
         check_config_obj.uptime_kuma = None
 
-        with patch("kuma_scout.cli.generator.execution_context_manager"), \
-             patch("kuma_scout.cli.generator.SSHRunner") as mock_ssh_runner, \
-             patch("kuma_scout.cli.generator.send_push", return_value=True):
+        with patch("kuma_scout.cli.generator.execution_context_manager"), patch(
+            "kuma_scout.cli.generator.SSHRunner"
+        ) as mock_ssh_runner, patch(
+            "kuma_scout.cli.generator.send_push", return_value=True
+        ):
 
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
@@ -358,9 +360,11 @@ class TestExecuteCheckWithReporting:
         )
         check_config_obj.uptime_kuma = None
 
-        with patch("kuma_scout.cli.generator.execution_context_manager"), \
-             patch("kuma_scout.cli.generator.SSHRunner") as mock_ssh_runner, \
-             patch("kuma_scout.cli.generator.send_push", return_value=True):
+        with patch("kuma_scout.cli.generator.execution_context_manager"), patch(
+            "kuma_scout.cli.generator.SSHRunner"
+        ) as mock_ssh_runner, patch(
+            "kuma_scout.cli.generator.send_push", return_value=True
+        ):
 
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
@@ -399,8 +403,10 @@ class TestExecuteCheckWithReporting:
         )
         check_config_obj.uptime_kuma = None
 
-        with patch("kuma_scout.cli.generator.execution_context_manager"), \
-             patch("kuma_scout.cli.generator.parse_ssh_connection_string", return_value=(None, None, None)):
+        with patch("kuma_scout.cli.generator.execution_context_manager"), patch(
+            "kuma_scout.cli.generator.parse_ssh_connection_string",
+            return_value=(None, None, None),
+        ):
 
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
@@ -412,7 +418,9 @@ class TestExecuteCheckWithReporting:
             # Should return None and log error
             assert result is None
             mock_output_handler.error.assert_called_once()
-            assert "Failed to parse SSH host" in mock_output_handler.error.call_args[0][0]
+            assert (
+                "Failed to parse SSH host" in mock_output_handler.error.call_args[0][0]
+            )
 
 
 class TestPluginSubcommandGeneration:

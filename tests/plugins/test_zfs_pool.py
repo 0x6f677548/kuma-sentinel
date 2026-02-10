@@ -96,3 +96,58 @@ class TestZfsPoolExecution:
 
             assert result.status == "down"
             assert "Failed to get status" in result.message
+
+    def test_no_pool_configured(self, plugin):
+        """Test failure when no pool is configured."""
+        config = ZfsPoolConfig(name="test-no-pool", pool="")
+
+        result = plugin.execute(config)
+
+        assert result.status == "down"
+        assert "No ZFS pool configured" in result.message
+
+    def test_empty_output_failure(self, plugin, config):
+        """Test failure with empty output from zpool."""
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, "", "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to get status" in result.message
+
+    def test_unexpected_output_format_failure(self, plugin, config):
+        """Test failure with unexpected output format."""
+        mock_output = "tank\t50%"  # Missing health field
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, mock_output, "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to get status" in result.message
+
+    def test_pool_name_mismatch_failure(self, plugin, config):
+        """Test failure when pool name doesn't match."""
+        mock_output = "otherpool\t50%\tONLINE"
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, mock_output, "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to get status" in result.message
+
+    def test_invalid_capacity_format_failure(self, plugin, config):
+        """Test failure when capacity cannot be parsed."""
+        mock_output = "tank\tinvalid%\tONLINE"
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, mock_output, "", 0)
+
+            result = plugin.execute(config)
+
+            assert result.status == "down"
+            assert "Failed to get status" in result.message

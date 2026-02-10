@@ -5,6 +5,7 @@ Scans TCP ports on target IP ranges and reports results to Uptime Kuma.
 """
 
 import os
+import tempfile
 import xml.etree.ElementTree as ET
 from typing import List, Optional
 
@@ -12,8 +13,7 @@ from pydantic import Field
 
 from kuma_scout.core.logger import log_security_event
 from kuma_scout.core.models import CheckResult
-
-from .base import CheckConfig, Plugin, execute_with_timing
+from kuma_scout.plugins.base import CheckConfig, Plugin, execute_with_timing
 
 
 class PortscanConfig(CheckConfig):
@@ -138,7 +138,6 @@ class PortscanPlugin(Plugin):
 
     def _create_nmap_xml_file(self) -> str:
         """Create temporary file for nmap XML output."""
-        import tempfile
 
         fd, path = tempfile.mkstemp(suffix=".xml", text=True)
         os.chmod(path, 0o600)

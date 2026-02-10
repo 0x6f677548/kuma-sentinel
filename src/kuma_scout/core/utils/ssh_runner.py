@@ -156,7 +156,7 @@ class SSHRunner:
 
         timeout = timeout or self.timeout
 
-        # If password is provided, use sshpass (if available)
+        env = None
         if self.password:
             # SECURITY: Use environment variable instead of command line argument
             # to prevent password exposure in process lists (ps/top)
@@ -168,53 +168,22 @@ class SSHRunner:
                 level="warning",
             )
 
-            # Try to use sshpass with environment variable (more secure than -p flag)
-            # Set password in environment variable for sshpass
             env = os.environ.copy()
             env["SSHPASS"] = self.password
 
             ssh_cmd = ["sshpass", "-e"] + ssh_cmd
 
-            try:
-                result = subprocess.run(
-                    ssh_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    env=env,  # Pass modified environment
-                )
-                # Check for SSH connection errors
-                if result.returncode != 0 and self._is_ssh_connection_error(
-                    result.stderr
-                ):
-                    self._log_ssh_auth_failure(result.stderr)
-                    raise SSHConnectionError(
-                        result.stderr or "Connection failed", result.stderr
-                    )
-                return (
-                    result.returncode == 0,
-                    result.stdout,
-                    result.stderr,
-                    result.returncode,
-                )
-            except subprocess.TimeoutExpired:
-                return False, "", f"Command timed out after {timeout}s", -1
-            except SSHConnectionError:
-                raise  # Re-raise SSH connection errors
-            except Exception as e:
-                return False, "", str(e), -1
-
-        # No password - use standard SSH
         try:
             result = subprocess.run(
                 ssh_cmd,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
+                env=env,
             )
-            # Check for SSH connection errors
-            if result.returncode != 0 and self._is_ssh_connection_error(result.stderr):
+            if result.returncode != 0:
                 self._log_ssh_auth_failure(result.stderr)
+            if result.returncode != 0 and self._is_ssh_connection_error(result.stderr):
                 raise SSHConnectionError(
                     result.stderr or "Connection failed", result.stderr
                 )

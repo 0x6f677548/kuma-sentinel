@@ -532,7 +532,9 @@ class CLIGenerator:
             ssh_config = check_config_obj.ssh or global_config.ssh
             if ssh_config and ssh_config.host:
                 # Parse SSH connection string to extract host, user, port
-                parsed_host, parsed_user, parsed_port = parse_ssh_connection_string(ssh_config.host)
+                parsed_host, parsed_user, parsed_port = parse_ssh_connection_string(
+                    ssh_config.host
+                )
                 if parsed_host is None:
                     output_handler.error(
                         f"Failed to parse SSH host from connection string: {ssh_config.host}",
@@ -543,7 +545,11 @@ class CLIGenerator:
                 # Merge parsed values with explicit config fields (explicit fields win)
                 host = parsed_host
                 user = ssh_config.user if ssh_config.user is not None else parsed_user
-                port = ssh_config.port if ssh_config.port is not None else (parsed_port or 22)
+                port = (
+                    ssh_config.port
+                    if ssh_config.port is not None
+                    else (parsed_port or 22)
+                )
 
                 ssh_runner = SSHRunner(
                     host=host,
@@ -586,8 +592,8 @@ class CLIGenerator:
                 success = send_push(
                     uptime_kuma_url=str(uptime_url),
                     push_token=uptime_token,
-                    message=result.message,
-                    command=check_config_obj.name,
+                    message=DataSanitizer.sanitize_output(result.message),
+                    command=DataSanitizer.sanitize_output(check_config_obj.name),
                     status=status,
                     ping_ms=int(result.duration_seconds * 1000),
                     output_handler=output_handler,

@@ -531,16 +531,24 @@ class CLIGenerator:
             ssh_runner = None
             ssh_config = check_config_obj.ssh or global_config.ssh
             if ssh_config and ssh_config.host:
-                # Parse user@host format
-                host = ssh_config.host
-                user = None
-                if "@" in host:
-                    user, host = host.split("@", 1)
+                # Parse SSH connection string to extract host, user, port
+                parsed_host, parsed_user, parsed_port = parse_ssh_connection_string(ssh_config.host)
+                if parsed_host is None:
+                    output_handler.error(
+                        f"Failed to parse SSH host from connection string: {ssh_config.host}",
+                        echo=True,
+                    )
+                    return None
+
+                # Merge parsed values with explicit config fields (explicit fields win)
+                host = parsed_host
+                user = ssh_config.user if ssh_config.user is not None else parsed_user
+                port = ssh_config.port if ssh_config.port is not None else (parsed_port or 22)
 
                 ssh_runner = SSHRunner(
                     host=host,
                     user=user,
-                    port=ssh_config.port or 22,
+                    port=port,
                     key_file=ssh_config.key_file,
                     password=ssh_config.password,
                     strict_host_key_checking=ssh_config.strict_host_key_checking,

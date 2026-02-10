@@ -188,8 +188,10 @@ checks:
 
         try:
             global_config, checks = load_config(temp_path, ignore_file_permissions=True)
-            assert global_config.uptime_kuma.url == "http://test:3001/api/push"
-            assert global_config.uptime_kuma.token == "test-token"
+            uptime_kuma = global_config.uptime_kuma
+            assert uptime_kuma is not None
+            assert uptime_kuma.url == "http://test:3001/api/push"
+            assert uptime_kuma.token == "test-token"
             assert len(checks) == 1
             assert checks[0][0] == "cmdcheck"
             assert checks[0][1]["name"] == "test-check"
@@ -221,8 +223,10 @@ checks:
                 global_config, checks = load_config(
                     temp_path, ignore_file_permissions=True
                 )
-                assert global_config.uptime_kuma.url == "http://env:3001/api/push"
-                assert global_config.uptime_kuma.token == "env-token"
+                uptime_kuma = global_config.uptime_kuma
+                assert uptime_kuma is not None
+                assert uptime_kuma.url == "http://env:3001/api/push"
+                assert uptime_kuma.token == "env-token"
                 assert len(checks) == 1
                 # The command should have $HOME expanded
                 assert "$HOME" not in checks[0][1]["command"]  # Should be expanded

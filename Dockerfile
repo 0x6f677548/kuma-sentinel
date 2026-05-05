@@ -3,7 +3,7 @@ FROM python:3.12-slim
 # Links Docker image with repository
 LABEL org.opencontainers.image.source=https://go.hugobatista.com/gh/kuma-scout
 LABEL security.scan="true"
-LABEL maintainer="Hugo Batista <mail@hugobatista.com>"
+LABEL maintainer="Hugo Batista <code at hugobatista.com>"
 
 # Install nmap (required for port scanning)
 RUN apt-get update && apt-get install -y --no-install-recommends \

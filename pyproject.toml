@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Hugo Batista", email = "code@hugobatista.com" }
+    { name = "Hugo Batista <code at hugobatista.com>" }
 ]
 keywords = ["uptime-kuma-agent", "uptime-kuma", "monitoring-agent", "uptime-monitoring", "server-monitoring", "port-scanner", "network-monitoring", "system-monitoring", "nmap", "backup-monitoring"]
 classifiers = [

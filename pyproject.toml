@@ -36,7 +36,7 @@ dependencies = [
     "pydantic>=2.0.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -137,14 +137,7 @@ python_files = ["test_*.py", "*_test.py"]
 addopts = "-ra --strict-markers --cov=src/kuma_scout --cov-report=html --cov-report=term-missing"
 
 [tool.hatch.envs.default]
-dependencies = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-    "types-PyYAML>=6.0",
-]
+dependency-groups = ["dev"]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest"

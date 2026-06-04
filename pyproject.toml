@@ -37,13 +37,21 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
+lint = [
+    "hatch>=1.16.5",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "types-PyYAML>=6.0",
+]
+test = [
+    "hatch>=1.16.5",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-    "types-PyYAML>=6.0",
+]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
 ]
 
 [project.urls]
@@ -54,6 +62,9 @@ Issues = "https://go.hugobatista.com/gh/kuma-scout/issues"
 
 [project.scripts]
 kuma-scout = "kuma_scout.cli.app:cli"
+
+[tool.uv]
+exclude-newer = "30 days"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuma_scout"]
@@ -121,31 +132,31 @@ known-first-party = ["kuma_scout"]
 
 [tool.mypy]
 python_version = "3.10"
+incremental = false
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
-warn_unused_configs = true
-disallow_untyped_defs = false
 ignore_missing_imports = true
 mypy_path = "src"
+files = ["src"]
 exclude = ["test_venv", ".venv"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-ra --strict-markers --cov=src/kuma_scout --cov-report=html --cov-report=term-missing"
+addopts = "-v -ra --strict-markers --cov=src/kuma_scout --cov-report=html --cov-report=term-missing"
 
 [tool.hatch.envs.default]
-dependency-groups = ["dev"]
+type = "virtual"
+path = ".venv"
 
 [tool.hatch.envs.default.scripts]
+lint = "ruff check . --fix"
+format = "black ."
+lint-check = "ruff check ."
+format-check = "black --check ."
 test = "pytest"
-lint = "ruff check src tests"
-format = "black src tests"
-format-check = "black --check src tests"
-check = [
-    "ruff check src tests",
-    "black --check src tests",
-    "mypy src",
-]
+typecheck = "mypy"
+validate = ["lint", "format", "test", "typecheck"]
+check = ["lint-check", "format-check", "test", "typecheck"]

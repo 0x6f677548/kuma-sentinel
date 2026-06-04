@@ -1,11 +1,14 @@
 """Typer CLI application for kuma scout."""
 
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
 import typer
 
-__version__ = version("kuma-scout")
+try:
+    __version__ = version("kuma-scout")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 from kuma_scout.cli.generator import CLIGenerator
 
 

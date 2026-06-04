@@ -129,6 +129,7 @@ exclude = ["test_venv", ".venv"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v -ra --strict-markers --cov=src/kuma_scout --cov-report=html --cov-report=term-missing"

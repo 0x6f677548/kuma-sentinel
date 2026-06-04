@@ -38,18 +38,16 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "hatch>=1.16.5",
-    "black>=23.0.0",
     "mypy>=1.0.0",
     "ruff>=0.1.0",
     "types-PyYAML>=6.0",
 ]
 test = [
-    "hatch>=1.16.5",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
 dev = [
+    "hatch>=1.16.5",
     {include-group = "lint"},
     {include-group = "test"},
 ]
@@ -65,6 +63,7 @@ kuma-scout = "kuma_scout.cli.app:cli"
 
 [tool.uv]
 exclude-newer = "30 days"
+required-version = "0.11.18"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuma_scout"]
@@ -80,23 +79,7 @@ include = [
 
 
 
-[tool.black]
-line-length = 88
-target-version = ["py37", "py38", "py39", "py310", "py311", "py312"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+
 
 [tool.ruff]
 line-length = 88
@@ -123,12 +106,15 @@ select = [
     "UP",   # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long, handled by black
+    "E501",  # line too long, handled by ruff format
     "B008",  # allow typer.Option in argument defaults (common pattern for CLI frameworks)
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["kuma_scout"]
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.mypy]
 python_version = "3.10"
@@ -153,9 +139,9 @@ path = ".venv"
 
 [tool.hatch.envs.default.scripts]
 lint = "ruff check . --fix"
-format = "black ."
+format = "ruff format ."
 lint-check = "ruff check ."
-format-check = "black --check ."
+format-check = "ruff format --check ."
 test = "pytest"
 typecheck = "mypy"
 validate = ["lint", "format", "test", "typecheck"]

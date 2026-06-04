@@ -158,10 +158,7 @@ class TestPortscanMethods:
             plugin, "_extract_hostname", return_value="test.example.com"
         ), patch.object(
             plugin, "_extract_open_ports", return_value=["22/tcp", "80/tcp"]
-        ), patch(
-            "xml.etree.ElementTree.parse"
-        ) as mock_parse:
-
+        ), patch("xml.etree.ElementTree.parse") as mock_parse:
             mock_tree = Mock()
             mock_tree.getroot.return_value = mock_root
             mock_parse.return_value = mock_tree
@@ -248,7 +245,6 @@ class TestPortscanMethods:
         with patch.object(plugin, "run_command") as mock_run, patch.object(
             plugin, "_parse_nmap_xml"
         ) as mock_parse, patch.object(plugin, "_create_nmap_xml_file") as mock_create:
-
             mock_create.return_value = "/tmp/test.xml"
             mock_run.return_value = (True, "", "", 0)
             mock_parse.return_value = []
@@ -268,7 +264,6 @@ class TestPortscanMethods:
         with patch.object(plugin, "run_command") as mock_run, patch.object(
             plugin, "_parse_nmap_xml"
         ) as mock_parse, patch.object(plugin, "_create_nmap_xml_file") as mock_create:
-
             mock_create.return_value = "/tmp/test.xml"
             mock_run.return_value = (True, "", "", 0)
             mock_parse.return_value = []

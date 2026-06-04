@@ -321,7 +321,6 @@ class TestExecuteCheckWithReporting:
         ) as mock_ssh_runner, patch(
             "kuma_scout.cli.generator.send_push", return_value=True
         ):
-
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
                 check_config_obj,
@@ -365,7 +364,6 @@ class TestExecuteCheckWithReporting:
         ) as mock_ssh_runner, patch(
             "kuma_scout.cli.generator.send_push", return_value=True
         ):
-
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
                 check_config_obj,
@@ -407,7 +405,6 @@ class TestExecuteCheckWithReporting:
             "kuma_scout.cli.generator.parse_ssh_connection_string",
             return_value=(None, None, None),
         ):
-
             result = generator._execute_check_with_reporting(
                 mock_plugin_class,
                 check_config_obj,

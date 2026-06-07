@@ -26,6 +26,7 @@ data
 *.swp
 *.swo
 *~
+.mypy_cache/
 .ruff_cache
 tests
 DEVELOPMENT.md

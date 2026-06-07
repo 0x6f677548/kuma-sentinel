@@ -38,13 +38,13 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "mypy>=1.0.0",
-    "ruff>=0.1.0",
+    "mypy>=1.11.0",
+    "ruff>=0.6.0",
     "types-PyYAML>=6.0",
 ]
 test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
 ]
 dev = [
     "hatch>=1.16.5",
@@ -64,6 +64,11 @@ kuma-scout = "kuma_scout.cli.app:cli"
 [tool.uv]
 exclude-newer = "30 days"
 required-version = "0.11.18"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+explicit = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuma_scout"]

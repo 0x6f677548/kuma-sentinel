@@ -2,6 +2,7 @@
 
 import logging
 import logging.handlers
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,13 @@ def _add_syslog_handler(logger: logging.Logger, silent: bool = True) -> None:
         silent: If True, silently continue if syslog is unavailable.
                 If False, print warning message.
     """
+    if not os.path.exists("/dev/log"):
+        if not silent:
+            print(
+                "\033[93mWarning: /dev/log not found, syslog logging unavailable\033[0m",
+                file=sys.stderr,
+            )
+        return
     try:
         syslog_handler = logging.handlers.SysLogHandler(
             address="/dev/log", facility=logging.handlers.SysLogHandler.LOG_USER
@@ -35,10 +43,9 @@ def _add_syslog_handler(logger: logging.Logger, silent: bool = True) -> None:
         syslog_handler.setFormatter(logging.Formatter(_SYSLOG_FORMAT))
         logger.addHandler(syslog_handler)
     except Exception as e:
-        # Syslog not available on all systems (e.g., Windows)
         if not silent:
             print(
-                f"\033[93mWarning: Could not set up syslog logging: {e}. This is expected on non-Unix systems.\033[0m",
+                f"\033[93mWarning: Could not set up syslog logging: {e}\033[0m",
                 file=sys.stderr,
             )
 

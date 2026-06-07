@@ -910,7 +910,7 @@ class CLIGenerator:
                 help="Log level (DEBUG, INFO, WARNING, ERROR)",
             ),
             log_file: Optional[str] = typer.Option(
-                "/var/log/kuma-scout.log", "--log-file", help="Log file path"
+                "/var/log/kuma-scout/kuma-scout.log", "--log-file", help="Log file path"
             ),
             quiet: bool = typer.Option(
                 False, "--quiet", help="Suppress all console output"

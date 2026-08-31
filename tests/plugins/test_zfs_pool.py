@@ -151,3 +151,15 @@ class TestZfsPoolExecution:
 
             assert result.status == "down"
             assert "Failed to get status" in result.message
+
+    def test_uses_configured_timeout(self, plugin, config):
+        """Test that the check passes config.timeout to run_command."""
+        config.timeout = 90
+        mock_output = "tank\t50%\tONLINE"
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, mock_output, "", 0)
+
+            plugin.execute(config)
+
+            assert mock_run.call_args.kwargs["timeout"] == 90

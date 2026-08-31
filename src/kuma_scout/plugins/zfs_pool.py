@@ -52,7 +52,7 @@ class ZfsPoolPlugin(Plugin):
             echo=False,
         )
 
-        health, free_percent = self._get_pool_status(config.pool)
+        health, free_percent = self._get_pool_status(config.pool, config.timeout)
 
         if health is None or free_percent is None:
             self.output_handler.error(
@@ -116,7 +116,9 @@ class ZfsPoolPlugin(Plugin):
                 },
             )
 
-    def _get_pool_status(self, pool_name: str) -> Tuple[Optional[str], Optional[float]]:
+    def _get_pool_status(
+        self, pool_name: str, timeout: Optional[int] = None
+    ) -> Tuple[Optional[str], Optional[float]]:
         """Get ZFS pool health and free space percentage."""
         cmd = [
             "zpool",
@@ -128,7 +130,7 @@ class ZfsPoolPlugin(Plugin):
         ]
 
         try:
-            success, stdout, stderr, exit_code = self.run_command(cmd, timeout=30)
+            success, stdout, stderr, exit_code = self.run_command(cmd, timeout=timeout)
 
             if not success:
                 self.output_handler.error(

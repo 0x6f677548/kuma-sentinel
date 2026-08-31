@@ -76,12 +76,12 @@ class TestOutputHandlerQuiet:
 class TestConfigMergerQuietVerbose:
     """Test ConfigMerger handling of quiet and verbose options."""
 
-    def test_apply_cli_overrides_quiet(self):
+    def test_apply_cli_to_global_config_quiet(self):
         """Test that quiet flag is applied correctly."""
         config = GlobalConfig()
         assert config.quiet is False
 
-        ConfigMerger.apply_cli_overrides(
+        ConfigMerger.apply_cli_to_global_config(
             config,
             uptime_kuma_url=None,
             token=None,
@@ -96,13 +96,13 @@ class TestConfigMergerQuietVerbose:
         assert config.quiet is True
         assert config.verbose is False
 
-    def test_apply_cli_overrides_verbose(self):
+    def test_apply_cli_to_global_config_verbose(self):
         """Test that verbose flag is applied correctly."""
         config = GlobalConfig()
         assert config.verbose is False
         assert config.logging.level == "INFO"
 
-        ConfigMerger.apply_cli_overrides(
+        ConfigMerger.apply_cli_to_global_config(
             config,
             uptime_kuma_url=None,
             token=None,
@@ -119,11 +119,11 @@ class TestConfigMergerQuietVerbose:
         # Verbose should set log level to DEBUG
         assert config.logging.level == "DEBUG"
 
-    def test_apply_cli_overrides_verbose_respects_explicit_log_level(self):
+    def test_apply_cli_to_global_config_verbose_respects_explicit_log_level(self):
         """Test that verbose doesn't override explicit log level."""
         config = GlobalConfig()
 
-        ConfigMerger.apply_cli_overrides(
+        ConfigMerger.apply_cli_to_global_config(
             config,
             uptime_kuma_url=None,
             token=None,

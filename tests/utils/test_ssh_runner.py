@@ -123,6 +123,20 @@ class TestSSHRunner:
         assert exit_code == -1
 
     @patch("subprocess.run")
+    def test_run_override_timeout(self, mock_run):
+        """Test that timeout override is forwarded to subprocess."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "output"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
+        runner = SSHRunner(host="host", timeout=30)
+        runner.run(["echo", "test"], timeout=5)
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["timeout"] == 5
+
+    @patch("subprocess.run")
     def test_run_exception(self, mock_run):
         """Test general exception during command execution."""
         mock_run.side_effect = Exception("network error")

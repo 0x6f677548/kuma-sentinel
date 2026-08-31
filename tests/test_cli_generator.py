@@ -661,6 +661,58 @@ class TestSetupRunCommand:
             assert global_config.ssh.password == "secret"
             assert global_config.ssh.strict_host_key_checking is False
 
+    @patch("kuma_scout.cli.generator.load_config")
+    @patch("kuma_scout.cli.generator.setup_logging")
+    @patch("kuma_scout.cli.generator.setup_default_logging")
+    def test_setup_run_command_cli_overrides_per_check(
+        self, mock_setup_default, mock_setup_logging, mock_load_config, generator
+    ):
+        """Test that CLI values override per-check timeout/uptime_kuma/ssh."""
+        from kuma_scout.plugins.models import SSHConfig
+
+        mock_global_config = GlobalConfig(
+            ssh=SSHConfig(host="global", user="global-user", port=22)
+        )
+        mock_checks = [
+            (
+                "cmdcheck",
+                {
+                    "name": "test",
+                    "timeout": 90,
+                    "uptime_kuma": {"url": "http://check.com", "token": "old"},
+                    "ssh": {"host": "check-host"},
+                },
+            )
+        ]
+        mock_load_config.return_value = (mock_global_config, mock_checks)
+
+        with patch("kuma_scout.cli.generator.OutputHandler"):
+            _output_handler, _global_config, checks = generator._setup_run_command(
+                config="test.yaml",
+                ignore_file_permissions=False,
+                uptime_kuma_url="http://cli.com",
+                token="new",
+                heartbeat_token=None,
+                timeout=5,
+                log_file=None,
+                log_level=None,
+                ssh="user@cli-host:2222",
+                ssh_key_file=None,
+                ssh_password=None,
+                ssh_strict_host_key_checking=True,
+                ssh_no_strict_host_key_checking=False,
+                quiet=False,
+                verbose=False,
+            )
+
+        check_config = checks[0][1]
+        assert check_config["timeout"] == 5
+        assert check_config["uptime_kuma"]["url"] == "http://cli.com"
+        assert check_config["uptime_kuma"]["token"] == "new"
+        assert check_config["ssh"]["host"] == "cli-host"
+        assert check_config["ssh"]["user"] == "user"
+        assert check_config["ssh"]["port"] == 2222
+
 
 class TestHandleDryRun:
     """Test _handle_dry_run method."""

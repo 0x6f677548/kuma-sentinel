@@ -8,6 +8,7 @@ uptime_kuma:
   # Uptime Kuma API base URL (required)
   url: http://uptimekuma:3001/api/push
   # Global push token (can be overridden per-check)
+  # CLI --uptime-kuma-url and --token override per-check settings
   token: "${UPTIME_KUMA_TOKEN}"
 
 logging:
@@ -24,10 +25,12 @@ ignore_file_permissions: false
 
 # Global timeout for checks in seconds (default: 300)
 # Individual checks can override this with their own timeout setting
+# CLI --timeout has the highest priority and overrides per-check timeouts
 timeout: 300
 
 # === GLOBAL SSH CONFIGURATION ===
 # Default SSH settings for remote execution (can be overridden per-check)
+# CLI --ssh overrides per-check SSH settings
 ssh:
   # SSH host (user@host or host)
   host: backup-server.example.com

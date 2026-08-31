@@ -67,7 +67,7 @@ class KopiaSnapshotPlugin(Plugin):
         )
 
         # Get snapshot info
-        age_hours = self._get_snapshot_info(config.path)
+        age_hours = self._get_snapshot_info(config.path, config.timeout)
 
         if age_hours is None:
             self.output_handler.error(
@@ -129,7 +129,9 @@ class KopiaSnapshotPlugin(Plugin):
         if not (re.match(local_path, path) or re.match(ssh_path, path)):
             raise ValueError(f"Invalid snapshot path format: {path}")
 
-    def _get_snapshot_info(self, snapshot_path: str) -> Optional[float]:
+    def _get_snapshot_info(
+        self, snapshot_path: str, timeout: Optional[int] = None
+    ) -> Optional[float]:
         """Get snapshot information for a path."""
         cmd = [
             "kopia",
@@ -141,7 +143,7 @@ class KopiaSnapshotPlugin(Plugin):
             "--max-results=1",
         ]
 
-        success, stdout, stderr, exit_code = self.run_command(cmd)
+        success, stdout, stderr, exit_code = self.run_command(cmd, timeout=timeout)
 
         if not success or not stdout:
             self.output_handler.error(

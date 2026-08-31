@@ -215,7 +215,7 @@ class ConfigMerger:
                 global_config.logging.level = "DEBUG"
 
     @staticmethod
-    def apply_cli_overrides(
+    def apply_cli_to_global_config(
         global_config: GlobalConfig,
         uptime_kuma_url: Optional[str],
         token: Optional[str],
@@ -226,7 +226,7 @@ class ConfigMerger:
         quiet: bool = False,
         verbose: bool = False,
     ) -> None:
-        """Apply CLI argument overrides to global configuration.
+        """Apply CLI argument overrides to the global configuration.
 
         Args:
             global_config: Global configuration to update
@@ -240,8 +240,8 @@ class ConfigMerger:
             verbose: CLI-provided verbose flag
 
         Note:
-            CLI arguments represent the highest priority in config hierarchy.
-            They completely override YAML config values where specified.
+            This applies CLI values to the global config (fallback layer).
+            Per-check precedence is enforced separately by apply_cli_to_checks().
             quiet and verbose are mutually exclusive and validated by GlobalConfig.
         """
         if uptime_kuma_url:
@@ -275,6 +275,65 @@ class ConfigMerger:
         ConfigMerger.apply_quiet_verbose_overrides(
             global_config, quiet, verbose, log_level
         )
+
+    @staticmethod
+    def apply_cli_to_checks(
+        checks: list,
+        global_config: GlobalConfig,
+        uptime_kuma_url: Optional[str],
+        token: Optional[str],
+        timeout: int,
+        ssh: Optional[str],
+    ) -> None:
+        """Enforce CLI values as highest priority over per-check and per-tag config.
+
+        Runs after all merging so the downstream per-check merge respects the
+        CLI values written into the per-check configs.
+
+        Args:
+            checks: List of check tuples (plugin_type, config_dict)
+            global_config: Global configuration (CLI already applied)
+            uptime_kuma_url: CLI-provided Uptime Kuma URL
+            token: CLI-provided Uptime Kuma token
+            timeout: CLI-provided timeout in seconds
+            ssh: CLI-provided SSH connection string
+
+        Note:
+            Applies only when the CLI value is provided and non-empty:
+            - timeout is forced onto every check when not the 300s default
+            - uptime_kuma url/token are forced onto checks and tags when a CLI
+              url is given; token requires the CLI url (mirrors
+              apply_cli_to_global_config)
+            - ssh replaces per-check ssh entirely with the CLI-derived global ssh
+        """
+        cli_uptime = bool(uptime_kuma_url)
+        cli_ssh = bool(ssh)
+
+        cli_ssh_config = None
+        if cli_ssh:
+            # Invariant: a CLI SSH host implies global ssh config was created by
+            # the CLI SSH setup (validation rejects ssh options without a host).
+            assert global_config.ssh is not None
+            cli_ssh_config = global_config.ssh
+
+        for _check_type, check_config in checks:
+            if timeout != 300:
+                check_config["timeout"] = timeout
+            if cli_uptime:
+                uptime_kuma = check_config.setdefault("uptime_kuma", {})
+                uptime_kuma["url"] = uptime_kuma_url
+                if token:
+                    uptime_kuma["token"] = token
+            if cli_ssh_config is not None:
+                check_config["ssh"] = cli_ssh_config.model_dump()
+
+        if cli_uptime and global_config.tags:
+            for tag in global_config.tags.values():
+                uptime_kuma = tag.uptime_kuma or UptimeKumaConfig()
+                uptime_kuma.url = uptime_kuma_url
+                if token:
+                    uptime_kuma.token = token
+                tag.uptime_kuma = uptime_kuma
 
     @staticmethod
     def apply_cli_ssh_config(

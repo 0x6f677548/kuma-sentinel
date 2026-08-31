@@ -140,6 +140,11 @@ class CLIGenerator:
             output_handler,
         )
 
+        # CLI values have highest priority: enforce them over per-check/per-tag config
+        ConfigMerger.apply_cli_to_checks(
+            checks, global_config, uptime_kuma_url, token, timeout, ssh
+        )
+
         return output_handler, global_config, checks
 
     def _handle_dry_run(
@@ -393,8 +398,9 @@ class CLIGenerator:
         if heartbeat_token:
             heartbeat_token = os.path.expandvars(heartbeat_token)
 
-        # Apply CLI overrides using ConfigMerger
-        ConfigMerger.apply_cli_overrides(
+        # Apply CLI values to the global config (fallback layer; per-check
+        # precedence is enforced later by ConfigMerger.apply_cli_to_checks)
+        ConfigMerger.apply_cli_to_global_config(
             global_config,
             uptime_kuma_url,
             token,

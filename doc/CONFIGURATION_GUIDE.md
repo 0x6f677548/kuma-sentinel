@@ -29,6 +29,15 @@ This means if you set a value in multiple places, CLI arguments win, followed by
 # Result: timeout will be 60 (CLI wins, YAML provides fallback)
 ```
 
+**CLI precedence:**
+For values that exist at both CLI and per-check level (`timeout`, `uptime_kuma` url/token, `ssh`), priority is:
+1. **CLI arguments** (highest) - override global and per-check values
+2. **Per-check config** - applies to that check only
+3. **Global config** (YAML top-level) - fallback when a check has no value
+4. **Defaults** (lowest)
+
+For example, `--uptime-kuma-url` and `--ssh` override any per-check `uptime_kuma`/`ssh` settings for that run. A CLI token is only applied together with a CLI `--uptime-kuma-url`.
+
 ### Configuration Methods
 
 **Method 1: YAML File (Recommended for production)**

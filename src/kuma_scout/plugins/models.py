@@ -78,6 +78,10 @@ class TagConfig(BaseModel):
     )
 
 
+DEFAULT_TIMEOUT = 300
+"""Default global timeout for checks in seconds."""
+
+
 class GlobalConfig(BaseModel):
     """
     Global configuration loaded from YAML.
@@ -98,7 +102,9 @@ class GlobalConfig(BaseModel):
     heartbeat: HeartbeatConfig = Field(
         default_factory=HeartbeatConfig, description="Heartbeat settings"
     )
-    timeout: int = Field(default=300, description="Global timeout for checks (seconds)")
+    timeout: int = Field(
+        default=DEFAULT_TIMEOUT, description="Global timeout for checks (seconds)"
+    )
     tags: dict[str, TagConfig] = Field(
         default_factory=dict, description="Tag-based result aggregation configuration"
     )

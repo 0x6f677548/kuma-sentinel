@@ -200,6 +200,7 @@ See [Tag-Based Result Aggregation](CONFIGURATION_GUIDE.md#tag-based-result-aggre
 
 **Impact:**
 - `kuma-scout run config.yaml --timeout 5` now applies 5s to every check, even those with a per-check `timeout`.
+- An explicit `--timeout 300` is no longer treated as "not provided" — it now overrides per-check timeouts with 300s.
 - `--uptime-kuma-url` / `--token` override per-check `uptime_kuma` (a CLI token is applied only together with a CLI url).
 - `--ssh` replaces per-check `ssh` settings entirely.
 - Without CLI flags, behavior is unchanged (per-check overrides global YAML, global is the fallback).

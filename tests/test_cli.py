@@ -77,7 +77,7 @@ def test_apply_command_line_overrides_expands_tokens():
             uptime_kuma_url="http://example.com",
             token="$TEST_TOKEN",
             heartbeat_token="$TEST_HEARTBEAT_TOKEN",
-            timeout=300,
+            timeout=None,
             log_file=None,
             log_level=None,
         )
@@ -927,7 +927,7 @@ def test_apply_cli_to_global_config_uptime_kuma():
         uptime_kuma_url="http://cli.com",
         token="cli_token",
         heartbeat_token=None,
-        timeout=300,
+        timeout=None,
         log_file=None,
         log_level=None,
     )
@@ -951,7 +951,7 @@ def test_apply_cli_to_global_config_uptime_kuma_existing_config():
         uptime_kuma_url="http://cli.com",
         token="cli_token",
         heartbeat_token=None,
-        timeout=300,
+        timeout=None,
         log_file=None,
         log_level=None,
     )
@@ -976,7 +976,7 @@ def test_apply_cli_to_global_config_uptime_kuma_url_only():
         uptime_kuma_url="http://cli.com",
         token=None,  # No token provided
         heartbeat_token=None,
-        timeout=300,
+        timeout=None,
         log_file=None,
         log_level=None,
     )
@@ -998,7 +998,7 @@ def test_apply_cli_to_global_config_heartbeat_token():
         uptime_kuma_url=None,
         token=None,
         heartbeat_token="cli_heartbeat_token",
-        timeout=300,
+        timeout=None,
         log_file=None,
         log_level=None,
     )
@@ -1026,6 +1026,44 @@ def test_apply_cli_to_global_config_timeout():
     assert global_config.timeout == 600
 
 
+def test_apply_cli_to_global_config_timeout_default_value_applied():
+    """Test that an explicit CLI timeout of 300 is applied."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig()
+
+    ConfigMerger.apply_cli_to_global_config(
+        global_config=global_config,
+        uptime_kuma_url=None,
+        token=None,
+        heartbeat_token=None,
+        timeout=300,
+        log_file=None,
+        log_level=None,
+    )
+
+    assert global_config.timeout == 300
+
+
+def test_apply_cli_to_global_config_timeout_not_provided_kept():
+    """Test that no CLI timeout leaves the global timeout unchanged."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    global_config = GlobalConfig(timeout=600)
+
+    ConfigMerger.apply_cli_to_global_config(
+        global_config=global_config,
+        uptime_kuma_url=None,
+        token=None,
+        heartbeat_token=None,
+        timeout=None,
+        log_file=None,
+        log_level=None,
+    )
+
+    assert global_config.timeout == 600
+
+
 def test_apply_cli_to_global_config_logging():
     """Test applying CLI overrides for logging config."""
     from kuma_scout.cli.config_merger import ConfigMerger
@@ -1037,7 +1075,7 @@ def test_apply_cli_to_global_config_logging():
         uptime_kuma_url=None,
         token=None,
         heartbeat_token=None,
-        timeout=300,
+        timeout=None,
         log_file="/tmp/test.log",
         log_level="DEBUG",
     )
@@ -1055,12 +1093,21 @@ def test_apply_cli_to_checks_timeout_override():
     assert checks[0][1]["timeout"] == 5
 
 
-def test_apply_cli_to_checks_timeout_default_keeps_check():
-    """Test that default CLI timeout keeps per-check timeout."""
+def test_apply_cli_to_checks_timeout_default_value_overrides():
+    """Test that an explicit CLI timeout of 300 overrides per-check timeouts."""
     from kuma_scout.cli.config_merger import ConfigMerger
 
     checks = [("cmdcheck", {"name": "a", "timeout": 90})]
     ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, None, 300, None)
+    assert checks[0][1]["timeout"] == 300
+
+
+def test_apply_cli_to_checks_timeout_not_provided_keeps_check():
+    """Test that no CLI timeout keeps per-check timeout."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    checks = [("cmdcheck", {"name": "a", "timeout": 90})]
+    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, None, None, None)
     assert checks[0][1]["timeout"] == 90
 
 
@@ -1075,7 +1122,7 @@ def test_apply_cli_to_checks_uptime_kuma_url_and_token():
         )
     ]
     ConfigMerger.apply_cli_to_checks(
-        checks, GlobalConfig(), "http://cli.com", "new", 300, None
+        checks, GlobalConfig(), "http://cli.com", "new", None, None
     )
     assert checks[0][1]["uptime_kuma"] == {
         "url": "http://cli.com",
@@ -1089,7 +1136,7 @@ def test_apply_cli_to_checks_uptime_kuma_url_only_keeps_token():
 
     checks = [("cmdcheck", {"name": "a", "uptime_kuma": {"token": "old"}})]
     ConfigMerger.apply_cli_to_checks(
-        checks, GlobalConfig(), "http://cli.com", None, 300, None
+        checks, GlobalConfig(), "http://cli.com", None, None, None
     )
     assert checks[0][1]["uptime_kuma"] == {
         "url": "http://cli.com",
@@ -1107,7 +1154,7 @@ def test_apply_cli_to_checks_token_without_url_ignored():
             {"name": "a", "uptime_kuma": {"url": "http://check.com", "token": "old"}},
         )
     ]
-    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, "new", 300, None)
+    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, "new", None, None)
     assert checks[0][1]["uptime_kuma"] == {
         "url": "http://check.com",
         "token": "old",
@@ -1125,7 +1172,9 @@ def test_apply_cli_to_checks_ssh_replaces_check():
     checks = [
         ("cmdcheck", {"name": "a", "ssh": {"host": "check-host", "user": "check-user"}})
     ]
-    ConfigMerger.apply_cli_to_checks(checks, global_config, None, None, 300, "cli-host")
+    ConfigMerger.apply_cli_to_checks(
+        checks, global_config, None, None, None, "cli-host"
+    )
     assert checks[0][1]["ssh"] == {
         "host": "cli-host",
         "user": "cli-user",
@@ -1136,12 +1185,32 @@ def test_apply_cli_to_checks_ssh_replaces_check():
     }
 
 
+def test_apply_cli_to_checks_ssh_without_global_config_raises():
+    """Test that CLI ssh without global ssh config raises ValueError."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    checks = [("cmdcheck", {"name": "a"})]
+    with pytest.raises(ValueError, match="internal invariant violated"):
+        ConfigMerger.apply_cli_to_checks(
+            checks, GlobalConfig(), None, None, None, "host"
+        )
+
+
+def test_apply_cli_to_checks_accepts_dict_form_checks():
+    """Test that apply_cli_to_checks accepts plain dict checks."""
+    from kuma_scout.cli.config_merger import ConfigMerger
+
+    checks = [{"name": "a", "timeout": 90}]
+    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, None, 5, None)
+    assert checks[0]["timeout"] == 5
+
+
 def test_apply_cli_to_checks_no_cli_values_noop():
     """Test that no CLI values leave per-check config unchanged."""
     from kuma_scout.cli.config_merger import ConfigMerger
 
     checks = [("cmdcheck", {"name": "a", "timeout": 90})]
-    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, None, 300, None)
+    ConfigMerger.apply_cli_to_checks(checks, GlobalConfig(), None, None, None, None)
     assert checks[0][1] == {"name": "a", "timeout": 90}
 
 
@@ -1154,7 +1223,7 @@ def test_apply_cli_to_checks_overrides_tag_uptime_kuma():
         tags={"backup": TagConfig(uptime_kuma=None)},
     )
     ConfigMerger.apply_cli_to_checks(
-        [], global_config, "http://cli.com", "tok", 300, None
+        [], global_config, "http://cli.com", "tok", None, None
     )
     assert global_config.tags["backup"].uptime_kuma is not None
     assert global_config.tags["backup"].uptime_kuma.url == "http://cli.com"

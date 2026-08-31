@@ -264,6 +264,57 @@ class TestExecuteSingleCheck:
             assert "Failed to execute" in mock_output_handler.error.call_args[0][0]
 
 
+class TestExecuteIndividualCheck:
+    """Test _execute_individual_check method."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a CLIGenerator instance."""
+        return CLIGenerator()
+
+    def test_individual_check_timeout_default_value_applied(self, generator):
+        """Test that an explicit --timeout 300 is forced onto the single check."""
+        from kuma_scout.plugins.base import CheckConfig
+
+        plugin_class = Mock()
+        plugin_class.config_class = CheckConfig
+        plugin_class.name = "cmdcheck"
+
+        captured: dict = {}
+
+        def fake_execute(_plugin_class, check_config_obj, _global_config, _output):
+            captured["timeout"] = check_config_obj.timeout
+            return None
+
+        with patch("kuma_scout.cli.generator.setup_default_logging"), patch(
+            "kuma_scout.cli.generator.setup_logging"
+        ), patch("kuma_scout.cli.generator.OutputHandler"), patch.object(
+            generator, "_execute_check_with_reporting", side_effect=fake_execute
+        ):
+            generator._execute_individual_check(
+                plugin_class=plugin_class,
+                name="test-check",
+                log_level=None,
+                log_file=None,
+                uptime_kuma_url="http://cli.com",
+                token="tok",
+                heartbeat_token=None,
+                timeout=300,
+                ssh=None,
+                ssh_key_file=None,
+                ssh_password=None,
+                ssh_strict_host_key_checking=True,
+                ssh_no_strict_host_key_checking=False,
+                retry_attempts=None,
+                retry_delay_seconds=None,
+                quiet=False,
+                verbose=False,
+                kwargs={},
+            )
+
+        assert captured["timeout"] == 300
+
+
 class TestExecuteCheckWithReporting:
     """Test _execute_check_with_reporting method."""
 
@@ -712,6 +763,40 @@ class TestSetupRunCommand:
         assert check_config["ssh"]["host"] == "cli-host"
         assert check_config["ssh"]["user"] == "user"
         assert check_config["ssh"]["port"] == 2222
+
+    @patch("kuma_scout.cli.generator.load_config")
+    @patch("kuma_scout.cli.generator.setup_logging")
+    @patch("kuma_scout.cli.generator.setup_default_logging")
+    def test_setup_run_command_timeout_default_value_overrides_per_check(
+        self, mock_setup_default, mock_setup_logging, mock_load_config, generator
+    ):
+        """Test that explicit --timeout 300 overrides a per-check timeout."""
+        from kuma_scout.plugins.models import GlobalConfig
+
+        mock_global_config = GlobalConfig()
+        mock_checks = [("cmdcheck", {"name": "test", "timeout": 600})]
+        mock_load_config.return_value = (mock_global_config, mock_checks)
+
+        with patch("kuma_scout.cli.generator.OutputHandler"):
+            _output_handler, _global_config, checks = generator._setup_run_command(
+                config="test.yaml",
+                ignore_file_permissions=False,
+                uptime_kuma_url=None,
+                token=None,
+                heartbeat_token=None,
+                timeout=300,
+                log_file=None,
+                log_level=None,
+                ssh=None,
+                ssh_key_file=None,
+                ssh_password=None,
+                ssh_strict_host_key_checking=True,
+                ssh_no_strict_host_key_checking=False,
+                quiet=False,
+                verbose=False,
+            )
+
+        assert checks[0][1]["timeout"] == 300
 
 
 class TestHandleDryRun:

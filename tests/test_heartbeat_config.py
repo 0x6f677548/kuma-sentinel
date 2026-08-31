@@ -224,7 +224,7 @@ class TestHeartbeatURLInheritance:
             uptime_kuma_url=None,
             token=None,
             heartbeat_token="cli_token",
-            timeout=300,
+            timeout=None,
             log_file=None,
             log_level=None,
         )
@@ -256,7 +256,7 @@ class TestHeartbeatURLInheritance:
             uptime_kuma_url=None,
             token=None,
             heartbeat_token="cli_token",
-            timeout=300,
+            timeout=None,
             log_file=None,
             log_level=None,
         )

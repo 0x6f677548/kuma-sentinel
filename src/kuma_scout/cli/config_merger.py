@@ -293,14 +293,18 @@ class ConfigMerger:
 
     @staticmethod
     def _cli_ssh_config(
-        global_config: GlobalConfig, cli_ssh: bool
+        global_config: GlobalConfig, ssh: Optional[str]
     ) -> Optional[SSHConfig]:
         """Resolve the CLI-derived global SSH config, if a CLI SSH host was given.
+
+        Args:
+            global_config: Global configuration (CLI already applied)
+            ssh: CLI-provided SSH connection string
 
         Raises:
             ValueError: if a CLI SSH host was given but no global SSH config exists
         """
-        if not cli_ssh:
+        if not ssh:
             return None
         # Invariant: a CLI SSH host implies global ssh config was created by the
         # CLI SSH setup (validation rejects ssh options without a host).
@@ -343,7 +347,7 @@ class ConfigMerger:
             - ssh replaces per-check ssh entirely with the CLI-derived global ssh
         """
         cli_uptime = bool(uptime_kuma_url)
-        cli_ssh_config = ConfigMerger._cli_ssh_config(global_config, bool(ssh))
+        cli_ssh_config = ConfigMerger._cli_ssh_config(global_config, ssh)
 
         for check in checks:
             check_config = ConfigMerger._check_config(check)

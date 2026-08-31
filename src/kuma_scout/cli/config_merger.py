@@ -294,7 +294,7 @@ class ConfigMerger:
     @staticmethod
     def _cli_ssh_config(
         global_config: GlobalConfig, cli_ssh: bool
-    ) -> Optional["SSHConfig"]:
+    ) -> Optional[SSHConfig]:
         """Resolve the CLI-derived global SSH config, if a CLI SSH host was given.
 
         Raises:

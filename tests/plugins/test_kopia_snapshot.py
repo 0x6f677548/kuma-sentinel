@@ -116,3 +116,21 @@ class TestKopiaSnapshotExecution:
 
             assert result.status == "down"
             assert "Failed to get snapshot info" in result.message
+
+    def test_uses_configured_timeout(self, plugin, config):
+        """Test that the check passes config.timeout to run_command."""
+        config.timeout = 90
+        mock_output: list[dict[str, Any]] = [
+            {
+                "startTime": "2024-01-01T10:00:00Z",
+                "endTime": "2024-01-01T10:05:00Z",
+                "rootEntry": {"name": "test"},
+            }
+        ]
+
+        with patch.object(plugin, "run_command") as mock_run:
+            mock_run.return_value = (True, json.dumps(mock_output), "", 0)
+
+            plugin.execute(config)
+
+            assert mock_run.call_args.kwargs["timeout"] == 90

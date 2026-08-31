@@ -123,7 +123,7 @@ class Plugin(ABC):
     def __init__(
         self,
         global_config: GlobalConfig,
-        ssh_runner: Optional["SSHRunner"] = None,
+        ssh_runner: Optional[SSHRunner] = None,
         output_handler: Optional[OutputHandler] = None,
     ):
         self.global_config = global_config

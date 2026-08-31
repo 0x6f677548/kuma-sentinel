@@ -118,11 +118,11 @@ kuma-scout zfspoolstatus "tank" \
 
 | Option | Required | Purpose | Example |
 |--------|----------|---------|---------|
-| `--token TOKEN` | ✓ (for individual checks) | Uptime Kuma push token | `--token abc123` |
-| `--uptime-kuma-url URL` | ✓ (for individual checks) | Uptime Kuma API endpoint | `--uptime-kuma-url http://uptimekuma:3001/api/push` |
+| `--token TOKEN` | ✓ (for individual checks) | Uptime Kuma push token (overrides per-check config) | `--token abc123` |
+| `--uptime-kuma-url URL` | ✓ (for individual checks) | Uptime Kuma API endpoint (overrides per-check config) | `--uptime-kuma-url http://uptimekuma:3001/api/push` |
 | `--name NAME` | ✗ | Check name (auto-generated if omitted) | `--name "nginx-health"` |
-| `--ssh CONNECTION` | ✗ | Remote SSH execution | `--ssh user@server` or `--ssh user@server:2222` |
-| `--timeout SECONDS` | ✗ | Operation timeout | `--timeout 600` |
+| `--ssh CONNECTION` | ✗ | Remote SSH execution (overrides per-check config) | `--ssh user@server` or `--ssh user@server:2222` |
+| `--timeout SECONDS` | ✗ | Operation timeout (overrides per-check and global timeouts) | `--timeout 600` |
 | `--log-level LEVEL` | ✗ | Debug output | `--log-level DEBUG` |
 | `--log-file PATH` | ✗ | Log file path | `--log-file /var/log/kuma-scout.log` |
 | `--quiet` | ✗ | Suppress console output | `--quiet` |

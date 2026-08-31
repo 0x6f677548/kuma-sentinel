@@ -192,6 +192,23 @@ See [Tag-Based Result Aggregation](CONFIGURATION_GUIDE.md#tag-based-result-aggre
 
 ---
 
+## v0.2.0 → v0.2.1 (Behavior Change)
+
+### CLI overrides now take precedence over per-check config
+
+**What changed:** CLI arguments (`--timeout`, `--uptime-kuma-url`, `--token`, `--ssh*`) now override per-check YAML settings for the run invocation. Previously per-check values took precedence over CLI flags.
+
+**Impact:**
+- `kuma-scout run config.yaml --timeout 5` now applies 5s to every check, even those with a per-check `timeout`.
+- An explicit `--timeout 300` is no longer treated as "not provided" — it now overrides per-check timeouts with 300s.
+- `--uptime-kuma-url` / `--token` override per-check `uptime_kuma` (a CLI token is applied only together with a CLI url).
+- `--ssh` replaces per-check `ssh` settings entirely.
+- Without CLI flags, behavior is unchanged (per-check overrides global YAML, global is the fallback).
+
+**Migration:** Review automation that passes CLI flags alongside config files that define per-check `timeout`, `uptime_kuma`, or `ssh`. The CLI values now win.
+
+---
+
 ## Future Versions
 
 Breaking changes for future major versions will be documented in this file with similar detail, allowing users to plan upgrades carefully.

@@ -11,7 +11,12 @@ All config merging operations follow this standard pattern:
 
 from typing import Optional
 
-from kuma_scout.plugins.models import GlobalConfig, UptimeKumaConfig
+from kuma_scout.plugins.models import (
+    DEFAULT_TIMEOUT,
+    GlobalConfig,
+    SSHConfig,
+    UptimeKumaConfig,
+)
 
 
 class ConfigMerger:
@@ -182,10 +187,10 @@ class ConfigMerger:
 
         Priority:
             1. Check-level config (already in merged_config)
-            2. Global config (applied if global != 300)
-            3. Default 300 seconds (implicit)
+            2. Global config (applied if global != DEFAULT_TIMEOUT)
+            3. Default timeout (implicit)
         """
-        if "timeout" not in merged_config and global_config.timeout != 300:
+        if "timeout" not in merged_config and global_config.timeout != DEFAULT_TIMEOUT:
             merged_config["timeout"] = global_config.timeout
 
     @staticmethod
@@ -215,33 +220,33 @@ class ConfigMerger:
                 global_config.logging.level = "DEBUG"
 
     @staticmethod
-    def apply_cli_overrides(
+    def apply_cli_to_global_config(
         global_config: GlobalConfig,
         uptime_kuma_url: Optional[str],
         token: Optional[str],
         heartbeat_token: Optional[str],
-        timeout: int,
+        timeout: Optional[int],
         log_file: Optional[str],
         log_level: Optional[str],
         quiet: bool = False,
         verbose: bool = False,
     ) -> None:
-        """Apply CLI argument overrides to global configuration.
+        """Apply CLI argument overrides to the global configuration.
 
         Args:
             global_config: Global configuration to update
             uptime_kuma_url: CLI-provided Uptime Kuma URL
             token: CLI-provided Uptime Kuma token
             heartbeat_token: CLI-provided heartbeat token
-            timeout: CLI-provided timeout in seconds
+            timeout: CLI-provided timeout in seconds (None if not provided)
             log_file: CLI-provided log file path
             log_level: CLI-provided log level
             quiet: CLI-provided quiet flag
             verbose: CLI-provided verbose flag
 
         Note:
-            CLI arguments represent the highest priority in config hierarchy.
-            They completely override YAML config values where specified.
+            This applies CLI values to the global config (fallback layer).
+            Per-check precedence is enforced separately by apply_cli_to_checks().
             quiet and verbose are mutually exclusive and validated by GlobalConfig.
         """
         if uptime_kuma_url:
@@ -262,7 +267,7 @@ class ConfigMerger:
             else:
                 global_config.heartbeat.uptime_kuma.token = heartbeat_token
 
-        if timeout != 300:  # Only override if not default
+        if timeout is not None:
             global_config.timeout = timeout
 
         if log_file is not None:
@@ -275,6 +280,108 @@ class ConfigMerger:
         ConfigMerger.apply_quiet_verbose_overrides(
             global_config, quiet, verbose, log_level
         )
+
+    @staticmethod
+    def _check_config(check) -> dict:
+        """Unpack a check tuple into its config dict.
+
+        Accepts both (plugin_type, config_dict) tuples and plain config dicts.
+        """
+        if isinstance(check, tuple) and len(check) == 2:
+            return check[1]
+        return check
+
+    @staticmethod
+    def _cli_ssh_config(
+        global_config: GlobalConfig, ssh: Optional[str]
+    ) -> Optional[SSHConfig]:
+        """Resolve the CLI-derived global SSH config, if a CLI SSH host was given.
+
+        Args:
+            global_config: Global configuration (CLI already applied)
+            ssh: CLI-provided SSH connection string
+
+        Raises:
+            ValueError: if a CLI SSH host was given but no global SSH config exists
+        """
+        if not ssh:
+            return None
+        # Invariant: a CLI SSH host implies global ssh config was created by the
+        # CLI SSH setup (validation rejects ssh options without a host).
+        if global_config.ssh is None:
+            raise ValueError(
+                "CLI SSH host provided but no SSH config was created "
+                "(internal invariant violated)"
+            )
+        return global_config.ssh
+
+    @staticmethod
+    def apply_cli_to_checks(
+        checks: list,
+        global_config: GlobalConfig,
+        uptime_kuma_url: Optional[str],
+        token: Optional[str],
+        timeout: Optional[int],
+        ssh: Optional[str],
+    ) -> None:
+        """Enforce CLI values as highest priority over per-check and per-tag config.
+
+        Runs after all merging so the downstream per-check merge respects the
+        CLI values written into the per-check configs.
+
+        Args:
+            checks: List of check tuples (plugin_type, config_dict)
+            global_config: Global configuration (CLI already applied)
+            uptime_kuma_url: CLI-provided Uptime Kuma URL
+            token: CLI-provided Uptime Kuma token
+            timeout: CLI-provided timeout in seconds (None if not provided)
+            ssh: CLI-provided SSH connection string
+
+        Note:
+            Applies only when the CLI value is provided and non-empty:
+            - timeout is forced onto every check when provided (including the
+              DEFAULT_TIMEOUT value, which is no longer used as a sentinel)
+            - uptime_kuma url/token are forced onto checks and tags when a CLI
+              url is given; token requires the CLI url (mirrors
+              apply_cli_to_global_config)
+            - ssh replaces per-check ssh entirely with the CLI-derived global ssh
+        """
+        cli_uptime = bool(uptime_kuma_url)
+        cli_ssh_config = ConfigMerger._cli_ssh_config(global_config, ssh)
+
+        for check in checks:
+            check_config = ConfigMerger._check_config(check)
+
+            if timeout is not None:
+                check_config["timeout"] = timeout
+            if cli_uptime:
+                uptime_kuma = check_config.setdefault("uptime_kuma", {})
+                uptime_kuma["url"] = uptime_kuma_url
+                if token:
+                    uptime_kuma["token"] = token
+            if cli_ssh_config is not None:
+                check_config["ssh"] = cli_ssh_config.model_dump()
+
+        if cli_uptime:
+            ConfigMerger._apply_cli_uptime_to_tags(
+                global_config, uptime_kuma_url, token
+            )
+
+    @staticmethod
+    def _apply_cli_uptime_to_tags(
+        global_config: GlobalConfig,
+        uptime_kuma_url: Optional[str],
+        token: Optional[str],
+    ) -> None:
+        """Enforce CLI uptime_kuma url/token over tag aggregation config."""
+        if not uptime_kuma_url or not global_config.tags:
+            return
+        for tag in global_config.tags.values():
+            uptime_kuma = tag.uptime_kuma or UptimeKumaConfig()
+            uptime_kuma.url = uptime_kuma_url
+            if token:
+                uptime_kuma.token = token
+            tag.uptime_kuma = uptime_kuma
 
     @staticmethod
     def apply_cli_ssh_config(
@@ -301,8 +408,6 @@ class ConfigMerger:
             This method expects pre-parsed SSH connection data.
             Use parse_ssh_connection_string() to extract components from "user@host:port" format.
         """
-        from kuma_scout.plugins.models import SSHConfig
-
         if not global_config.ssh:
             global_config.ssh = SSHConfig(host=host, user=user, port=port or 22)
         else:
@@ -367,12 +472,7 @@ class ConfigMerger:
 
         for check_tuple in checks:
             # Unpack check tuple: (plugin_type, check_config)
-            # check_tuple is expected to be (str, dict)
-            if isinstance(check_tuple, tuple) and len(check_tuple) == 2:
-                check_config = check_tuple[1]
-            else:
-                # Fallback for direct dict format (used in tests)
-                check_config = check_tuple
+            check_config = ConfigMerger._check_config(check_tuple)
 
             # Merge uptime_kuma for this check
             merged_uptime = ConfigMerger.merge_uptime_kuma_config(

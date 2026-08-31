@@ -219,12 +219,12 @@ class TestHeartbeatURLInheritance:
             ),
         )
 
-        ConfigMerger.apply_cli_overrides(
+        ConfigMerger.apply_cli_to_global_config(
             global_config=global_config,
             uptime_kuma_url=None,
             token=None,
             heartbeat_token="cli_token",
-            timeout=300,
+            timeout=None,
             log_file=None,
             log_level=None,
         )
@@ -251,12 +251,12 @@ class TestHeartbeatURLInheritance:
             ),
         )
 
-        ConfigMerger.apply_cli_overrides(
+        ConfigMerger.apply_cli_to_global_config(
             global_config=global_config,
             uptime_kuma_url=None,
             token=None,
             heartbeat_token="cli_token",
-            timeout=300,
+            timeout=None,
             log_file=None,
             log_level=None,
         )

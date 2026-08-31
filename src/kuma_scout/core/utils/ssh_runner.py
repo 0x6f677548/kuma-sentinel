@@ -178,7 +178,7 @@ class SSHRunner:
                 ssh_cmd,
                 capture_output=True,
                 text=True,
-                timeout=self.timeout,
+                timeout=timeout,
                 env=env,
             )
             if result.returncode != 0:

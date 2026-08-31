@@ -73,7 +73,7 @@ class CLIGenerator:
         uptime_kuma_url: Optional[str],
         token: Optional[str],
         heartbeat_token: Optional[str],
-        timeout: int,
+        timeout: Optional[int],
         log_file: Optional[str],
         log_level: Optional[str],
         ssh: Optional[str],
@@ -138,6 +138,11 @@ class CLIGenerator:
             ssh_strict_host_key_checking,
             ssh_no_strict_host_key_checking,
             output_handler,
+        )
+
+        # CLI values have highest priority: enforce them over per-check/per-tag config
+        ConfigMerger.apply_cli_to_checks(
+            checks, global_config, uptime_kuma_url, token, timeout, ssh
         )
 
         return output_handler, global_config, checks
@@ -380,7 +385,7 @@ class CLIGenerator:
         uptime_kuma_url: Optional[str],
         token: Optional[str],
         heartbeat_token: Optional[str],
-        timeout: int,
+        timeout: Optional[int],
         log_file: Optional[str],
         log_level: Optional[str],
         quiet: bool = False,
@@ -393,8 +398,9 @@ class CLIGenerator:
         if heartbeat_token:
             heartbeat_token = os.path.expandvars(heartbeat_token)
 
-        # Apply CLI overrides using ConfigMerger
-        ConfigMerger.apply_cli_overrides(
+        # Apply CLI values to the global config (fallback layer; per-check
+        # precedence is enforced later by ConfigMerger.apply_cli_to_checks)
+        ConfigMerger.apply_cli_to_global_config(
             global_config,
             uptime_kuma_url,
             token,
@@ -692,8 +698,8 @@ class CLIGenerator:
                 "--heartbeat-token",
                 help="Uptime Kuma token for heartbeat (overrides config) ",
             ),
-            timeout: int = typer.Option(
-                300, "--timeout", help="Global timeout for checks (seconds)"
+            timeout: Optional[int] = typer.Option(
+                None, "--timeout", help="Global timeout for checks (seconds)"
             ),
             ssh: Optional[str] = typer.Option(
                 None, "--ssh", help="SSH host (user@host or host) (overrides config)"
@@ -876,8 +882,8 @@ class CLIGenerator:
                 "--heartbeat-token",
                 help="Uptime Kuma token for heartbeat (heartbeat disabled if not provided)",
             ),
-            timeout: int = typer.Option(
-                300, "--timeout", help="Global timeout for checks (seconds)"
+            timeout: Optional[int] = typer.Option(
+                None, "--timeout", help="Global timeout for checks (seconds)"
             ),
             ssh: Optional[str] = typer.Option(
                 None,
@@ -975,7 +981,7 @@ class CLIGenerator:
         uptime_kuma_url: Optional[str],
         token: Optional[str],
         heartbeat_token: Optional[str],
-        timeout: int,
+        timeout: Optional[int],
         ssh: Optional[str],
         ssh_key_file: Optional[str],
         ssh_password: Optional[str],
@@ -1048,6 +1054,10 @@ class CLIGenerator:
         check_config_data = self._build_check_config_data(
             name, retry_attempts, retry_delay_seconds, kwargs
         )
+
+        # CLI --timeout has highest priority, even for the default timeout value
+        if timeout is not None:
+            check_config_data["timeout"] = timeout
 
         # Create plugin config with merged settings (uptime_kuma, ssh, timeout)
         # Uses centralized _create_plugin_config for consistency with run command flow
